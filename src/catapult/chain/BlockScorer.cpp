@@ -110,10 +110,17 @@ namespace catapult { namespace chain {
 	namespace {
 		BlockTarget GetMultiplier(uint64_t timeDiff, const model::BlockChainConfiguration& config) {
 			auto targetTime = config.BlockGenerationTargetTime.seconds();
-			long double smoother = 1.0;
+			double smoother = 1.0;
 			if (0 != config.BlockTimeSmoothingFactor) {
 				double factor = config.BlockTimeSmoothingFactor / 1000.0;
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
+#endif
 				smoother = std::min(std::exp(factor * static_cast<int64_t>(timeDiff - targetTime) / targetTime), 100.0);
+#ifdef __clang__
+#pragma clang diagnostic pop 
+#endif
 			}
 
 			BlockTarget target(static_cast<uint64_t>(Two_To_54 * smoother));
