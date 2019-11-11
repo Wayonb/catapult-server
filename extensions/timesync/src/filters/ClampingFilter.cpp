@@ -34,10 +34,17 @@ namespace catapult { namespace timesync { namespace filters {
 
 	SynchronizationFilter CreateClampingFilter() {
 		return [](const auto& sample, auto nodeAge) {
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
+#endif
 			auto ageToUse = std::max<int64_t>(nodeAge.unwrap() - Start_Decay_After_Round, 0);
 			auto toleratedDeviation = std::max(
 					static_cast<int64_t>(std::exp(-Decay_Strength * ageToUse) * ToInt64(Tolerated_Deviation_Start)),
 					ToInt64(Tolerated_Deviation_Minimum));
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 			auto timeOffsetToRemote = sample.timeOffsetToRemote();
 			return timeOffsetToRemote > toleratedDeviation || -toleratedDeviation > timeOffsetToRemote;
 		};

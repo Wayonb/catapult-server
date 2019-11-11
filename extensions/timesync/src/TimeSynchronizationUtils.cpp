@@ -41,7 +41,14 @@ namespace catapult { namespace timesync {
 				const TimeSynchronizationConfiguration& timeSyncConfig,
 				const config::CatapultConfiguration& config) {
 			auto totalChainImportance = config.BlockChain.TotalChainImportance.unwrap();
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
+#endif
 			auto minImportance = Importance(static_cast<uint64_t>(Required_Minimum_Importance * totalChainImportance));
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 			return ImportanceAwareNodeSelector(ionet::ServiceIdentifier(0x53594E43), timeSyncConfig.MaxNodes, minImportance);
 		}
 

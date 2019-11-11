@@ -35,6 +35,10 @@ namespace catapult { namespace timesync {
 
 		double GetCoupling(NodeAge nodeAge) {
 			auto ageToUse = std::max<int64_t>(nodeAge.unwrap() - filters::Start_Decay_After_Round, 0);
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
+#endif
 			return std::max(std::exp(-Coupling_Decay_Strength * ageToUse) * Coupling_Start, Coupling_Minimum);
 		}
 	}
@@ -97,6 +101,9 @@ namespace catapult { namespace timesync {
 
 			auto importance = importanceView.getAccountImportanceOrDefault(sample.identityKey(), height);
 			return scaling * offset * importance.unwrap() / totalChainImportance;
+#ifdef __clang__
+#pragma clang diagnostic pop 
+#endif
 		});
 	}
 }}

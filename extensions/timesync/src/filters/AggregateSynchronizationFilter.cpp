@@ -40,7 +40,14 @@ namespace catapult { namespace timesync { namespace filters {
 		});
 
 		// alpha trim on both ends
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
+#endif
 		auto samplesToDiscardAtBothEnds = static_cast<size_t>(samples.size() * Alpha / 2);
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 		for (auto i = 0u; i < samplesToDiscardAtBothEnds; ++i) {
 			samples.erase(samples.cbegin());
 			samples.erase(--samples.cend());

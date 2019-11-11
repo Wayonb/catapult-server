@@ -39,10 +39,17 @@ namespace catapult { namespace sync {
 
 		size_t GetMaxTransactions(size_t cacheSize, size_t maxCacheSize, Importance effectiveImportance, Importance totalImportance) {
 			auto slotsLeft = maxCacheSize - cacheSize;
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
+#endif
 			double scaleFactor = std::exp(-3.0 * cacheSize / maxCacheSize);
 
 			// the value 100 is empirical and thus has no special meaning
 			return static_cast<size_t>(scaleFactor * effectiveImportance.unwrap() * slotsLeft * 100 / totalImportance.unwrap());
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 		}
 
 		class TransactionSpamThrottle {
