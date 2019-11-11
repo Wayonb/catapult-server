@@ -19,7 +19,40 @@
 **/
 
 #pragma once
-#define CATAPULT_VERSION_MAJOR 0
-#define CATAPULT_VERSION_MINOR 8
-#define CATAPULT_VERSION_REVISION 0
-#define CATAPULT_VERSION_BUILD 3
+#include "catapult/crypto/KeyPair.h"
+
+namespace catapult { namespace local { class LocalNode; } }
+
+namespace catapult { namespace tools { namespace pipeline {
+
+	/// Facade around LocalNode that allows direct invocation of handlers.
+	class Pipeline {
+	public:
+		/// Process result.
+		enum class ProcessResult {
+			/// Processing was skipped because packet was corrupt.
+			Skipped_Corrupt,
+
+			/// Processing was skipped because packet was unsupported.
+			Skipped_Unsupported,
+
+			/// Proessing was completed.
+			Processed
+		};
+
+	public:
+		/// Creates a pipeline around \a resourcesPath.
+		explicit Pipeline(const std::string& resourcesPath);
+
+		/// Destroys pipeline.
+		~Pipeline();
+
+	public:
+		/// Processes \a buffer.
+		ProcessResult process(const RawBuffer& buffer);
+
+	private:
+		struct Impl;
+		std::unique_ptr<Impl> m_pImpl;
+	};
+}}}

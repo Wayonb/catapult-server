@@ -18,8 +18,22 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#pragma once
-#define CATAPULT_VERSION_MAJOR 0
-#define CATAPULT_VERSION_MINOR 8
-#define CATAPULT_VERSION_REVISION 0
-#define CATAPULT_VERSION_BUILD 3
+#include "../impl/Pipeline.h"
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t* pData, size_t size);
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wexit-time-destructors"
+#endif
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t* pData, size_t size) {
+	static catapult::tools::pipeline::Pipeline pipeline("{RESOURCES_PATH}");
+
+	pipeline.process({ pData, size });
+	return 0;
+}
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
