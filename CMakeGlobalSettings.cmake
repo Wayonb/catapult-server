@@ -67,10 +67,22 @@ if(USE_SANITIZER)
 
 	if(USE_SANITIZER MATCHES "undefined")
 		set(SANITIZATION_FLAGS "${SANITIZATION_FLAGS} -fsanitize=implicit-conversion,nullability")
+		set(SANITIZATION_FLAGS "${SANITIZATION_FLAGS} -fsanitize=address -fno-sanitize-recover=all")
+	endif()
+
+	if(ENABLE_FUZZING AND "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+		 set(SANITIZATION_FLAGS "${SANITIZATION_FLAGS} -fsanitize=fuzzer-no-link")
 	endif()
 
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SANITIZATION_FLAGS}")
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SANITIZATION_FLAGS}")
+endif()
+
+### set fuzzer(only for clang)
+if(ENABLE_FUZZING AND "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+	set(FUZZING_FLAGS "-fsanitize=fuzzer-no-link")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FUZZING_FLAGS}")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${FUZZING_FLAGS}")
 endif()
 
 ### set compiler settings
