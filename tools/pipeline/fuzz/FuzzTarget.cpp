@@ -19,6 +19,7 @@
 **/
 
 #include "../impl/Pipeline.h"
+#include <boost/dll/runtime_symbol_info.hpp>
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* pData, size_t size);
 
@@ -28,7 +29,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* pData, size_t size);
 #endif
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* pData, size_t size) {
-	static catapult::tools::pipeline::Pipeline pipeline("{RESOURCES_PATH}");
+	static catapult::tools::pipeline::Pipeline pipeline(boost::dll::program_location().generic_string());
 
 	pipeline.process({ pData, size });
 	return 0;
