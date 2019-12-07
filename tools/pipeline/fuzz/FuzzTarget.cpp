@@ -20,16 +20,17 @@
 
 #include "../impl/Pipeline.h"
 #include <boost/dll/runtime_symbol_info.hpp>
+#include "catapult/plugins.h"
 
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t* pData, size_t size);
+extern "C" PLUGIN_API int LLVMFuzzerTestOneInput(const uint8_t* pData, size_t size);
 
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wexit-time-destructors"
 #endif
 
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t* pData, size_t size) {
-	static catapult::tools::pipeline::Pipeline pipeline(boost::dll::program_location().generic_string());
+extern "C" PLUGIN_API int LLVMFuzzerTestOneInput(const uint8_t* pData, size_t size) {
+        static catapult::tools::pipeline::Pipeline pipeline(boost::dll::program_location().parent_path().generic_string());
 
 	pipeline.process({ pData, size });
 	return 0;
