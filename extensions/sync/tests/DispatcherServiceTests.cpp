@@ -26,7 +26,6 @@
 #include "catapult/io/IndexFile.h"
 #include "catapult/model/BlockUtils.h"
 #include "catapult/plugins/PluginLoader.h"
-#include "catapult/utils/NetworkTime.h"
 #include "catapult/preprocessor.h"
 #include "tests/test/cache/CacheTestUtils.h"
 #include "tests/test/core/BlockTestUtils.h"
@@ -164,7 +163,7 @@ namespace catapult { namespace sync {
 			using BaseType = test::ServiceLocatorTestContext<DispatcherServiceTraits>;
 
 		public:
-			TestContext() : TestContext(utils::NetworkTime)
+			TestContext() : TestContext(test::CreateDefaultNetworkTimeSupplier())
 			{}
 
 			explicit TestContext(const supplier<Timestamp>& timeSupplier)
@@ -966,6 +965,32 @@ namespace catapult { namespace sync {
 		EXPECT_EQ(0u, context.bannedNodesDeepSize());
 	}
 
+	CONSUMER_FACTORY_TRAITS_BASED_TEST(Dispatcher_NodeIsNotBannedWhenHostIsInLocalNetworks_BlockRange) {
+		// Arrange:
+		TestContext context;
+		const_cast<config::NodeConfiguration&>(context.testState().state().config().Node).LocalNetworks.emplace("123.456.789");
+		context.setBlockValidationResults(ValidationResults(ValidationResult::Failure, ValidationResult::Success));
+		context.boot();
+
+		auto nodeIdentity = model::NodeIdentity{ test::GenerateRandomByteArray<Key>(), "123.456.789.123" };
+		auto pNextBlock = CreateValidBlockForDispatcherTests(GetBlockSignerKeyPair());
+		auto annotatedRange = model::AnnotatedBlockRange(test::CreateEntityRange({ pNextBlock.get() }), nodeIdentity);
+
+		auto factory = TTraits::CreateFactory(context, disruptor::InputSource::Local);
+
+		// Act:
+		TTraits::ConsumeRange(factory, std::move(annotatedRange));
+
+		// - wait a bit to give the service time to consume more if there is a bug in the implementation
+		test::Pause();
+
+		// Assert:
+		EXPECT_EQ(1u, context.counter(Block_Elements_Counter_Name));
+		EXPECT_EQ(0u, context.counter(Transaction_Elements_Counter_Name));
+		EXPECT_EQ(0u, context.bannedNodesSize());
+		EXPECT_EQ(0u, context.bannedNodesDeepSize());
+	}
+
 	CONSUMER_FACTORY_TRAITS_BASED_TEST(Dispatcher_BannedNodesArePruned) {
 		// Arrange:
 		TestContext context(CreateTimeSupplier({ 1, 1, 1, 5 }));
@@ -1020,7 +1045,7 @@ namespace catapult { namespace sync {
 			for (auto& transaction : range) {
 				auto keyPair = test::GenerateKeyPair();
 				transaction.SignerPublicKey = keyPair.publicKey();
-				transaction.Deadline = utils::NetworkTime() + Timestamp(60'000);
+				transaction.Deadline = test::CreateDefaultNetworkTimeSupplier()() + Timestamp(60'000);
 				extensions::TransactionExtensions(test::GetNemesisGenerationHash()).sign(keyPair, transaction);
 			}
 
@@ -1127,7 +1152,7 @@ namespace catapult { namespace sync {
 		auto signer = test::GenerateKeyPair();
 		auto pValidTransaction = test::GenerateRandomTransaction();
 		pValidTransaction->SignerPublicKey = signer.publicKey();
-		pValidTransaction->Deadline = utils::NetworkTime() + Timestamp(60'000);
+		pValidTransaction->Deadline = test::CreateDefaultNetworkTimeSupplier()() + Timestamp(60'000);
 		extensions::TransactionExtensions(test::GetNemesisGenerationHash()).sign(signer, *pValidTransaction);
 
 		auto range = test::CreateEntityRange({ pValidTransaction.get() });
@@ -1171,6 +1196,34 @@ namespace catapult { namespace sync {
 		AssertTransactionRangeConsumeHandlesBanning(transactionValidationResults, CreateSignedTransactionEntityRange(1), 0);
 	}
 
+	TEST(TEST_CLASS, Dispatcher_NodeIsNotBannedWhenHostIsInLocalNetworks_TransactionRange) {
+		// Arrange:
+		ValidationResults transactionValidationResults;
+		transactionValidationResults.Stateless = ValidationResult::Failure;
+		TestContext context;
+		const_cast<config::NodeConfiguration&>(context.testState().state().config().Node).LocalNetworks.emplace("123.456.789");
+		context.setTransactionValidationResults(transactionValidationResults);
+		context.boot();
+		auto factory = context.testState().state().hooks().transactionRangeConsumerFactory()(disruptor::InputSource::Local);
+
+		// Act:
+		auto nodeIdentity = model::NodeIdentity{ test::GenerateRandomByteArray<Key>(), "123.456.789.123" };
+		auto annotatedRange = model::AnnotatedTransactionRange(test::CreateTransactionEntityRange(1), nodeIdentity);
+		factory(std::move(annotatedRange));
+		context.testState().state().tasks()[0].Callback();
+		WAIT_FOR_ONE_EXPR(context.counter(Transaction_Elements_Counter_Name));
+		WAIT_FOR_ZERO_EXPR(context.counter(Transaction_Elements_Active_Counter_Name));
+
+		// - wait a bit to give the service time to consume more if there is a bug in the implementation
+		test::Pause();
+
+		// Assert:
+		EXPECT_EQ(0u, context.counter(Block_Elements_Counter_Name));
+		EXPECT_EQ(1u, context.counter(Transaction_Elements_Counter_Name));
+		EXPECT_EQ(0u, context.bannedNodesSize());
+		EXPECT_EQ(0u, context.bannedNodesDeepSize());
+	}
+
 	TEST(TEST_CLASS, Dispatcher_TransactionRangeFromBannedNodeIsIgnored) {
 		// Arrange:
 		auto signer = test::GenerateKeyPair();
@@ -1200,7 +1253,7 @@ namespace catapult { namespace sync {
 		EXPECT_EQ(1u, context.bannedNodesDeepSize());
 
 		// Act: valid transaction range is not processed
-		pTransaction->Deadline = utils::NetworkTime() + Timestamp(60'000);
+		pTransaction->Deadline = test::CreateDefaultNetworkTimeSupplier()() + Timestamp(60'000);
 		extensions::TransactionExtensions(test::GetNemesisGenerationHash()).sign(signer, *pTransaction);
 
 		auto range2 = model::AnnotatedTransactionRange(test::CreateEntityRange({ pTransaction.get() }), nodeIdentity);
@@ -1272,11 +1325,12 @@ namespace catapult { namespace sync {
 			context.testState().state().tasks()[0].Callback(); // forward all batched transactions to the dispatcher
 
 			// - wait for the transactions to flow through the consumers
+			const auto& utCache = const_cast<const extensions::ServiceState&>(context.testState().state()).utCache();
 			WAIT_FOR_ONE_EXPR(context.counter(Transaction_Elements_Counter_Name));
-			WAIT_FOR_VALUE_EXPR(expectedCacheSize, context.testState().state().utCache().view().size());
+			WAIT_FOR_VALUE_EXPR(expectedCacheSize, utCache.view().size());
 
 			// Assert:
-			EXPECT_EQ(expectedCacheSize, context.testState().state().utCache().view().size());
+			EXPECT_EQ(expectedCacheSize, utCache.view().size());
 			EXPECT_EQ(maxCacheSize - expectedCacheSize, context.numTransactionStatuses());
 		}
 	}

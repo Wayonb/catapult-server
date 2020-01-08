@@ -46,7 +46,8 @@ namespace catapult { namespace model {
 							{ "identifier", "public-test" },
 							{ "nodeEqualityStrategy", "host" },
 							{ "publicKey", Nemesis_Public_Key },
-							{ "generationHash", Nemesis_Generation_Hash }
+							{ "generationHash", Nemesis_Generation_Hash },
+							{ "epochAdjustment", "1234567h" }
 						}
 					},
 					{
@@ -75,6 +76,7 @@ namespace catapult { namespace model {
 
 							{ "totalChainImportance", "88'000'000'000" },
 							{ "minHarvesterBalance", "4'000'000'000" },
+							{ "maxHarvesterBalance", "9'000'000'000" },
 							{ "harvestBeneficiaryPercentage", "56" },
 
 							{ "blockPruneInterval", "432" },
@@ -107,6 +109,7 @@ namespace catapult { namespace model {
 				EXPECT_EQ(static_cast<NodeIdentityEqualityStrategy>(0), config.Network.NodeEqualityStrategy);
 				EXPECT_EQ(Key(), config.Network.PublicKey);
 				EXPECT_EQ(GenerationHash(), config.Network.GenerationHash);
+				EXPECT_EQ(utils::TimeSpan(), config.Network.EpochAdjustment);
 
 				EXPECT_FALSE(config.EnableVerifiableState);
 				EXPECT_FALSE(config.EnableVerifiableReceipts);
@@ -131,6 +134,7 @@ namespace catapult { namespace model {
 
 				EXPECT_EQ(Importance(0), config.TotalChainImportance);
 				EXPECT_EQ(Amount(0), config.MinHarvesterBalance);
+				EXPECT_EQ(Amount(0), config.MaxHarvesterBalance);
 				EXPECT_EQ(0u, config.HarvestBeneficiaryPercentage);
 
 				EXPECT_EQ(0u, config.BlockPruneInterval);
@@ -145,6 +149,7 @@ namespace catapult { namespace model {
 				EXPECT_EQ(NodeIdentityEqualityStrategy::Host, config.Network.NodeEqualityStrategy);
 				EXPECT_EQ(crypto::ParseKey(Nemesis_Public_Key), config.Network.PublicKey);
 				EXPECT_EQ(utils::ParseByteArray<GenerationHash>(Nemesis_Generation_Hash), config.Network.GenerationHash);
+				EXPECT_EQ(utils::TimeSpan::FromHours(1234567), config.Network.EpochAdjustment);
 
 				EXPECT_TRUE(config.EnableVerifiableState);
 				EXPECT_TRUE(config.EnableVerifiableReceipts);
@@ -169,6 +174,7 @@ namespace catapult { namespace model {
 
 				EXPECT_EQ(Importance(88'000'000'000), config.TotalChainImportance);
 				EXPECT_EQ(Amount(4'000'000'000), config.MinHarvesterBalance);
+				EXPECT_EQ(Amount(9'000'000'000), config.MaxHarvesterBalance);
 				EXPECT_EQ(56u, config.HarvestBeneficiaryPercentage);
 
 				EXPECT_EQ(432u, config.BlockPruneInterval);

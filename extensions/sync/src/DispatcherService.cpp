@@ -39,6 +39,7 @@
 #include "catapult/consumers/TransactionConsumers.h"
 #include "catapult/consumers/UndoBlock.h"
 #include "catapult/disruptor/BatchRangeDispatcher.h"
+#include "catapult/extensions/CommitStepHandler.h"
 #include "catapult/extensions/DispatcherUtils.h"
 #include "catapult/extensions/ExecutionConfigurationFactory.h"
 #include "catapult/extensions/LocalNodeChainScore.h"
@@ -91,7 +92,8 @@ namespace catapult { namespace sync {
 				std::vector<DisruptorConsumer>&& disruptorConsumers) {
 			auto& statusSubscriber = state.transactionStatusSubscriber();
 			auto reclaimMemoryInspector = CreateReclaimMemoryInspector();
-			auto inspector = [&statusSubscriber, &nodes = state.nodes(), reclaimMemoryInspector](
+			const auto& localNetworks = state.config().Node.LocalNetworks;
+			auto inspector = [&statusSubscriber, &nodes = state.nodes(), &localNetworks, reclaimMemoryInspector](
 					auto& input,
 					const auto& completionResult) {
 				statusSubscriber.flush();
@@ -100,8 +102,13 @@ namespace catapult { namespace sync {
 
 				auto nodesModifier = nodes.modifier();
 				nodesModifier.pruneBannedNodes();
-				if (ConsumerResultSeverity::Fatal == completionResult.ResultSeverity)
-					nodesModifier.ban(input.sourceIdentity(), completionResult.CompletionCode);
+				const auto& identity = input.sourceIdentity();
+				if (ConsumerResultSeverity::Fatal == completionResult.ResultSeverity) {
+					if (config::IsLocalHost(identity.Host, localNetworks))
+						CATAPULT_LOG(debug) << "bypassing banning of " << identity << " because host is contained in local networks";
+					else
+						nodesModifier.ban(identity, completionResult.CompletionCode);
+				}
 
 				reclaimMemoryInspector(input, completionResult);
 			};
@@ -180,7 +187,7 @@ namespace catapult { namespace sync {
 			auto dataDirectory = config::CatapultDataDirectory(state.config().User.DataDirectory);
 			syncHandlers.PreStateWritten = [](const auto&, auto) {};
 			syncHandlers.TransactionsChange = state.hooks().transactionsChangeHandler();
-			syncHandlers.CommitStep = CreateCommitStepHandler(dataDirectory);
+			syncHandlers.CommitStep = extensions::CreateCommitStepHandler(dataDirectory);
 
 			if (state.config().Node.EnableCacheDatabaseStorage)
 				AddSupplementalDataResiliency(syncHandlers, dataDirectory, state.cache(), state.score());
@@ -208,7 +215,8 @@ namespace catapult { namespace sync {
 			std::shared_ptr<ConsumerDispatcher> build(
 					const std::shared_ptr<thread::IoThreadPool>& pValidatorPool,
 					RollbackInfo& rollbackInfo) {
-				auto requiresValidationPredicate = ToRequiresValidationPredicate(m_state.hooks().knownHashPredicate(m_state.utCache()));
+				const auto& utCache = const_cast<const extensions::ServiceState&>(m_state).utCache();
+				auto requiresValidationPredicate = ToRequiresValidationPredicate(m_state.hooks().knownHashPredicate(utCache));
 				m_consumers.push_back(CreateBlockChainCheckConsumer(
 						m_nodeConfig.MaxBlocksPerSyncAttempt,
 						m_state.config().BlockChain.MaxBlockFutureTime,
@@ -232,7 +240,11 @@ namespace catapult { namespace sync {
 				if (m_state.config().Node.EnableAutoSyncCleanup)
 					disruptorConsumers.push_back(CreateBlockChainSyncCleanupConsumer(m_state.config().User.DataDirectory));
 
-				disruptorConsumers.push_back(CreateNewBlockConsumer(m_state.hooks().newBlockSink(), InputSource::Local));
+				// forward locally harvested blocks and blocks pushed by partners
+				auto newBlockSinkSourceMask = static_cast<InputSource>(
+						utils::to_underlying_type(InputSource::Local)
+						| utils::to_underlying_type(InputSource::Remote_Push));
+				disruptorConsumers.push_back(CreateNewBlockConsumer(m_state.hooks().newBlockSink(), newBlockSinkSourceMask));
 				return CreateConsumerDispatcher(
 						m_state,
 						CreateBlockConsumerDispatcherOptions(m_nodeConfig),
@@ -282,13 +294,14 @@ namespace catapult { namespace sync {
 
 		public:
 			void addHashConsumers() {
+				const auto& utCache = const_cast<const extensions::ServiceState&>(m_state).utCache();
 				m_consumers.push_back(CreateTransactionHashCalculatorConsumer(
 						m_state.config().BlockChain.Network.GenerationHash,
 						m_state.pluginManager().transactionRegistry()));
 				m_consumers.push_back(CreateTransactionHashCheckConsumer(
 						m_state.timeSupplier(),
 						extensions::CreateHashCheckOptions(m_nodeConfig.ShortLivedCacheTransactionDuration, m_nodeConfig),
-						m_state.hooks().knownHashPredicate(m_state.utCache())));
+						m_state.hooks().knownHashPredicate(utCache)));
 			}
 
 			std::shared_ptr<ConsumerDispatcher> build(

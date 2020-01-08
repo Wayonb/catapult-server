@@ -26,6 +26,7 @@
 #include "NodeUtils.h"
 #include "StaticNodeRefreshService.h"
 #include "catapult/config/CatapultDataDirectory.h"
+#include "catapult/extensions/CommitStepHandler.h"
 #include "catapult/extensions/ConfigurationUtils.h"
 #include "catapult/extensions/LocalNodeChainScore.h"
 #include "catapult/extensions/LocalNodeStateFileStorage.h"
@@ -90,7 +91,7 @@ namespace catapult { namespace local {
 							m_config.Node.MaxTrackedNodes,
 							m_config.BlockChain.Network.NodeEqualityStrategy,
 							GetBanSettings(m_config.Node.Banning),
-							m_pBootstrapper->extensionManager().networkTimeSupplier())
+							m_pBootstrapper->extensionManager().networkTimeSupplier(m_config.BlockChain.Network.EpochAdjustment))
 					, m_catapultCache({}) // note that sub caches are added in boot
 					, m_storage(
 							m_pBootstrapper->subscriptionManager().createBlockStorage(m_pBlockChangeSubscriber),
@@ -136,8 +137,8 @@ namespace catapult { namespace local {
 						m_catapultCache,
 						m_storage,
 						m_score,
-						*m_pUtCache,
-						extensionManager.networkTimeSupplier(),
+						m_pUtCache->get(),
+						extensionManager.networkTimeSupplier(m_config.BlockChain.Network.EpochAdjustment),
 						*m_pTransactionStatusSubscriber,
 						*m_pStateChangeSubscriber,
 						*m_pNodeSubscriber,
@@ -183,6 +184,10 @@ namespace catapult { namespace local {
 					notifier.raise(*m_pBlockChangeSubscriber);
 
 				notifier.raise(*m_pStateChangeSubscriber);
+
+				// indicate the nemesis block is fully updated so that it can be processed downstream immediately
+				auto commitStep = extensions::CreateCommitStepHandler(m_dataDirectory);
+				commitStep(consumers::CommitOperationStep::All_Updated);
 
 				// skip next *two* messages because subscriber creates two files during raise (score change and state change)
 				if (m_config.Node.EnableAutoSyncCleanup)

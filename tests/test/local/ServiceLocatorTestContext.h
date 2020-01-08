@@ -45,7 +45,7 @@ namespace catapult { namespace test {
 		{}
 
 		/// Creates the test state around \a cache.
-		explicit ServiceTestState(cache::CatapultCache&& cache) : ServiceTestState(std::move(cache), &utils::NetworkTime)
+		explicit ServiceTestState(cache::CatapultCache&& cache) : ServiceTestState(std::move(cache), CreateDefaultNetworkTimeSupplier())
 		{}
 
 		/// Creates the test state around \a cache and \a timeSupplier.
@@ -67,7 +67,7 @@ namespace catapult { namespace test {
 						m_catapultCache,
 						m_storage,
 						m_score,
-						*m_pUtCache,
+						m_pUtCache->get(),
 						timeSupplier,
 						m_transactionStatusSubscriber,
 						m_stateChangeSubscriber,
@@ -156,7 +156,7 @@ namespace catapult { namespace test {
 
 		/// Creates the test context around \a cache.
 		explicit ServiceLocatorTestContext(cache::CatapultCache&& cache)
-				: ServiceLocatorTestContext(std::move(cache), &utils::NetworkTime)
+				: ServiceLocatorTestContext(std::move(cache), CreateDefaultNetworkTimeSupplier())
 		{}
 
 		/// Creates the test context around \a cache and \a timeSupplier.

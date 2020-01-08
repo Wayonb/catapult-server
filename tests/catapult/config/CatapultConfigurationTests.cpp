@@ -79,6 +79,7 @@ namespace catapult { namespace config {
 
 			EXPECT_EQ(Importance(15'000'000), config.TotalChainImportance);
 			EXPECT_EQ(Amount(500), config.MinHarvesterBalance);
+			EXPECT_EQ(Amount(4'000'000), config.MaxHarvesterBalance);
 			EXPECT_EQ(10u, config.HarvestBeneficiaryPercentage);
 
 			EXPECT_EQ(360u, config.BlockPruneInterval);
@@ -101,7 +102,7 @@ namespace catapult { namespace config {
 			EXPECT_TRUE(config.EnableTransactionSpamThrottling);
 			EXPECT_EQ(Amount(10'000'000), config.TransactionSpamThrottlingMaxBoostFee);
 
-			EXPECT_EQ(400u, config.MaxBlocksPerSyncAttempt);
+			EXPECT_EQ(42u, config.MaxBlocksPerSyncAttempt);
 			EXPECT_EQ(utils::FileSize::FromMegabytes(100), config.MaxChainBytesPerSyncAttempt);
 
 			EXPECT_EQ(utils::TimeSpan::FromMinutes(10), config.ShortLivedCacheTransactionDuration);
