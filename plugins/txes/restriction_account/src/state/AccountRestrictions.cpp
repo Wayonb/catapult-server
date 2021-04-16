@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,12 +25,12 @@
 namespace catapult { namespace state {
 
 	AccountRestrictions::AccountRestrictions(const Address& address) : m_address(address) {
+		constexpr auto Outgoing = model::AccountRestrictionFlags::Outgoing;
+
 		addRestriction(model::AccountRestrictionFlags::Address, Address::Size);
-		addRestriction(model::AccountRestrictionFlags::Address | model::AccountRestrictionFlags::Outgoing, Address::Size);
 		addRestriction(model::AccountRestrictionFlags::MosaicId, sizeof(MosaicId));
-		addRestriction(
-				model::AccountRestrictionFlags::TransactionType | model::AccountRestrictionFlags::Outgoing,
-				sizeof(model::EntityType));
+		addRestriction(model::AccountRestrictionFlags::Address | Outgoing, Address::Size);
+		addRestriction(model::AccountRestrictionFlags::TransactionType | Outgoing, sizeof(model::EntityType));
 	}
 
 	const Address& AccountRestrictions::address() const {

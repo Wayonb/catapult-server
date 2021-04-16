@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,7 +23,7 @@
 #include "CalculatorUtils.h"
 #include "catapult/cache_core/AccountStateCache.h"
 #include "catapult/model/BlockChainConfiguration.h"
-#include "catapult/model/ImportanceHeight.h"
+#include "catapult/model/HeightGrouping.h"
 #include "catapult/state/AccountImportanceSnapshots.h"
 #include "catapult/utils/StackLogger.h"
 #include <boost/multiprecision/cpp_int.hpp>
@@ -38,12 +39,15 @@ namespace catapult { namespace importance {
 			{}
 
 		public:
-			void recalculate(model::ImportanceHeight importanceHeight, cache::AccountStateCacheDelta& cache) const override {
-				utils::StackLogger stopwatch("PosImportanceCalculator::recalculate", utils::LogLevel::Debug);
+			void recalculate(
+					ImportanceRollbackMode,
+					model::ImportanceHeight importanceHeight,
+					cache::AccountStateCacheDelta& cache) const override {
+				utils::StackLogger stopwatch("PosImportanceCalculator::recalculate", utils::LogLevel::debug);
 
 				// 1. get high value accounts (notice two step lookup because only const iteration is supported)
-				auto highValueAddressesTuple = cache.highValueAddresses();
-				const auto& highValueAddresses = highValueAddressesTuple.Current;
+				const auto& highValueAccounts = cache.highValueAccounts();
+				const auto& highValueAddresses = highValueAccounts.addresses();
 				std::vector<AccountSummary> accountSummaries;
 				accountSummaries.reserve(highValueAddresses.size());
 
@@ -81,21 +85,12 @@ namespace catapult { namespace importance {
 					accountSummary.pAccountState->ImportanceSnapshots.set(effectiveImportance, importanceHeight);
 				}
 
-				CATAPULT_LOG(debug) << "recalculated importances (" << highValueAddresses.size() << " / " << cache.size() << " eligible)";
+				CATAPULT_LOG(debug)
+						<< "recalculated importances (" << highValueAddresses.size() << " / " << cache.size() << " eligible)"
+						<< " at height " << importanceHeight;
 
 				// 5. disable collection of activity for the removed accounts
-				const auto& removedHighValueAddresses = highValueAddressesTuple.Removed;
-				for (const auto& address : removedHighValueAddresses) {
-					auto accountStateIter = cache.find(address);
-					if (!accountStateIter.tryGet())
-						continue;
-
-					auto& accountState = accountStateIter.get();
-					auto& activityBuckets = accountState.ActivityBuckets;
-					auto currentBucket = activityBuckets.get(importanceHeight);
-					if (currentBucket.StartHeight == importanceHeight)
-						activityBuckets.pop();
-				}
+				cache.processHighValueRemovedAccounts(importanceHeight);
 			}
 
 		private:

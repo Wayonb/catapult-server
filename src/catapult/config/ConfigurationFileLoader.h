@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,7 +22,7 @@
 #pragma once
 #include "PeersConfiguration.h"
 #include "catapult/utils/ConfigurationBag.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <iostream>
 
 namespace catapult { namespace config {
@@ -31,8 +32,8 @@ namespace catapult { namespace config {
 			typename TConfigurationLoader,
 			typename TConfiguration = std::invoke_result_t<TConfigurationLoader, const std::string&>
 	>
-	TConfiguration LoadConfiguration(const boost::filesystem::path& path, TConfigurationLoader loader) {
-		if (!boost::filesystem::exists(path)) {
+	TConfiguration LoadConfiguration(const std::filesystem::path& path, TConfigurationLoader loader) {
+		if (!std::filesystem::exists(path)) {
 			auto message = "aborting load due to missing configuration file";
 			CATAPULT_LOG(fatal) << message << ": " << path;
 			CATAPULT_THROW_EXCEPTION(catapult_runtime_error(message));
@@ -44,18 +45,18 @@ namespace catapult { namespace config {
 
 	/// Loads ini configuration from \a path.
 	template<typename TConfiguration>
-	TConfiguration LoadIniConfiguration(const boost::filesystem::path& path) {
+	TConfiguration LoadIniConfiguration(const std::filesystem::path& path) {
 		return LoadConfiguration(path, [](const auto& filePath) {
 			return TConfiguration::LoadFromBag(utils::ConfigurationBag::FromPath(filePath));
 		});
 	}
 
-	/// Loads peers configuration from \a path for network \a networkIdentifier.
+	/// Loads peers configuration from \a path for network \a networkFingerprint.
 	inline std::vector<ionet::Node> LoadPeersConfiguration(
-			const boost::filesystem::path& path,
-			model::NetworkIdentifier networkIdentifier) {
-		return LoadConfiguration(path, [networkIdentifier](const auto& filePath) {
-			return LoadPeersFromPath(filePath, networkIdentifier);
+			const std::filesystem::path& path,
+			const model::UniqueNetworkFingerprint& networkFingerprint) {
+		return LoadConfiguration(path, [networkFingerprint](const auto& filePath) {
+			return LoadPeersFromPath(filePath, networkFingerprint);
 		});
 	}
 }}

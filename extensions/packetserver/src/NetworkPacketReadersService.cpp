@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,10 +20,12 @@
 **/
 
 #include "NetworkPacketReadersService.h"
+#include "catapult/config/CatapultKeys.h"
 #include "catapult/extensions/NetworkUtils.h"
 #include "catapult/extensions/PeersConnectionTasks.h"
 #include "catapult/extensions/ServiceLocator.h"
 #include "catapult/extensions/ServiceState.h"
+#include "catapult/extensions/ServiceUtils.h"
 #include "catapult/thread/MultiServicePool.h"
 
 namespace catapult { namespace packetserver {
@@ -32,12 +35,7 @@ namespace catapult { namespace packetserver {
 		constexpr auto Service_Id = ionet::ServiceIdentifier(0x52454144);
 
 		thread::Task CreateAgePeersTask(extensions::ServiceState& state, net::ConnectionContainer& connectionContainer) {
-			auto settings = extensions::SelectorSettings(
-					state.cache(),
-					state.config().BlockChain.TotalChainImportance,
-					state.nodes(),
-					Service_Id,
-					state.config().Node.IncomingConnections);
+			auto settings = extensions::CreateIncomingSelectorSettings(state, Service_Id);
 			auto task = extensions::CreateAgePeersTask(settings, connectionContainer);
 			task.Name += " for service Readers";
 			return task;
@@ -61,7 +59,7 @@ namespace catapult { namespace packetserver {
 				auto pReaders = pServiceGroup->pushService(
 						net::CreatePacketReaders,
 						state.packetHandlers(),
-						locator.keyPair(),
+						locator.keys().caPublicKey(),
 						extensions::GetConnectionSettings(config),
 						config.Node.MaxIncomingConnectionsPerIdentity);
 				extensions::BootServer(
@@ -74,6 +72,9 @@ namespace catapult { namespace packetserver {
 						*pReaders);
 
 				locator.registerService(Service_Name, pReaders);
+
+				// add sinks
+				state.hooks().addBannedNodeIdentitySink(extensions::CreateCloseConnectionSink(*pReaders));
 
 				// add tasks
 				state.tasks().push_back(CreateAgePeersTask(state, *pReaders));

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -30,7 +31,8 @@ namespace catapult { namespace subscribers {
 #define TEST_CLASS BlockChangeReaderTests
 
 	namespace {
-		constexpr auto Empty_Block_Element_Size = sizeof(model::BlockHeader) + 2 * Hash256::Size + 2 * sizeof(uint32_t);
+		constexpr auto Empty_Block_Element_Size = sizeof(model::BlockHeader) + sizeof(model::PaddedBlockFooter)
+				+ 2 * (Hash256::Size + sizeof(uint32_t));
 
 		std::vector<uint8_t> CreateSerializedDataBuffer(BlockChangeOperationType operationType, Height height) {
 			std::vector<uint8_t> buffer(1 + sizeof(Height));

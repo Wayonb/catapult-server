@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,9 +24,10 @@
 #include "PtUtils.h"
 #include "partialtransaction/src/chain/PtUpdater.h"
 #include "partialtransaction/src/chain/PtValidator.h"
-#include "partialtransaction/src/handlers/CosignatureHandler.h"
+#include "partialtransaction/src/handlers/CosignatureHandlers.h"
 #include "partialtransaction/src/handlers/PtHandlers.h"
 #include "catapult/cache_tx/MemoryPtCache.h"
+#include "catapult/chain/TransactionUpdateResultUtils.h"
 #include "catapult/consumers/RecentHashCache.h"
 #include "catapult/consumers/ReclaimMemoryInspector.h"
 #include "catapult/consumers/TransactionConsumers.h"
@@ -39,25 +41,23 @@
 
 using namespace catapult::consumers;
 using namespace catapult::disruptor;
-using namespace catapult::extensions;
 
 namespace catapult { namespace partialtransaction {
 
 	namespace {
 		constexpr auto Service_Name = "pt.dispatcher";
-		constexpr auto Api_Partial_Service_Name = "api.partial";
+		constexpr auto Writers_Service_Name = "pt.writers";
 
 		using CosignaturesSink = consumer<const std::vector<model::DetachedCosignature>&>;
 
 		Hash256 ToHash(const model::DetachedCosignature& cosignature) {
 			// the R-part of the signature is good enough for a hash
-			Hash256 hash;
-			std::memcpy(hash.data(), cosignature.Signature.data(), Hash256::Size);
-			return hash;
+			return cosignature.Signature.copyTo<Hash256>();
 		}
 
 		ConsumerDispatcherOptions CreateTransactionConsumerDispatcherOptions(const config::NodeConfiguration& config) {
-			auto options = ConsumerDispatcherOptions("partial transaction dispatcher", config.TransactionDisruptorSize);
+			auto options = ConsumerDispatcherOptions("partial transaction dispatcher", config.TransactionDisruptorSlotCount);
+			options.DisruptorMaxMemorySize = config.TransactionDisruptorMaxMemorySize;
 			options.ElementTraceInterval = config.TransactionElementTraceInterval;
 			options.ShouldThrowWhenFull = config.EnableDispatcherAbortWhenFull;
 			return options;
@@ -70,7 +70,7 @@ namespace catapult { namespace partialtransaction {
 			return std::make_unique<ConsumerDispatcher>(options, consumers, reclaimMemoryInspector);
 		}
 
-		auto CreateKnownHashPredicate(const cache::MemoryPtCacheProxy& ptCache, ServiceState& state) {
+		auto CreateKnownHashPredicate(const cache::MemoryPtCacheProxy& ptCache, extensions::ServiceState& state) {
 			const auto& utCache = const_cast<const extensions::ServiceState&>(state).utCache();
 			auto knownHashPredicate = state.hooks().knownHashPredicate(utCache);
 			return [&ptCache, knownHashPredicate](auto timestamp, const auto& hash) {
@@ -81,12 +81,12 @@ namespace catapult { namespace partialtransaction {
 		auto CreateNewTransactionSink(const extensions::ServiceLocator& locator) {
 			return extensions::CreatePushEntitySink<extensions::SharedNewTransactionsSink>(
 					locator,
-					Api_Partial_Service_Name,
+					Writers_Service_Name,
 					ionet::PacketType::Push_Partial_Transactions);
 		}
 
 		auto CreateNewCosignaturesSink(const extensions::ServiceLocator& locator) {
-			return extensions::CreatePushEntitySink<CosignaturesSink>(locator, Api_Partial_Service_Name);
+			return extensions::CreatePushEntitySink<CosignaturesSink>(locator, Writers_Service_Name);
 		}
 
 		class TransactionDispatcherBuilder {
@@ -99,7 +99,7 @@ namespace catapult { namespace partialtransaction {
 		public:
 			void addHashConsumers(const cache::MemoryPtCacheProxy& ptCache) {
 				m_consumers.push_back(CreateTransactionHashCalculatorConsumer(
-						m_state.config().BlockChain.Network.GenerationHash,
+						m_state.config().BlockChain.Network.GenerationHashSeed,
 						m_state.pluginManager().transactionRegistry()));
 				m_consumers.push_back(CreateTransactionHashCheckConsumer(
 						m_state.timeSupplier(),
@@ -109,16 +109,21 @@ namespace catapult { namespace partialtransaction {
 
 			std::shared_ptr<ConsumerDispatcher> build(
 					chain::PtUpdater& ptUpdater,
-					const extensions::SharedNewTransactionsSink& newTransactionSink) {
+					const extensions::SharedNewTransactionsSink& newTransactionsSink) {
+				const auto& banningConfig = m_nodeConfig.Banning;
 				auto disruptorConsumers = DisruptorConsumersFromTransactionConsumers(m_consumers);
-				disruptorConsumers.push_back(CreateNewTransactionsConsumer([&ptUpdater, newTransactionSink](auto&& transactionInfos) {
-					newTransactionSink(transactionInfos);
-					std::vector<thread::future<chain::TransactionUpdateResult>> futures;
-					for (const auto& transactionInfo : transactionInfos)
-						futures.push_back(ptUpdater.update(transactionInfo));
+				disruptorConsumers.push_back(CreateNewTransactionsConsumer(
+						banningConfig.MinTransactionFailuresCountForBan,
+						banningConfig.MinTransactionFailuresPercentForBan,
+						[&ptUpdater, newTransactionsSink](auto&& transactionInfos) {
+							std::vector<thread::future<chain::PtUpdateResult>> futures;
+							for (const auto& transactionInfo : transactionInfos)
+								futures.push_back(ptUpdater.update(transactionInfo));
 
-					thread::when_all(std::move(futures)).get();
-				}));
+							auto updateResults = thread::get_all(std::move(futures));
+							newTransactionsSink(chain::SelectValid(std::move(transactionInfos), updateResults));
+							return chain::AggregateUpdateResults(updateResults);
+						}));
 
 				return CreateConsumerDispatcher(CreateTransactionConsumerDispatcherOptions(m_nodeConfig), disruptorConsumers);
 			}
@@ -167,26 +172,26 @@ namespace catapult { namespace partialtransaction {
 					*pDispatcher,
 					state.config().BlockChain.Network.NodeEqualityStrategy);
 			locator.registerRootedService("pt.dispatcher.batch", pBatchRangeDispatcher);
+			auto& batchRangeDispatcher = *pBatchRangeDispatcher;
 
 			// register hooks
 			const auto& nodeConfig = state.config().Node;
-			auto pRecentHashCache = std::make_shared<RecentHashCache>(
+			auto pRecentHashCache = std::make_shared<SynchronizedRecentHashCache>(
 					state.timeSupplier(),
 					extensions::CreateHashCheckOptions(nodeConfig.ShortLivedCacheTransactionDuration, nodeConfig));
+
 			auto cosignaturesSink = CreateNewCosignaturesSink(locator);
-			auto pCacheLock = std::make_shared<utils::SpinLock>();
 			auto& hooks = GetPtServerHooks(locator);
-			hooks.setCosignedTransactionInfosConsumer(
-					[&dispatcher = *pBatchRangeDispatcher, &ptUpdater, pRecentHashCache, cosignaturesSink, pCacheLock](auto&& infos) {
-				CATAPULT_LOG(debug) << "pushing infos " << infos.size() << " to pt dispatcher";
+			hooks.setCosignedTransactionInfosConsumer([&batchRangeDispatcher, &ptUpdater, pRecentHashCache, cosignaturesSink](
+					auto&& transactionInfos) {
+				CATAPULT_LOG(debug) << "pushing " << transactionInfos.size() << " transaction infos to pt dispatcher";
 				std::vector<model::DetachedCosignature> newCosignatures;
 				SplitCosignedTransactionInfos(
-						std::move(infos),
-						[&dispatcher](auto&& transactionRange) {
-							dispatcher.queue(std::move(transactionRange), InputSource::Remote_Pull);
+						std::move(transactionInfos),
+						[&batchRangeDispatcher](auto&& transactionRange) {
+							batchRangeDispatcher.queue(std::move(transactionRange), InputSource::Remote_Pull);
 						},
-						[&ptUpdater, &newCosignatures, pRecentHashCache, pCacheLock](auto&& cosignature) {
-							utils::SpinLockGuard guard(*pCacheLock);
+						[&ptUpdater, &newCosignatures, pRecentHashCache](auto&& cosignature) {
 							if (pRecentHashCache->add(ToHash(cosignature))) {
 								ptUpdater.update(cosignature);
 								newCosignatures.push_back(cosignature);
@@ -197,12 +202,17 @@ namespace catapult { namespace partialtransaction {
 					cosignaturesSink(newCosignatures);
 			});
 
-			hooks.setPtRangeConsumer([&dispatcher = *pBatchRangeDispatcher](auto&& transactionRange) {
-				dispatcher.queue(std::move(transactionRange), InputSource::Remote_Push);
+			auto shouldProcessTransactions = extensions::CreateShouldProcessTransactionsPredicate(state);
+			hooks.setPtRangeConsumer([shouldProcessTransactions, &batchRangeDispatcher](auto&& transactionRange) {
+				if (!shouldProcessTransactions()) {
+					CATAPULT_LOG(trace) << "ignoring push due to should process transactions predicate";
+					return;
+				}
+
+				batchRangeDispatcher.queue(std::move(transactionRange), InputSource::Remote_Push);
 			});
 
-			hooks.setCosignatureRangeConsumer([&ptUpdater, pRecentHashCache, cosignaturesSink, pCacheLock](auto&& cosignatureRange) {
-				utils::SpinLockGuard guard(*pCacheLock);
+			hooks.setCosignatureRangeConsumer([&ptUpdater, pRecentHashCache, cosignaturesSink](auto&& cosignatureRange) {
 				std::vector<model::DetachedCosignature> newCosignatures;
 				for (const auto& cosignature : cosignatureRange.Range) {
 					if (pRecentHashCache->add(ToHash(cosignature))) {
@@ -215,11 +225,11 @@ namespace catapult { namespace partialtransaction {
 					cosignaturesSink(newCosignatures);
 			});
 
-			state.tasks().push_back(extensions::CreateBatchTransactionTask(*pBatchRangeDispatcher, "partial transaction"));
+			state.tasks().push_back(extensions::CreateBatchTransactionTask(batchRangeDispatcher, "partial transaction"));
 		}
 
-		std::unique_ptr<chain::PtUpdater> CreateAndRegisterPtUpdater(cache::MemoryPtCacheProxy& ptCache, extensions::ServiceState& state) {
-			auto pUpdaterPool = state.pool().pushIsolatedPool("ptUpdater");
+		std::unique_ptr<chain::PtUpdater> CreatePtUpdater(cache::MemoryPtCacheProxy& ptCache, extensions::ServiceState& state) {
+			auto* pUpdaterPool = state.pool().pushIsolatedPool("ptUpdater");
 
 			// validator needs to be created here because bootstrapper does not have cache nor all validators registered
 			auto pValidator = chain::CreatePtValidator(state.cache(), state.timeSupplier(), state.pluginManager());
@@ -233,23 +243,23 @@ namespace catapult { namespace partialtransaction {
 						consumer(model::TransactionRange::FromEntity(std::move(pTransaction)));
 					},
 					extensions::SubscriberToSink(state.transactionStatusSubscriber()),
-					pUpdaterPool);
+					*pUpdaterPool);
 		}
 
-		class PtDispatcherServiceRegistrar : public ServiceRegistrar {
+		class PtDispatcherServiceRegistrar : public extensions::ServiceRegistrar {
 		public:
-			ServiceRegistrarInfo info() const override {
-				return { "PtDispatcher", ServiceRegistrarPhase::Post_Range_Consumers };
+			extensions::ServiceRegistrarInfo info() const override {
+				return { "PtDispatcher", extensions::ServiceRegistrarPhase::Post_Range_Consumers };
 			}
 
-			void registerServiceCounters(ServiceLocator& locator) override {
+			void registerServiceCounters(extensions::ServiceLocator& locator) override {
 				extensions::AddDispatcherCounters(locator, Service_Name, "PT");
 			}
 
-			void registerServices(ServiceLocator& locator, ServiceState& state) override {
+			void registerServices(extensions::ServiceLocator& locator, extensions::ServiceState& state) override {
 				// partial transaction updater
 				auto& ptCache = GetMemoryPtCache(locator);
-				auto pPtUpdater = CreateAndRegisterPtUpdater(ptCache, state);
+				auto pPtUpdater = CreatePtUpdater(ptCache, state);
 
 				// partial transaction dispatcher
 				auto pServiceGroup = state.pool().pushServiceGroup("partial dispatcher");
@@ -265,7 +275,7 @@ namespace catapult { namespace partialtransaction {
 		};
 	}
 
-	std::unique_ptr<ServiceRegistrar> CreatePtDispatcherServiceRegistrar() {
+	std::unique_ptr<extensions::ServiceRegistrar> CreatePtDispatcherServiceRegistrar() {
 		return std::make_unique<PtDispatcherServiceRegistrar>();
 	}
 }}

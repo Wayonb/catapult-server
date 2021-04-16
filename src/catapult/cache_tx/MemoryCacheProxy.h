@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -57,9 +58,9 @@ namespace catapult { namespace cache {
 			return m_memoryCache;
 		}
 
-		/// Gets the underlying (non-const) read write cache.
-		CacheReadWriteInterface& get() {
-			return m_memoryCache;
+		/// Gets the underlying (non-const) write only cache.
+		CacheWriteOnlyInterface& get() {
+			return *m_pCache;
 		}
 
 	public:

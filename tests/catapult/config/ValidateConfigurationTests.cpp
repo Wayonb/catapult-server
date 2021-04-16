@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -30,10 +31,6 @@ namespace catapult { namespace config {
 #define TEST_CLASS ValidateConfigurationTests
 
 	namespace {
-		// the key is invalid because it contains a non hex char ('G')
-		const char* Invalid_Private_Key = "3485D98EFD7EB07ABAFCFD1A157D89DE2G96A95E780813C0258AF3F5F84ED8CB";
-		const char* Valid_Private_Key = "3485D98EFD7EB07ABAFCFD1A157D89DE2796A95E780813C0258AF3F5F84ED8CB";
-
 		auto CreateMutableCatapultConfiguration() {
 			test::MutableCatapultConfiguration config;
 
@@ -44,38 +41,14 @@ namespace catapult { namespace config {
 			auto& inflationConfig = config.Inflation;
 			inflationConfig.InflationCalculator.add(Height(1), Amount(1));
 			inflationConfig.InflationCalculator.add(Height(100), Amount());
-
-			auto& userConfig = config.User;
-			userConfig.BootPrivateKey = Valid_Private_Key;
-
 			return config;
 		}
 	}
 
-	// region boot key validation
-
-	namespace {
-		void AssertInvalidBootPrivateKey(const std::string& bootPrivateKey) {
-			// Arrange:
-			auto mutableConfig = CreateMutableCatapultConfiguration();
-			mutableConfig.User.BootPrivateKey = bootPrivateKey;
-
-			// Act + Assert:
-			EXPECT_THROW(ValidateConfiguration(mutableConfig.ToConst()), utils::property_malformed_error);
-		}
-	}
-
-	TEST(TEST_CLASS, ValidationFailsWhenBootPrivateKeyIsInvalid) {
-		AssertInvalidBootPrivateKey(Invalid_Private_Key);
-		AssertInvalidBootPrivateKey("");
-	}
-
-	// endregion
-
 	// region importance grouping validation
 
 	namespace {
-		auto CreateCatapultConfiguration(uint32_t importanceGrouping, uint32_t maxRollbackBlocks) {
+		auto CreateCatapultConfigurationWithImportanceGrouping(uint32_t importanceGrouping, uint32_t maxRollbackBlocks) {
 			auto mutableConfig = CreateMutableCatapultConfiguration();
 			mutableConfig.BlockChain.ImportanceGrouping = importanceGrouping;
 			mutableConfig.BlockChain.MaxRollbackBlocks = maxRollbackBlocks;
@@ -86,12 +59,12 @@ namespace catapult { namespace config {
 	TEST(TEST_CLASS, ImportanceGroupingIsValidatedAgainstMaxRollbackBlocks) {
 		// Arrange:
 		auto assertNoThrow = [](uint32_t importanceGrouping, uint32_t maxRollbackBlocks) {
-			auto config = CreateCatapultConfiguration(importanceGrouping, maxRollbackBlocks);
+			auto config = CreateCatapultConfigurationWithImportanceGrouping(importanceGrouping, maxRollbackBlocks);
 			EXPECT_NO_THROW(ValidateConfiguration(config)) << "IG " << importanceGrouping << ", MRB " << maxRollbackBlocks;
 		};
 
 		auto assertThrow = [](uint32_t importanceGrouping, uint32_t maxRollbackBlocks) {
-			auto config = CreateCatapultConfiguration(importanceGrouping, maxRollbackBlocks);
+			auto config = CreateCatapultConfigurationWithImportanceGrouping(importanceGrouping, maxRollbackBlocks);
 			EXPECT_THROW(ValidateConfiguration(config), utils::property_malformed_error)
 					<< "IG " << importanceGrouping << ", MRB " << maxRollbackBlocks;
 		};
@@ -112,37 +85,44 @@ namespace catapult { namespace config {
 	// region harvest beneficiary percentage validation
 
 	namespace {
-		auto CreateCatapultConfigurationWithHarvestBeneficiaryPercentage(uint8_t harvestBeneficiaryPercentage) {
+		auto CreateCatapultConfigurationWithHarvestPercentages(uint8_t harvestBeneficiaryPercentage, uint8_t harvestNetworkPercentage) {
 			auto mutableConfig = CreateMutableCatapultConfiguration();
 			mutableConfig.BlockChain.HarvestBeneficiaryPercentage = harvestBeneficiaryPercentage;
+			mutableConfig.BlockChain.HarvestNetworkPercentage = harvestNetworkPercentage;
 			return mutableConfig.ToConst();
 		}
 	}
 
-	TEST(TEST_CLASS, HarvestBeneficiaryPercentageIsValidated) {
+	TEST(TEST_CLASS, HarvestPercentagesAreValidated) {
 		// Arrange:
-		auto assertNoThrow = [](uint8_t harvestBeneficiaryPercentage) {
-			auto config = CreateCatapultConfigurationWithHarvestBeneficiaryPercentage(harvestBeneficiaryPercentage);
-			EXPECT_NO_THROW(ValidateConfiguration(config)) << "HBP " << harvestBeneficiaryPercentage;
+		auto assertNoThrow = [](uint8_t harvestBeneficiaryPercentage, uint8_t harvestNetworkPercentage) {
+			auto config = CreateCatapultConfigurationWithHarvestPercentages(harvestBeneficiaryPercentage, harvestNetworkPercentage);
+			EXPECT_NO_THROW(ValidateConfiguration(config))
+					<< "HBP " << static_cast<uint16_t>(harvestBeneficiaryPercentage)
+					<< " HNP " << static_cast<uint16_t>(harvestNetworkPercentage);
 		};
 
-		auto assertThrow = [](uint8_t harvestBeneficiaryPercentage) {
-			auto config = CreateCatapultConfigurationWithHarvestBeneficiaryPercentage(harvestBeneficiaryPercentage);
-			EXPECT_THROW(ValidateConfiguration(config), utils::property_malformed_error) << "HBP " << harvestBeneficiaryPercentage;
+		auto assertThrow = [](uint8_t harvestBeneficiaryPercentage, uint8_t harvestNetworkPercentage) {
+			auto config = CreateCatapultConfigurationWithHarvestPercentages(harvestBeneficiaryPercentage, harvestNetworkPercentage);
+			EXPECT_THROW(ValidateConfiguration(config), utils::property_malformed_error)
+					<< "HBP " << static_cast<uint16_t>(harvestBeneficiaryPercentage)
+					<< " HNP " << static_cast<uint16_t>(harvestNetworkPercentage);
+		};
+
+		auto dispatch = [](auto check, uint8_t percentage) {
+			check(percentage, 0);
+			check(0, percentage);
+			check(static_cast<uint8_t>(percentage / 2), static_cast<uint8_t>(percentage / 2 + (0 == percentage % 2 ? 0 : 1)));
 		};
 
 		// Act + Assert:
 		// - no exceptions
-		assertNoThrow(0);
-		assertNoThrow(1);
-		assertNoThrow(57);
-		assertNoThrow(99);
-		assertNoThrow(100);
+		for (auto percentage : std::initializer_list<uint8_t>{ 0, 1, 57, 99, 100 })
+			dispatch(assertNoThrow, percentage);
 
 		// - exceptions
-		assertThrow(101);
-		assertThrow(156);
-		assertThrow(255);
+		for (auto percentage : std::initializer_list<uint8_t>{ 101, 156, 255 })
+			dispatch(assertThrow, percentage);
 	}
 
 	// endregion
@@ -171,16 +151,52 @@ namespace catapult { namespace config {
 
 		// Act + Assert:
 		// - no exceptions
-		assertNoThrow(0);
-		assertNoThrow(1);
-		assertNoThrow(57);
-		assertNoThrow(99);
+		for (auto percentage : std::initializer_list<uint8_t>{ 0, 1, 57, 99 })
+			assertNoThrow(percentage);
 
 		// - exceptions
-		assertThrow(100);
-		assertThrow(101);
-		assertThrow(156);
-		assertThrow(255);
+		for (auto percentage : std::initializer_list<uint8_t>{ 100, 101, 156, 255 })
+			assertThrow(percentage);
+	}
+
+	// endregion
+
+	// region voting set grouping validation
+
+	namespace {
+		auto CreateCatapultConfigurationWithGroupings(uint32_t importanceGrouping, uint32_t votingSetGrouping) {
+			auto mutableConfig = CreateMutableCatapultConfiguration();
+			mutableConfig.BlockChain.ImportanceGrouping = importanceGrouping;
+			mutableConfig.BlockChain.VotingSetGrouping = votingSetGrouping;
+			return mutableConfig.ToConst();
+		}
+	}
+
+	TEST(TEST_CLASS, VotingSetGroupingMustBeMultipleOfImportanceGrouping) {
+		// Arrange:
+		auto assertNoThrow = [](uint32_t importanceGrouping, uint32_t votingSetGrouping) {
+			auto config = CreateCatapultConfigurationWithGroupings(importanceGrouping, votingSetGrouping);
+			EXPECT_NO_THROW(ValidateConfiguration(config)) << "IG " << importanceGrouping << ", VSG " << votingSetGrouping;
+		};
+
+		auto assertThrow = [](uint32_t importanceGrouping, uint32_t votingSetGrouping) {
+			auto config = CreateCatapultConfigurationWithGroupings(importanceGrouping, votingSetGrouping);
+			EXPECT_THROW(ValidateConfiguration(config), utils::property_malformed_error)
+					<< "IG " << importanceGrouping << ", VSG " << votingSetGrouping;
+		};
+
+		// Act + Assert:
+		// - no exceptions
+		assertNoThrow(200, 200); // IG == VSG
+		assertNoThrow(200, 800); // IG < VSG
+		assertNoThrow(1, 17);
+
+		// - exceptions
+		assertThrow(800, 200); // IG > VSG
+		assertThrow(200, 700); // VSG not multiple of IG
+		assertThrow(200, 799);
+		assertThrow(200, 801);
+		assertThrow(200, 900);
 	}
 
 	// endregion
@@ -250,6 +266,43 @@ namespace catapult { namespace config {
 
 		// Act:
 		EXPECT_THROW(ValidateConfiguration(config), utils::property_malformed_error);
+	}
+
+	// endregion
+
+	// region cache database max write batch size validation
+
+	namespace {
+		auto CreateCatapultConfigurationWithMaxWriteBatchSize(utils::FileSize maxWriteBatchSize) {
+			auto mutableConfig = CreateMutableCatapultConfiguration();
+			mutableConfig.Node.CacheDatabase.MaxWriteBatchSize = maxWriteBatchSize;
+			return mutableConfig.ToConst();
+		}
+	}
+
+	TEST(TEST_CLASS, MaxWriteBatchSizeMustBeUnsetOrAtLeastMinValue) {
+		// Arrange:
+		auto assertNoThrow = [](uint32_t maxWriteBatchSizeKb) {
+			auto config = CreateCatapultConfigurationWithMaxWriteBatchSize(utils::FileSize::FromKilobytes(maxWriteBatchSizeKb));
+			EXPECT_NO_THROW(ValidateConfiguration(config)) << "size " << maxWriteBatchSizeKb;
+		};
+
+		auto assertThrow = [](uint32_t maxWriteBatchSizeKb) {
+			auto config = CreateCatapultConfigurationWithMaxWriteBatchSize(utils::FileSize::FromKilobytes(maxWriteBatchSizeKb));
+			EXPECT_THROW(ValidateConfiguration(config), utils::property_malformed_error) << "size " << maxWriteBatchSizeKb;
+		};
+
+		// Act + Assert:
+		// - no exceptions
+		assertNoThrow(0); // unset
+		assertNoThrow(100); // min value
+		assertNoThrow(101);
+		assertNoThrow(9999);
+
+		// - exceptions
+		assertThrow(1);
+		assertThrow(50);
+		assertThrow(99);
 	}
 
 	// endregion

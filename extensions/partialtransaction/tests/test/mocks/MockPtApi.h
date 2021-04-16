@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -33,6 +34,11 @@ namespace catapult { namespace mocks {
 			Partial_Transaction_Infos
 		};
 
+		struct TransactionInfosRequest {
+			Timestamp Deadline;
+			cache::ShortHashPairRange ShortHashPairs;
+		};
+
 	public:
 		/// Creates a partial transaction api around cosigned transaction infos (\a transactionInfos).
 		explicit MockPtApi(const partialtransaction::CosignedTransactionInfos& transactionInfos)
@@ -47,17 +53,18 @@ namespace catapult { namespace mocks {
 			m_errorEntryPoint = entryPoint;
 		}
 
-		/// Gets the vector of short hash pair ranges that were passed to the partial transaction infos requests.
-		const std::vector<cache::ShortHashPairRange>& transactionInfosRequests() const {
+		/// Gets a vector of parameters that were passed to the partial transaction infos requests.
+		const auto& transactionInfosRequests() const {
 			return m_transactionInfosRequests;
 		}
 
 	public:
 		/// Gets the configured partial transaction infos and throws if the error entry point is set to Partial_Transaction_Infos.
-		/// \note The \a knownShortHashPairs parameter is captured.
+		/// \note The \a minDeadline and \a knownShortHashPairs parameters are captured.
 		thread::future<partialtransaction::CosignedTransactionInfos> transactionInfos(
+				Timestamp minDeadline,
 				cache::ShortHashPairRange&& knownShortHashPairs) const override {
-			m_transactionInfosRequests.push_back(std::move(knownShortHashPairs));
+			m_transactionInfosRequests.push_back(TransactionInfosRequest{ minDeadline, std::move(knownShortHashPairs) });
 			if (shouldRaiseException(EntryPoint::Partial_Transaction_Infos)) {
 				using ResultType = partialtransaction::CosignedTransactionInfos;
 				return CreateFutureException<ResultType>("partial transaction infos error has been set");
@@ -79,6 +86,6 @@ namespace catapult { namespace mocks {
 	private:
 		partialtransaction::CosignedTransactionInfos m_transactionInfos;
 		EntryPoint m_errorEntryPoint;
-		mutable std::vector<cache::ShortHashPairRange> m_transactionInfosRequests;
+		mutable std::vector<TransactionInfosRequest> m_transactionInfosRequests;
 	};
 }}

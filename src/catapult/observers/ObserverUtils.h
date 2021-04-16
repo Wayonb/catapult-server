@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,49 +25,10 @@
 
 namespace catapult { namespace observers {
 
-	/// Returns \c true if \a context and \a pruneInterval indicate that pruning should be done.
-	constexpr bool ShouldPrune(const ObserverContext& context, size_t pruneInterval) {
-		return NotifyMode::Commit == context.Mode && 0 == context.Height.unwrap() % pruneInterval;
-	}
-
 	/// Returns \c true if \a action and \a notifyMode indicate that a link should be made.
 	template<typename TAction>
 	constexpr bool ShouldLink(TAction action, NotifyMode notifyMode) {
 		return NotifyMode::Commit == notifyMode ? TAction::Link == action : TAction::Unlink == action;
-	}
-
-	/// Creates a block-based cache pruning observer with \a name that runs every \a interval blocks
-	/// with the specified grace period (\a gracePeriod).
-	template<typename TCache>
-	NotificationObserverPointerT<model::BlockNotification> CreateCacheBlockPruningObserver(
-			const std::string& name,
-			size_t interval,
-			BlockDuration gracePeriod) {
-		using ObserverType = FunctionalNotificationObserverT<model::BlockNotification>;
-		return std::make_unique<ObserverType>(name + "PruningObserver", [interval, gracePeriod](const auto&, auto& context) {
-			if (!ShouldPrune(context, interval))
-				return;
-
-			if (context.Height.unwrap() <= gracePeriod.unwrap())
-				return;
-
-			auto pruneHeight = Height(context.Height.unwrap() - gracePeriod.unwrap());
-			auto& cache = context.Cache.template sub<TCache>();
-			cache.prune(pruneHeight);
-		});
-	}
-
-	/// Creates a time-based cache pruning observer with \a name that runs every \a interval blocks.
-	template<typename TCache>
-	NotificationObserverPointerT<model::BlockNotification> CreateCacheTimePruningObserver(const std::string& name, size_t interval) {
-		using ObserverType = FunctionalNotificationObserverT<model::BlockNotification>;
-		return std::make_unique<ObserverType>(name + "PruningObserver", [interval](const auto& notification, const auto& context) {
-			if (!ShouldPrune(context, interval))
-				return;
-
-			auto& cache = context.Cache.template sub<TCache>();
-			cache.prune(notification.Timestamp);
-		});
 	}
 
 	/// Creates a block-based cache touch observer with \a name that touches the cache at every block height taking into account

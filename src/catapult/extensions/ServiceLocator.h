@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -25,7 +26,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace catapult { namespace crypto { class KeyPair; } }
+namespace catapult { namespace config { class CatapultKeys; } }
 
 namespace catapult { namespace extensions {
 
@@ -36,8 +37,8 @@ namespace catapult { namespace extensions {
 		static constexpr uint64_t Sentinel_Counter_Value = static_cast<uint64_t>(-1);
 
 	public:
-		/// Creates a locator around \a keyPair.
-		explicit ServiceLocator(const crypto::KeyPair& keyPair) : m_keyPair(keyPair)
+		/// Creates a locator around \a keys.
+		explicit ServiceLocator(const config::CatapultKeys& keys) : m_keys(keys)
 		{}
 
 		/// Destroys the locator.
@@ -54,9 +55,9 @@ namespace catapult { namespace extensions {
 		}
 
 	public:
-		/// Gets the local key pair.
-		const crypto::KeyPair& keyPair() const {
-			return m_keyPair;
+		/// Gets the local keys.
+		const config::CatapultKeys& keys() const {
+			return m_keys;
 		}
 
 		/// Gets the diagnostic counters.
@@ -115,7 +116,7 @@ namespace catapult { namespace extensions {
 		}
 
 	private:
-		const crypto::KeyPair& m_keyPair;
+		const config::CatapultKeys& m_keys;
 		std::vector<utils::DiagnosticCounter> m_counters;
 		std::unordered_map<std::string, std::weak_ptr<void>> m_services;
 		std::vector<std::pair<std::string, std::shared_ptr<void>>> m_rootedServices;

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -29,7 +30,7 @@ namespace catapult { namespace subscribers {
 	struct StateChangeInfo {
 	public:
 		/// Creates state change information around \a cacheChanges, \a scoreDelta and \a height.
-		StateChangeInfo(cache::CacheChanges&& cacheChanges, const model::ChainScore& scoreDelta, Height height)
+		StateChangeInfo(cache::CacheChanges&& cacheChanges, model::ChainScore::Delta scoreDelta, Height height)
 				: CacheChanges(std::move(cacheChanges))
 				, ScoreDelta(scoreDelta)
 				, Height(height)
@@ -40,7 +41,7 @@ namespace catapult { namespace subscribers {
 		const cache::CacheChanges CacheChanges;
 
 		/// Chain score delta.
-		const model::ChainScore ScoreDelta;
+		const model::ChainScore::Delta ScoreDelta;
 
 		/// New chain height.
 		const catapult::Height Height;

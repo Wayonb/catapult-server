@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -75,19 +76,18 @@ namespace catapult { namespace validators {
 			static constexpr auto Num_Transactions = 3u;
 			uint32_t txBufferSize = 0;
 			for (auto i = 0u; i < Num_Transactions; ++i) {
-				uint32_t txSize = sizeof(model::EmbeddedTransaction) + i + 1;
+				uint32_t txSize = SizeOf32<model::EmbeddedTransaction>() + i + 1;
 				txBufferSize += txSize + utils::GetPaddingSize(txSize, 8);
 			}
 
-			std::vector<uint8_t> txBuffer(txBufferSize);
-			test::FillWithRandomData(txBuffer);
+			auto txBuffer = test::GenerateRandomVector(txBufferSize);
 
 			// - correct sizes and calculate hashes
 			size_t txOffset = 0;
 			std::vector<Hash256> transactionHashes(Num_Transactions);
 			for (auto i = 0u; i < Num_Transactions; ++i) {
 				auto* pTransaction = reinterpret_cast<model::EmbeddedTransaction*>(&txBuffer[txOffset]);
-				pTransaction->Size = sizeof(model::EmbeddedTransaction) + i + 1;
+				pTransaction->Size = SizeOf32<model::EmbeddedTransaction>() + i + 1;
 
 				auto txHeaderSize = model::EmbeddedTransaction::Header_Size;
 				crypto::Sha3_256(

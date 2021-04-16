@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -37,9 +38,8 @@ namespace catapult { namespace zeromq {
 
 			void notifyAddCosignature(
 					const model::TransactionInfo& parentTransactionInfo,
-					const Key& signer,
-					const Signature& signature) override {
-				m_publisher.publishCosignature(parentTransactionInfo, signer, signature);
+					const model::Cosignature& cosignature) override {
+				m_publisher.publishCosignature(parentTransactionInfo, cosignature);
 			}
 
 			void notifyRemovePartials(const TransactionInfos& transactionInfos) override {

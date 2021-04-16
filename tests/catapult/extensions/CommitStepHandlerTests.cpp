@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -37,7 +38,7 @@ namespace catapult { namespace extensions {
 					: m_dataDirectory(m_tempDir.name())
 					, m_commitStep(CreateCommitStepHandler(m_dataDirectory)) {
 				auto stateChangeDirectory = m_dataDirectory.spoolDir("state_change");
-				boost::filesystem::create_directories(stateChangeDirectory.path());
+				std::filesystem::create_directories(stateChangeDirectory.path());
 
 				if (0 != syncIndexWriterValue)
 					io::IndexFile(stateChangeDirectory.file("index_server.dat")).set(syncIndexWriterValue);

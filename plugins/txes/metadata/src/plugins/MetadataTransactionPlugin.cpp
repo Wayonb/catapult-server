@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,6 +25,7 @@
 #include "src/model/MosaicMetadataTransaction.h"
 #include "src/model/NamespaceMetadataTransaction.h"
 #include "plugins/txes/namespace/src/model/NamespaceNotifications.h"
+#include "catapult/model/Address.h"
 #include "catapult/model/NotificationSubscriber.h"
 #include "catapult/model/TransactionPluginFactory.h"
 
@@ -33,8 +35,8 @@ namespace catapult { namespace plugins {
 
 	namespace {
 		template<typename TTransaction>
-		PartialMetadataKey ExtractPartialMetadataKey(const TTransaction& transaction) {
-			return { transaction.SignerPublicKey, transaction.TargetPublicKey, transaction.ScopedMetadataKey };
+		UnresolvedPartialMetadataKey ExtractPartialMetadataKey(const TTransaction& transaction, const PublishContext& context) {
+			return { context.SignerAddress, transaction.TargetAddress, transaction.ScopedMetadataKey };
 		}
 
 		struct AccountTraits {
@@ -45,7 +47,7 @@ namespace catapult { namespace plugins {
 
 			template<typename TTransaction>
 			static void RaiseCustomNotifications(const TTransaction& transaction, NotificationSubscriber& sub) {
-				sub.notify(AccountPublicKeyNotification(transaction.TargetPublicKey));
+				sub.notify(AccountAddressNotification(transaction.TargetAddress));
 			}
 		};
 
@@ -57,7 +59,7 @@ namespace catapult { namespace plugins {
 
 			template<typename TTransaction>
 			static void RaiseCustomNotifications(const TTransaction& transaction, NotificationSubscriber& sub) {
-				sub.notify(MosaicRequiredNotification(transaction.TargetPublicKey, transaction.TargetMosaicId));
+				sub.notify(MosaicRequiredNotification(transaction.TargetAddress, transaction.TargetMosaicId));
 			}
 		};
 
@@ -69,7 +71,7 @@ namespace catapult { namespace plugins {
 
 			template<typename TTransaction>
 			static void RaiseCustomNotifications(const TTransaction& transaction, NotificationSubscriber& sub) {
-				sub.notify(NamespaceRequiredNotification(transaction.TargetPublicKey, transaction.TargetNamespaceId));
+				sub.notify(NamespaceRequiredNotification(transaction.TargetAddress, transaction.TargetNamespaceId));
 			}
 		};
 
@@ -77,10 +79,10 @@ namespace catapult { namespace plugins {
 		class Publisher {
 		public:
 			template<typename TTransaction>
-			static void Publish(const TTransaction& transaction, NotificationSubscriber& sub) {
+			static void Publish(const TTransaction& transaction, const PublishContext& context, NotificationSubscriber& sub) {
 				sub.notify(MetadataSizesNotification(transaction.ValueSizeDelta, transaction.ValueSize));
 				sub.notify(MetadataValueNotification(
-						ExtractPartialMetadataKey(transaction),
+						ExtractPartialMetadataKey(transaction, context),
 						TTraits::ExtractMetadataTarget(transaction),
 						transaction.ValueSizeDelta,
 						transaction.ValueSize,

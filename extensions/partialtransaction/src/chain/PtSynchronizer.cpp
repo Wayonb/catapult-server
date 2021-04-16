@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -32,15 +33,17 @@ namespace catapult { namespace chain {
 
 		public:
 			PtTraits(
+					const TimeSupplier& timeSupplier,
 					const partialtransaction::ShortHashPairsSupplier& shortHashPairsSupplier,
 					const partialtransaction::CosignedTransactionInfosConsumer& transactionInfosConsumer)
-					: m_shortHashPairsSupplier(shortHashPairsSupplier)
+					: m_timeSupplier(timeSupplier)
+					, m_shortHashPairsSupplier(shortHashPairsSupplier)
 					, m_transactionInfosConsumer(transactionInfosConsumer)
 			{}
 
 		public:
 			thread::future<partialtransaction::CosignedTransactionInfos> apiCall(const RemoteApiType& api) const {
-				return api.transactionInfos(m_shortHashPairsSupplier());
+				return api.transactionInfos(m_timeSupplier(), m_shortHashPairsSupplier());
 			}
 
 			void consume(partialtransaction::CosignedTransactionInfos&& transactionInfos, const model::NodeIdentity&) const {
@@ -48,16 +51,19 @@ namespace catapult { namespace chain {
 			}
 
 		private:
+			TimeSupplier m_timeSupplier;
 			partialtransaction::ShortHashPairsSupplier m_shortHashPairsSupplier;
 			partialtransaction::CosignedTransactionInfosConsumer m_transactionInfosConsumer;
 		};
 	}
 
 	RemoteNodeSynchronizer<api::RemotePtApi> CreatePtSynchronizer(
+			const TimeSupplier& timeSupplier,
 			const partialtransaction::ShortHashPairsSupplier& shortHashPairsSupplier,
-			const partialtransaction::CosignedTransactionInfosConsumer& transactionInfosConsumer) {
-		auto traits = PtTraits(shortHashPairsSupplier, transactionInfosConsumer);
+			const partialtransaction::CosignedTransactionInfosConsumer& transactionInfosConsumer,
+			const predicate<>& shouldExecute) {
+		auto traits = PtTraits(timeSupplier, shortHashPairsSupplier, transactionInfosConsumer);
 		auto pSynchronizer = std::make_shared<EntitiesSynchronizer<PtTraits>>(std::move(traits));
-		return CreateRemoteNodeSynchronizer(pSynchronizer);
+		return CreateConditionalRemoteNodeSynchronizer(pSynchronizer, shouldExecute);
 	}
 }}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -25,12 +26,12 @@ namespace catapult { namespace validators {
 
 	using Notification = model::SignatureNotification;
 
-	DECLARE_STATELESS_VALIDATOR(Signature, Notification)(const GenerationHash& generationHash) {
-		return MAKE_STATELESS_VALIDATOR(Signature, [generationHash](const Notification& notification) {
+	DECLARE_STATELESS_VALIDATOR(Signature, Notification)(const GenerationHashSeed& generationHashSeed) {
+		return MAKE_STATELESS_VALIDATOR(Signature, [generationHashSeed](const Notification& notification) {
 
 			auto isVerified = Notification::ReplayProtectionMode::Enabled == notification.DataReplayProtectionMode
-					? crypto::Verify(notification.Signer, { generationHash, notification.Data }, notification.Signature)
-					: crypto::Verify(notification.Signer, notification.Data, notification.Signature);
+					? crypto::Verify(notification.SignerPublicKey, { generationHashSeed, notification.Data }, notification.Signature)
+					: crypto::Verify(notification.SignerPublicKey, notification.Data, notification.Signature);
 
 			return isVerified ? ValidationResult::Success : Failure_Signature_Not_Verifiable;
 		});

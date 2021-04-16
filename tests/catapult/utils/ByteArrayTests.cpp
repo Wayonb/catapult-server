@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -171,6 +172,47 @@ namespace catapult { namespace utils {
 
 		// Assert:
 		EXPECT_EQ("0102080706020900", str);
+	}
+
+	// endregion
+
+	// region copyTo
+
+	TEST(TEST_CLASS, CopyToSupportsSameSizeDestinationByteArray) {
+		// Arrange:
+		auto sourceArray = test::GenerateRandomByteArray<Key>();
+
+		// Act:
+		auto destArray = sourceArray.copyTo<Hash256>();
+
+		// Assert:
+		EXPECT_EQ(sourceArray.size(), destArray.size());
+		EXPECT_EQ_MEMORY(sourceArray.data(), destArray.data(), Hash256::Size);
+	}
+
+	TEST(TEST_CLASS, CopyToSupportsSmallerSizeDestinationByteArray) {
+		// Arrange:
+		auto sourceArray = test::GenerateRandomByteArray<Hash512>();
+
+		// Act:
+		auto destArray = sourceArray.copyTo<Hash256>();
+
+		// Assert:
+		EXPECT_GT(sourceArray.size(), destArray.size());
+		EXPECT_EQ_MEMORY(sourceArray.data(), destArray.data(), Hash256::Size);
+	}
+
+	TEST(TEST_CLASS, CopyToSupportsLargerSizeDestinationByteArray) {
+		// Arrange:
+		auto sourceArray = test::GenerateRandomByteArray<Hash256>();
+
+		// Act:
+		auto destArray = sourceArray.copyTo<Hash512>();
+
+		// Assert:
+		EXPECT_LT(sourceArray.size(), destArray.size());
+		EXPECT_EQ_MEMORY(sourceArray.data(), destArray.data(), Hash256::Size);
+		EXPECT_EQ_MEMORY(Hash256().data(), destArray.data() + Hash256::Size, Hash256::Size);
 	}
 
 	// endregion

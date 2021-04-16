@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,7 +29,7 @@
 namespace catapult { namespace test {
 
 	namespace {
-		constexpr auto Network_Identifier = model::NetworkIdentifier::Mijin_Test;
+		constexpr auto Network_Identifier = model::NetworkIdentifier::Private_Test;
 	}
 
 	// region ctor
@@ -117,7 +118,7 @@ namespace catapult { namespace test {
 			Timestamp deadline) {
 		pTransaction->Deadline = deadline;
 		pTransaction->MaxFee = Amount(pTransaction->Size);
-		extensions::TransactionExtensions(GetNemesisGenerationHash()).sign(signerKeyPair, *pTransaction);
+		extensions::TransactionExtensions(GetNemesisGenerationHashSeed()).sign(signerKeyPair, *pTransaction);
 		return std::move(pTransaction);
 	}
 }}

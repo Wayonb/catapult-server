@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -39,8 +40,8 @@ namespace catapult { namespace validators {
 		virtual thread::future<std::vector<ValidationResult>> validateAll(const model::WeakEntityInfos& entityInfos) const = 0;
 	};
 
-	/// Creates a parallel validation policy using \a pPool for parallelization and \a pValidator for validation.
+	/// Creates a parallel validation policy using \a pool for parallelization and \a pValidator for validation.
 	std::shared_ptr<const ParallelValidationPolicy> CreateParallelValidationPolicy(
-			const std::shared_ptr<thread::IoThreadPool>& pPool,
+			thread::IoThreadPool& pool,
 			const std::shared_ptr<const StatelessEntityValidator>& pValidator);
 }}

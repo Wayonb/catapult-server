@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,7 +32,8 @@ namespace catapult { namespace disruptor {
 
 		// Assert:
 		EXPECT_EQ("foo dispatcher", options.DispatcherName);
-		EXPECT_EQ(123u, options.DisruptorSize);
+		EXPECT_EQ(123u, options.DisruptorSlotCount);
+		EXPECT_EQ(utils::FileSize::FromMegabytes(1024), options.DisruptorMaxMemorySize);
 		EXPECT_EQ(1u, options.ElementTraceInterval);
 		EXPECT_TRUE(options.ShouldThrowWhenFull);
 	}

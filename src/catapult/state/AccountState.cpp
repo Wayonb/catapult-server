@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,6 +24,14 @@
 
 namespace catapult { namespace state {
 
+	AccountState::AccountState(const catapult::Address& address, Height addressHeight)
+			: Address(address)
+			, AddressHeight(addressHeight)
+			, PublicKey()
+			, PublicKeyHeight(0)
+			, AccountType(AccountType::Unlinked)
+	{}
+
 	namespace {
 		void RequireAccountType(const AccountState& accountState, AccountType requiredAccountType, const char* requiredAccountTypeName) {
 			if (requiredAccountType == accountState.AccountType)
@@ -34,7 +43,7 @@ namespace catapult { namespace state {
 		}
 
 		bool AreLinked(const AccountState& lhs, const AccountState& rhs) {
-			return lhs.LinkedAccountKey == rhs.PublicKey && rhs.LinkedAccountKey == lhs.PublicKey;
+			return GetLinkedPublicKey(lhs) == rhs.PublicKey && GetLinkedPublicKey(rhs) == lhs.PublicKey;
 		}
 	}
 
@@ -49,6 +58,10 @@ namespace catapult { namespace state {
 		}
 	}
 
+	bool HasHistoricalInformation(const AccountState& accountState) {
+		return !accountState.ImportanceSnapshots.empty() || !accountState.ActivityBuckets.empty();
+	}
+
 	void RequireLinkedRemoteAndMainAccounts(const AccountState& remoteAccountState, const AccountState& mainAccountState) {
 		RequireAccountType(remoteAccountState, AccountType::Remote, "REMOTE");
 		RequireAccountType(mainAccountState, AccountType::Main, "MAIN");
@@ -58,7 +71,7 @@ namespace catapult { namespace state {
 
 		std::ostringstream out;
 		out
-				<< "remote " << model::AddressToString(remoteAccountState.Address) << " link to main"
+				<< "remote " << model::AddressToString(remoteAccountState.Address) << " link to main "
 				<< model::AddressToString(mainAccountState.Address) << " is improper";
 		CATAPULT_THROW_RUNTIME_ERROR(out.str().c_str());
 	}
@@ -68,5 +81,17 @@ namespace catapult { namespace state {
 		accountState.ActivityBuckets.tryUpdate(importanceHeight, [surplus = fee.Amount](auto& bucket) {
 			bucket.TotalFeesPaid = bucket.TotalFeesPaid - surplus;
 		});
+	}
+
+	Key GetLinkedPublicKey(const AccountState& accountState) {
+		return accountState.SupplementalPublicKeys.linked().get();
+	}
+
+	Key GetNodePublicKey(const AccountState& accountState) {
+		return accountState.SupplementalPublicKeys.node().get();
+	}
+
+	Key GetVrfPublicKey(const AccountState& accountState) {
+		return accountState.SupplementalPublicKeys.vrf().get();
 	}
 }}

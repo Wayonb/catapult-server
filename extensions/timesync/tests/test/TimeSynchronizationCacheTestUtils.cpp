@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -37,7 +38,7 @@ namespace catapult { namespace test {
 
 	void AddNode(ionet::NodeContainer& container, const Key& identityKey, const std::string& nodeName) {
 		auto modifier = container.modifier();
-		auto metadata = ionet::NodeMetadata(model::NetworkIdentifier::Zero, nodeName);
+		auto metadata = ionet::NodeMetadata(model::UniqueNetworkFingerprint(), nodeName);
 		metadata.Roles = ionet::NodeRoles::Peer;
 
 		auto identity = model::NodeIdentity{ identityKey, "fake-host-from-time-synchronization-cache-test-utils" };

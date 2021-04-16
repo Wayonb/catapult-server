@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -180,8 +181,11 @@ namespace catapult { namespace utils {
 	// region Base32Decode
 
 	namespace {
+		struct PaddedAddress_tag { static constexpr size_t Size = 25; };
+		using PaddedAddress = utils::ByteArray<PaddedAddress_tag>;
+
 		auto HexStringToArray(const std::string& str) {
-			return utils::ParseByteArray<Address>(str);
+			return utils::ParseByteArray<PaddedAddress>(str);
 		}
 	}
 

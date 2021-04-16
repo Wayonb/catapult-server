@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,15 +20,11 @@
 **/
 
 #include "catapult/model/NetworkInfo.h"
-#include "catapult/utils/Casting.h"
-#include "tests/test/nodeps/ConfigurationTestUtils.h"
 #include "tests/TestHarness.h"
 
 namespace catapult { namespace model {
 
 #define TEST_CLASS NetworkInfoTests
-
-	// region construction
 
 	TEST(TEST_CLASS, CanCreateDefaultNetwork) {
 		// Act:
@@ -36,63 +33,46 @@ namespace catapult { namespace model {
 		// Assert:
 		EXPECT_EQ(NetworkIdentifier::Zero, networkInfo.Identifier);
 		EXPECT_EQ(NodeIdentityEqualityStrategy::Key, networkInfo.NodeEqualityStrategy);
-		EXPECT_EQ(Key(), networkInfo.PublicKey);
-		EXPECT_EQ(GenerationHash(), networkInfo.GenerationHash);
+		EXPECT_EQ(Key(), networkInfo.NemesisSignerPublicKey);
+		EXPECT_EQ(GenerationHashSeed(), networkInfo.GenerationHashSeed);
 		EXPECT_EQ(utils::TimeSpan(), networkInfo.EpochAdjustment);
 	}
 
 	TEST(TEST_CLASS, CanCreateCustomNetwork) {
 		// Arrange:
-		auto publicKey = test::GenerateRandomByteArray<Key>();
-		auto generationHash = test::GenerateRandomByteArray<GenerationHash>();
+		auto nemesisSignerPublicKey = test::GenerateRandomByteArray<Key>();
+		auto generationHashSeed = test::GenerateRandomByteArray<GenerationHashSeed>();
 
 		// Act:
 		NetworkInfo networkInfo(
 				static_cast<NetworkIdentifier>(0xB9),
 				static_cast<NodeIdentityEqualityStrategy>(0xA7),
-				publicKey,
-				generationHash,
+				nemesisSignerPublicKey,
+				generationHashSeed,
 				utils::TimeSpan::FromHours(123));
 
 		// Assert:
 		EXPECT_EQ(static_cast<NetworkIdentifier>(0xB9), networkInfo.Identifier);
 		EXPECT_EQ(static_cast<NodeIdentityEqualityStrategy>(0xA7), networkInfo.NodeEqualityStrategy);
-		EXPECT_EQ(publicKey, networkInfo.PublicKey);
-		EXPECT_EQ(generationHash, networkInfo.GenerationHash);
+		EXPECT_EQ(nemesisSignerPublicKey, networkInfo.NemesisSignerPublicKey);
+		EXPECT_EQ(generationHashSeed, networkInfo.GenerationHashSeed);
 		EXPECT_EQ(utils::TimeSpan::FromHours(123), networkInfo.EpochAdjustment);
 	}
 
-	// endregion
-
-	// region parsing
-
-	TEST(TEST_CLASS, CanParseValidNetworkValue) {
+	TEST(TEST_CLASS, CanGetUniqueNetworkFingerprintForNetwork) {
 		// Arrange:
-		auto assertSuccessfulParse = [](const auto& input, const auto& expectedParsedValue) {
-			test::AssertParse(input, expectedParsedValue, [](const auto& str, auto& parsedValue) {
-				return TryParseValue(str, parsedValue);
-			});
-		};
+		NetworkInfo networkInfo(
+				static_cast<NetworkIdentifier>(0xB9),
+				static_cast<NodeIdentityEqualityStrategy>(0xA7),
+				test::GenerateRandomByteArray<Key>(),
+				test::GenerateRandomByteArray<GenerationHashSeed>(),
+				utils::TimeSpan::FromHours(123));
+
+		// Act:
+		auto fingerprint = GetUniqueNetworkFingerprint(networkInfo);
 
 		// Assert:
-		assertSuccessfulParse("mijin", NetworkIdentifier::Mijin);
-		assertSuccessfulParse("mijin-test", NetworkIdentifier::Mijin_Test);
-		assertSuccessfulParse("public", NetworkIdentifier::Public);
-		assertSuccessfulParse("public-test", NetworkIdentifier::Public_Test);
-
-		assertSuccessfulParse("0", static_cast<NetworkIdentifier>(0));
-		assertSuccessfulParse("17", static_cast<NetworkIdentifier>(17));
-		assertSuccessfulParse("255", static_cast<NetworkIdentifier>(255));
+		EXPECT_EQ(static_cast<NetworkIdentifier>(0xB9), fingerprint.Identifier);
+		EXPECT_EQ(networkInfo.GenerationHashSeed, fingerprint.GenerationHashSeed);
 	}
-
-	TEST(TEST_CLASS, CannotParseInvalidNetworkValue) {
-		test::AssertEnumParseFailure("mijin", NetworkIdentifier::Public, [](const auto& str, auto& parsedValue) {
-			return TryParseValue(str, parsedValue);
-		});
-		test::AssertFailedParse("256", NetworkIdentifier::Public, [](const auto& str, auto& parsedValue) {
-			return TryParseValue(str, parsedValue);
-		});
-	}
-
-	// endregion
 }}

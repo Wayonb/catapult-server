@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -26,9 +27,11 @@
 #include "catapult/cache/ReadOnlyCatapultCache.h"
 #include "catapult/cache_core/BlockStatisticCache.h"
 #include "catapult/cache_tx/MemoryUtCache.h"
+#include "catapult/config/CatapultDataDirectory.h"
 #include "catapult/extensions/ExecutionConfigurationFactory.h"
 #include "catapult/model/EntityHasher.h"
 #include "catapult/observers/NotificationObserverAdapter.h"
+#include "catapult/thread/ThreadGroup.h"
 #include "tests/test/cache/CacheTestUtils.h"
 #include "tests/test/core/BlockTestUtils.h"
 #include "tests/test/local/LocalTestUtils.h"
@@ -38,7 +41,6 @@
 #include "tests/test/nodeps/Nemesis.h"
 #include "tests/test/nodeps/TestConstants.h"
 #include "tests/TestHarness.h"
-#include <boost/thread.hpp>
 
 namespace catapult { namespace harvesting {
 
@@ -51,10 +53,8 @@ namespace catapult { namespace harvesting {
 
 		// region test factories
 
-		std::shared_ptr<plugins::PluginManager> CreatePluginManager() {
+		std::shared_ptr<plugins::PluginManager> CreatePluginManager(const config::CatapultConfiguration& config) {
 			// include memory hash cache system to better trigger the race condition under test
-			auto config = test::CreatePrototypicalBlockChainConfiguration();
-			config.Plugins.emplace("catapult.plugins.transfer", utils::ConfigurationBag({{ "", { { "maxMessageSize", "0" } } }}));
 			auto pPluginManager = test::CreatePluginManagerWithRealPlugins(config);
 			plugins::RegisterMemoryHashCacheSystem(*pPluginManager);
 			return pPluginManager;
@@ -63,13 +63,14 @@ namespace catapult { namespace harvesting {
 		auto CreateConfiguration() {
 			auto config = test::CreatePrototypicalBlockChainConfiguration();
 			config.EnableVerifiableState = true;
+			config.Plugins.emplace("catapult.plugins.transfer", utils::ConfigurationBag({{ "", { { "maxMessageSize", "0" } } }}));
 			return config;
 		}
 
 		cache::CatapultCache CreateCatapultCache(const std::string& databaseDirectory) {
 			auto cacheId = cache::HashCache::Id;
 			auto config = CreateConfiguration();
-			auto cacheConfig = cache::CacheConfiguration(databaseDirectory, utils::FileSize(), cache::PatriciaTreeStorageMode::Enabled);
+			auto cacheConfig = cache::CacheConfiguration(databaseDirectory, cache::PatriciaTreeStorageMode::Enabled);
 
 			std::vector<std::unique_ptr<cache::SubCachePlugin>> subCaches(cacheId + 1);
 			test::CoreSystemCacheFactory::CreateSubCaches(config, subCaches);
@@ -85,18 +86,24 @@ namespace catapult { namespace harvesting {
 		class HarvesterTestContext {
 		public:
 			HarvesterTestContext()
-					: m_pPluginManager(CreatePluginManager())
-					, m_config(test::CreatePrototypicalCatapultConfiguration(CreateConfiguration(), ""))
-					, m_transactionsCache(cache::MemoryCacheOptions(1024, GetNumIterations() * 2))
-					, m_cache(CreateCatapultCache(m_dbDirGuard.name()))
+					: m_config(test::CreatePrototypicalCatapultConfiguration(CreateConfiguration(), m_tempDataDir.name()))
+					, m_pPluginManager(CreatePluginManager(m_config))
+					, m_transactionsCache(cache::MemoryCacheOptions(
+							utils::FileSize::FromKilobytes(1),
+							utils::FileSize::FromBytes(test::GetTransferTransactionSize() * GetNumIterations() * 2)))
+					, m_cache(CreateCatapultCache(config::CatapultDataDirectory(m_tempDataDir.name()).dir("db").str()))
 					, m_unlockedAccounts(100, [](const auto&) { return 0; }) {
 				// create the harvester
 				auto executionConfig = extensions::CreateExecutionConfiguration(*m_pPluginManager);
-				HarvestingUtFacadeFactory utFacadeFactory(m_cache, CreateConfiguration(), executionConfig);
+				HarvestingUtFacadeFactory utFacadeFactory(m_cache, CreateConfiguration(), executionConfig, [](auto) { return Hash256(); });
 
 				auto strategy = model::TransactionSelectionStrategy::Oldest;
-				auto blockGenerator = CreateHarvesterBlockGenerator(strategy, utFacadeFactory, m_transactionsCache);
-				m_pHarvester = std::make_unique<Harvester>(m_cache, m_config.BlockChain, Key(), m_unlockedAccounts, blockGenerator);
+				auto blockGenerator = CreateHarvesterBlockGenerator(
+						strategy,
+						m_pPluginManager->transactionRegistry(),
+						utFacadeFactory,
+						m_transactionsCache);
+				m_pHarvester = std::make_unique<Harvester>(m_cache, m_config.BlockChain, Address(), m_unlockedAccounts, blockGenerator);
 			}
 
 		public:
@@ -127,21 +134,22 @@ namespace catapult { namespace harvesting {
 				return pLastBlock;
 			}
 
-			void prepareAndUnlockSenderAccount(crypto::KeyPair&& keyPair) {
+			void prepareAndUnlockSenderAccount(crypto::KeyPair&& signingKeyPair) {
 				// 1. seed an account with an initial currency balance of N and harvesting balance of 10'000'000
-				auto currencyMosaicId = test::Default_Currency_Mosaic_Id;
-				auto harvestingMosaicId = test::Default_Harvesting_Mosaic_Id;
+				auto vrfKeyPair = test::GenerateKeyPair();
+
 				auto cacheDelta = m_cache.createDelta();
 				auto& accountStateCacheDelta = cacheDelta.sub<cache::AccountStateCache>();
-				accountStateCacheDelta.addAccount(keyPair.publicKey(), Height(1));
-				auto accountStateIter = accountStateCacheDelta.find(keyPair.publicKey());
-				accountStateIter.get().Balances.credit(currencyMosaicId, Amount(GetNumIterations()));
-				accountStateIter.get().Balances.credit(harvestingMosaicId, Amount(10'000'000));
+				accountStateCacheDelta.addAccount(signingKeyPair.publicKey(), Height(1));
+				auto accountStateIter = accountStateCacheDelta.find(signingKeyPair.publicKey());
+				accountStateIter.get().Balances.credit(test::Default_Currency_Mosaic_Id, Amount(GetNumIterations()));
+				accountStateIter.get().Balances.credit(test::Default_Harvesting_Mosaic_Id, Amount(10'000'000));
 				accountStateIter.get().ImportanceSnapshots.set(Importance(10'000'000), model::ImportanceHeight(1));
+				accountStateIter.get().SupplementalPublicKeys.vrf().set(vrfKeyPair.publicKey());
 				m_cache.commit(Height(1));
 
 				// 2. unlock the account
-				m_unlockedAccounts.modifier().add(std::move(keyPair));
+				m_unlockedAccounts.modifier().add(BlockGeneratorAccountDescriptor(std::move(signingKeyPair), std::move(vrfKeyPair)));
 			}
 
 			void prepareSenderAccountAndTransactions(crypto::KeyPair&& keyPair, Timestamp deadline) {
@@ -152,7 +160,7 @@ namespace catapult { namespace harvesting {
 					pTransaction->MaxFee = Amount(0);
 					pTransaction->Deadline = deadline;
 
-					auto transactionHash = model::CalculateHash(*pTransaction, test::GetNemesisGenerationHash());
+					auto transactionHash = model::CalculateHash(*pTransaction, test::GetNemesisGenerationHashSeed());
 					model::TransactionInfo transactionInfo(std::move(pTransaction), transactionHash);
 					m_transactionsCache.modifier().add(std::move(transactionInfo));
 				}
@@ -174,15 +182,19 @@ namespace catapult { namespace harvesting {
 				observers::NotificationObserverAdapter entityObserver(
 						m_pPluginManager->createObserver(),
 						m_pPluginManager->createNotificationPublisher());
-				auto observerContext = observers::ObserverContext(observerState, Height(1), notifyMode, resolverContext);
+				auto observerContext = observers::ObserverContext(
+						model::NotificationContext(Height(1), resolverContext),
+						observerState,
+						notifyMode);
 				entityObserver.notify(model::WeakEntityInfo(*transactionInfo.pEntity, transactionInfo.EntityHash), observerContext);
 				m_cache.commit(Height(1));
 			}
 
 		private:
-			test::TempDirectoryGuard m_dbDirGuard;
-			std::shared_ptr<plugins::PluginManager> m_pPluginManager;
+			test::TempDirectoryGuard m_tempDataDir;
 			config::CatapultConfiguration m_config;
+
+			std::shared_ptr<plugins::PluginManager> m_pPluginManager;
 			cache::MemoryUtCache m_transactionsCache;
 			cache::CatapultCache m_cache;
 			UnlockedAccounts m_unlockedAccounts;
@@ -203,15 +215,15 @@ namespace catapult { namespace harvesting {
 
 		// Act:
 		// - simulate tx confirmation (block dispatcher) by confirming one tx at a time
-		boost::thread_group threads;
-		threads.create_thread([&context] {
+		thread::ThreadGroup threads;
+		threads.spawn([&context] {
 			for (auto i = 0u; i < GetNumIterations(); ++i) {
 				// 1. get next transaction info from UT cache
 				model::TransactionInfo nextTransactionInfo;
 				{
 					auto utCacheView = context.transactionsCache().view();
-					auto pTransaction = utCacheView.unknownTransactions(BlockFeeMultiplier(0), utils::ShortHashesSet())[0];
-					auto transactionHash = model::CalculateHash(*pTransaction, test::GetNemesisGenerationHash());
+					auto pTransaction = utCacheView.unknownTransactions(Timestamp(0), BlockFeeMultiplier(0), utils::ShortHashesSet())[0];
+					auto transactionHash = model::CalculateHash(*pTransaction, test::GetNemesisGenerationHashSeed());
 					nextTransactionInfo = model::TransactionInfo(std::move(pTransaction), transactionHash);
 				}
 
@@ -231,7 +243,7 @@ namespace catapult { namespace harvesting {
 		auto numHarvests = 0u;
 		auto numHarvestAttempts = 0u;
 		auto previousBlockElement = test::BlockToBlockElement(*pLastBlock);
-		threads.create_thread([&context, &numHarvests, &numHarvestAttempts, &previousBlockElement] {
+		threads.spawn([&context, &numHarvests, &numHarvestAttempts, &previousBlockElement] {
 			auto harvestTimestamp = previousBlockElement.Block.Timestamp + Timestamp(std::numeric_limits<int64_t>::max());
 			for (;;) {
 				auto pHarvestedBlock = context.harvester().harvest(previousBlockElement, harvestTimestamp);
@@ -246,7 +258,7 @@ namespace catapult { namespace harvesting {
 		});
 
 		// - wait for all threads
-		threads.join_all();
+		threads.join();
 
 		// Assert: all blocks were harvested (harvesting takes precedence) and all transactions were processed
 		CATAPULT_LOG(debug) << numHarvests << "/" << numHarvestAttempts << " blocks harvested";
@@ -266,8 +278,8 @@ namespace catapult { namespace harvesting {
 
 		// Act:
 		// - let the harvester sometimes see a cache height 1 and sometimes height 2
-		boost::thread_group threads;
-		threads.create_thread([&context] {
+		thread::ThreadGroup threads;
+		threads.spawn([&context] {
 			for (auto i = 0u; i < GetNumIterations(); ++i) {
 				// 1. add block statistic and commit cache at height 2
 				{
@@ -297,7 +309,7 @@ namespace catapult { namespace harvesting {
 		// - simulate harvester by harvesting blocks
 		auto numHarvests = 0u;
 		auto previousBlockElement = test::BlockToBlockElement(*pLastBlock);
-		threads.create_thread([&context, &numHarvests, &previousBlockElement] {
+		threads.spawn([&context, &numHarvests, &previousBlockElement] {
 			auto harvestTimestamp = previousBlockElement.Block.Timestamp + Timestamp(std::numeric_limits<int64_t>::max());
 			for (auto i = 0u; i < GetNumIterations(); ++i) {
 				auto pHarvestedBlock = context.harvester().harvest(previousBlockElement, harvestTimestamp);
@@ -309,7 +321,7 @@ namespace catapult { namespace harvesting {
 		});
 
 		// - wait for all threads
-		threads.join_all();
+		threads.join();
 
 		CATAPULT_LOG(debug) << numHarvests << "/" << GetNumIterations() << " blocks harvested";
 

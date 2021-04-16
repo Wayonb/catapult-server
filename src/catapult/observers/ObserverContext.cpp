@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -61,15 +62,11 @@ namespace catapult { namespace observers {
 		}
 	}
 
-	ObserverContext::ObserverContext(
-			const ObserverState& state,
-			catapult::Height height,
-			NotifyMode mode,
-			const model::ResolverContext& resolvers)
-			: Cache(state.Cache)
-			, Height(height)
+	ObserverContext::ObserverContext(const model::NotificationContext& notificationContext, const ObserverState& state, NotifyMode mode)
+			: NotificationContext(notificationContext.Height, BindConditional(notificationContext.Resolvers, state.pBlockStatementBuilder))
+			, Cache(state.Cache)
 			, Mode(mode)
-			, Resolvers(BindConditional(resolvers, state.pBlockStatementBuilder))
+			, UndecoratedResolvers(notificationContext.Resolvers)
 			, m_statementBuilder(CreateObserverStatementBuilder(state.pBlockStatementBuilder))
 	{}
 

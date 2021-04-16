@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -41,7 +42,6 @@ namespace catapult { namespace plugins {
 
 		NamespaceRentalFeeConfiguration CreateRentalFeeConfiguration(Amount rootFeePerBlock, Amount childFee) {
 			return {
-				test::GenerateRandomByteArray<Key>(),
 				UnresolvedMosaicId(1234),
 				test::GenerateRandomUnresolvedAddress(),
 				rootFeePerBlock,
@@ -53,7 +53,7 @@ namespace catapult { namespace plugins {
 		template<typename TTraits>
 		auto CreateTransactionWithName(uint8_t nameSize) {
 			using TransactionType = typename TTraits::TransactionType;
-			uint32_t entitySize = sizeof(TransactionType) + nameSize;
+			uint32_t entitySize = SizeOf32<TransactionType>() + nameSize;
 			auto pTransaction = utils::MakeUniqueWithSize<TransactionType>(entitySize);
 			pTransaction->Size = entitySize;
 			pTransaction->NameSize = nameSize;
@@ -79,14 +79,16 @@ namespace catapult { namespace plugins {
 				typename test::TransactionPluginTestUtils<TTraits>::PublishTestBuilder& builder,
 				const NamespaceRentalFeeConfiguration& config,
 				const typename TTraits::TransactionType& transaction) {
-			builder.template addExpectation<AccountPublicKeyNotification>([&config](const auto& notification) {
-				EXPECT_EQ(config.SinkPublicKey, notification.PublicKey);
+			builder.template addExpectation<AccountAddressNotification>([&config](const auto& notification) {
+				EXPECT_FALSE(notification.Address.isResolved());
+
+				EXPECT_EQ(config.SinkAddress, notification.Address.unresolved());
 			});
 			builder.template addExpectation<NamespaceRegistrationNotification>([&transaction](const auto& notification) {
 				EXPECT_EQ(transaction.RegistrationType, notification.RegistrationType);
 			});
 			builder.template addExpectation<RootNamespaceNotification>([&transaction](const auto& notification) {
-				EXPECT_EQ(transaction.SignerPublicKey, notification.Signer);
+				EXPECT_EQ(GetSignerAddress(transaction), notification.Owner);
 				EXPECT_EQ(transaction.Id, notification.NamespaceId);
 				EXPECT_EQ(transaction.Duration, notification.Duration);
 			});
@@ -113,11 +115,11 @@ namespace catapult { namespace plugins {
 
 		auto pTransaction = CreateTransactionWithName<TTraits>(11);
 		PrepareRootNamespaceFiniteDurationTransaction(*pTransaction);
-		pTransaction->SignerPublicKey = config.NemesisPublicKey;
+		pTransaction->SignerPublicKey = config.NemesisSignerPublicKey;
 
 		// Act + Assert:
 		test::TransactionPluginTestUtils<TTraits>::AssertNotificationTypes(*pTransaction, {
-			AccountPublicKeyNotification::Notification_Type,
+			AccountAddressNotification::Notification_Type,
 			NamespaceRegistrationNotification::Notification_Type,
 			RootNamespaceNotification::Notification_Type,
 			NamespaceNameNotification::Notification_Type
@@ -130,7 +132,7 @@ namespace catapult { namespace plugins {
 
 		auto pTransaction = CreateTransactionWithName<TTraits>(11);
 		PrepareRootNamespaceFiniteDurationTransaction(*pTransaction);
-		pTransaction->SignerPublicKey = config.NemesisPublicKey;
+		pTransaction->SignerPublicKey = config.NemesisSignerPublicKey;
 
 		typename test::TransactionPluginTestUtils<TTraits>::PublishTestBuilder builder;
 		AddCommonRootExpectations<TTraits>(builder, config, *pTransaction);
@@ -152,7 +154,7 @@ namespace catapult { namespace plugins {
 
 		// Act + Assert:
 		test::TransactionPluginTestUtils<TTraits>::AssertNotificationTypes(*pTransaction, {
-			AccountPublicKeyNotification::Notification_Type,
+			AccountAddressNotification::Notification_Type,
 			BalanceTransferNotification::Notification_Type,
 			NamespaceRentalFeeNotification::Notification_Type,
 			NamespaceRegistrationNotification::Notification_Type,
@@ -172,14 +174,14 @@ namespace catapult { namespace plugins {
 		typename test::TransactionPluginTestUtils<TTraits>::PublishTestBuilder builder;
 		AddCommonRootExpectations<TTraits>(builder, config, transaction);
 		builder.template addExpectation<BalanceTransferNotification>([&config, &transaction](const auto& notification) {
-			EXPECT_EQ(transaction.SignerPublicKey, notification.Sender);
+			EXPECT_EQ(GetSignerAddress(transaction), notification.Sender);
 			EXPECT_EQ(config.SinkAddress, notification.Recipient);
 			EXPECT_EQ(config.CurrencyMosaicId, notification.MosaicId);
 			EXPECT_EQ(Amount(987 * transaction.Duration.unwrap()), notification.Amount);
 			EXPECT_EQ(BalanceTransferNotification::AmountType::Dynamic, notification.TransferAmountType);
 		});
 		builder.template addExpectation<NamespaceRentalFeeNotification>([&config, &transaction](const auto& notification) {
-			EXPECT_EQ(transaction.SignerPublicKey, notification.Sender);
+			EXPECT_EQ(GetSignerAddress(transaction), notification.Sender);
 			EXPECT_EQ(config.SinkAddress, notification.Recipient);
 			EXPECT_EQ(config.CurrencyMosaicId, notification.MosaicId);
 			EXPECT_EQ(Amount(987 * transaction.Duration.unwrap()), notification.Amount);
@@ -203,7 +205,7 @@ namespace catapult { namespace plugins {
 
 		// Act + Assert:
 		test::TransactionPluginTestUtils<TTraits>::AssertNotificationTypes(*pTransaction, {
-			AccountPublicKeyNotification::Notification_Type,
+			AccountAddressNotification::Notification_Type,
 			NamespaceRegistrationNotification::Notification_Type,
 			RootNamespaceNotification::Notification_Type,
 			NamespaceNameNotification::Notification_Type
@@ -235,14 +237,16 @@ namespace catapult { namespace plugins {
 				typename test::TransactionPluginTestUtils<TTraits>::PublishTestBuilder& builder,
 				const NamespaceRentalFeeConfiguration& config,
 				const typename TTraits::TransactionType& transaction) {
-			builder.template addExpectation<AccountPublicKeyNotification>([&config](const auto& notification) {
-				EXPECT_EQ(config.SinkPublicKey, notification.PublicKey);
+			builder.template addExpectation<AccountAddressNotification>([&config](const auto& notification) {
+				EXPECT_FALSE(notification.Address.isResolved());
+
+				EXPECT_EQ(config.SinkAddress, notification.Address.unresolved());
 			});
 			builder.template addExpectation<NamespaceRegistrationNotification>([&transaction](const auto& notification) {
 				EXPECT_EQ(transaction.RegistrationType, notification.RegistrationType);
 			});
 			builder.template addExpectation<ChildNamespaceNotification>([&transaction](const auto& notification) {
-				EXPECT_EQ(transaction.SignerPublicKey, notification.Signer);
+				EXPECT_EQ(GetSignerAddress(transaction), notification.Owner);
 				EXPECT_EQ(transaction.Id, notification.NamespaceId);
 				EXPECT_EQ(transaction.ParentId, notification.ParentId);
 			});
@@ -269,11 +273,11 @@ namespace catapult { namespace plugins {
 
 		auto pTransaction = CreateTransactionWithName<TTraits>(11);
 		PrepareChildNamespaceTransaction(*pTransaction);
-		pTransaction->SignerPublicKey = config.NemesisPublicKey;
+		pTransaction->SignerPublicKey = config.NemesisSignerPublicKey;
 
 		// Act + Assert:
 		test::TransactionPluginTestUtils<TTraits>::AssertNotificationTypes(*pTransaction, {
-			AccountPublicKeyNotification::Notification_Type,
+			AccountAddressNotification::Notification_Type,
 			NamespaceRegistrationNotification::Notification_Type,
 			ChildNamespaceNotification::Notification_Type,
 			NamespaceNameNotification::Notification_Type
@@ -286,7 +290,7 @@ namespace catapult { namespace plugins {
 
 		auto pTransaction = CreateTransactionWithName<TTraits>(11);
 		PrepareChildNamespaceTransaction(*pTransaction);
-		pTransaction->SignerPublicKey = config.NemesisPublicKey;
+		pTransaction->SignerPublicKey = config.NemesisSignerPublicKey;
 
 		typename test::TransactionPluginTestUtils<TTraits>::PublishTestBuilder builder;
 		AddCommonChildExpectations<TTraits>(builder, config, *pTransaction);
@@ -308,7 +312,7 @@ namespace catapult { namespace plugins {
 
 		// Act + Assert:
 		test::TransactionPluginTestUtils<TTraits>::AssertNotificationTypes(*pTransaction, {
-			AccountPublicKeyNotification::Notification_Type,
+			AccountAddressNotification::Notification_Type,
 			BalanceTransferNotification::Notification_Type,
 			NamespaceRentalFeeNotification::Notification_Type,
 			NamespaceRegistrationNotification::Notification_Type,
@@ -328,14 +332,14 @@ namespace catapult { namespace plugins {
 		typename test::TransactionPluginTestUtils<TTraits>::PublishTestBuilder builder;
 		AddCommonChildExpectations<TTraits>(builder, config, transaction);
 		builder.template addExpectation<BalanceTransferNotification>([&config, &transaction](const auto& notification) {
-			EXPECT_EQ(transaction.SignerPublicKey, notification.Sender);
+			EXPECT_EQ(GetSignerAddress(transaction), notification.Sender);
 			EXPECT_EQ(config.SinkAddress, notification.Recipient);
 			EXPECT_EQ(config.CurrencyMosaicId, notification.MosaicId);
 			EXPECT_EQ(Amount(777), notification.Amount);
 			EXPECT_EQ(BalanceTransferNotification::AmountType::Dynamic, notification.TransferAmountType);
 		});
 		builder.template addExpectation<NamespaceRentalFeeNotification>([&config, &transaction](const auto& notification) {
-			EXPECT_EQ(transaction.SignerPublicKey, notification.Sender);
+			EXPECT_EQ(GetSignerAddress(transaction), notification.Sender);
 			EXPECT_EQ(config.SinkAddress, notification.Recipient);
 			EXPECT_EQ(config.CurrencyMosaicId, notification.MosaicId);
 			EXPECT_EQ(Amount(777), notification.Amount);

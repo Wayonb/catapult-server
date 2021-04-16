@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -32,17 +33,16 @@ namespace catapult { namespace model {
 			return { reinterpret_cast<const uint8_t*>(&entity) + headerSize, totalSize - headerSize };
 		}
 
-		Hash256 CalculateHash(const VerifiableEntity& entity, const RawBuffer& buffer, const GenerationHash* pGenerationHash) {
+		Hash256 CalculateHash(const VerifiableEntity& entity, const RawBuffer& buffer, const GenerationHashSeed* pGenerationHashSeed) {
 			Hash256 entityHash;
 			crypto::Sha3_256_Builder sha3;
-			// "R" part of a signature
-			sha3.update({ entity.Signature.data(), Signature::Size / 2 });
 
-			// public key is added here to match Sign/Verify behavior, which explicitly hashes it
+			// add full signature and public key (this is different than Sign/Verify)
+			sha3.update(entity.Signature);
 			sha3.update(entity.SignerPublicKey);
 
-			if (pGenerationHash)
-				sha3.update(*pGenerationHash);
+			if (pGenerationHashSeed)
+				sha3.update(*pGenerationHashSeed);
 
 			sha3.update(buffer);
 			sha3.final(entityHash);
@@ -51,17 +51,15 @@ namespace catapult { namespace model {
 	}
 
 	Hash256 CalculateHash(const Block& block) {
-		auto blockRawBuffer = EntityDataBuffer(block, sizeof(BlockHeader));
-		blockRawBuffer.Size -= Block::Footer_Size;
-		return CalculateHash(block, blockRawBuffer, nullptr);
+		return CalculateHash(block, GetBlockHeaderDataBuffer(block), nullptr);
 	}
 
-	Hash256 CalculateHash(const Transaction& transaction, const GenerationHash& generationHash) {
-		return CalculateHash(transaction, EntityDataBuffer(transaction, transaction.Size), &generationHash);
+	Hash256 CalculateHash(const Transaction& transaction, const GenerationHashSeed& generationHashSeed) {
+		return CalculateHash(transaction, EntityDataBuffer(transaction, transaction.Size), &generationHashSeed);
 	}
 
-	Hash256 CalculateHash(const Transaction& transaction, const GenerationHash& generationHash, const RawBuffer& buffer) {
-		return CalculateHash(transaction, buffer, &generationHash);
+	Hash256 CalculateHash(const Transaction& transaction, const GenerationHashSeed& generationHashSeed, const RawBuffer& buffer) {
+		return CalculateHash(transaction, buffer, &generationHashSeed);
 	}
 
 	Hash256 CalculateMerkleComponentHash(
@@ -96,12 +94,12 @@ namespace catapult { namespace model {
 
 	void UpdateHashes(
 			const TransactionRegistry& transactionRegistry,
-			const GenerationHash& generationHash,
+			const GenerationHashSeed& generationHashSeed,
 			TransactionElement& transactionElement) {
 		const auto& transaction = transactionElement.Transaction;
 		const auto& plugin = *transactionRegistry.findPlugin(transaction.Type);
 
-		transactionElement.EntityHash = CalculateHash(transaction, generationHash, plugin.dataBuffer(transaction));
+		transactionElement.EntityHash = CalculateHash(transaction, generationHashSeed, plugin.dataBuffer(transaction));
 		transactionElement.MerkleComponentHash = CalculateMerkleComponentHash(
 				transaction,
 				transactionElement.EntityHash,

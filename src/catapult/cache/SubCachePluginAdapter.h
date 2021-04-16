@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -130,6 +131,13 @@ namespace catapult { namespace cache {
 				return MerkleRootMutator<UnderlyingViewType>();
 			}
 
+			template<typename TPruneValue>
+			auto pruneMutator() {
+				// need to dereference to get underlying view type from LockedCacheView
+				using UnderlyingViewType = std::remove_reference_t<decltype(*m_view)>;
+				return PruneMutator<TPruneValue, UnderlyingViewType>();
+			}
+
 		public:
 			const SubCacheViewIdentifier& id() const override {
 				return m_id;
@@ -159,58 +167,77 @@ namespace catapult { namespace cache {
 				UpdateMerkleRoot(m_view, height, merkleRootMutator());
 			}
 
+			void prune(Height height) override {
+				Prune(m_view, height, pruneMutator<Height>());
+			}
+
+			void prune(Timestamp time) override {
+				Prune(m_view, time, pruneMutator<Timestamp>());
+			}
+
 			const void* asReadOnly() const override {
 				return &m_view->asReadOnly();
 			}
 
 		private:
-			enum class MerkleRootType { Unsupported, Supported };
-			using UnsupportedMerkleRootFlag = std::integral_constant<MerkleRootType, MerkleRootType::Unsupported>;
-			using SupportedMerkleRootFlag = std::integral_constant<MerkleRootType, MerkleRootType::Supported>;
+			enum class FeatureType { Unsupported, Supported };
+			using UnsupportedFeatureFlag = std::integral_constant<FeatureType, FeatureType::Unsupported>;
+			using SupportedFeatureFlag = std::integral_constant<FeatureType, FeatureType::Supported>;
 
 			template<typename T, typename = void>
-			struct MerkleRootAccessor : public UnsupportedMerkleRootFlag {};
+			struct MerkleRootAccessor : public UnsupportedFeatureFlag {};
 
 			template<typename T>
 			struct MerkleRootAccessor<
 					T,
 					utils::traits::is_type_expression_t<decltype(reinterpret_cast<const T*>(0)->tryGetMerkleRoot())>>
-					: public SupportedMerkleRootFlag
+					: public SupportedFeatureFlag
 			{};
 
 			template<typename T, typename = void>
-			struct MerkleRootMutator : public UnsupportedMerkleRootFlag {};
+			struct MerkleRootMutator : public UnsupportedFeatureFlag {};
 
 			template<typename T>
 			struct MerkleRootMutator<
 					T,
 					utils::traits::is_type_expression_t<decltype(reinterpret_cast<T*>(0)->setMerkleRoot(Hash256()))>>
-					: public SupportedMerkleRootFlag
+					: public SupportedFeatureFlag
 			{};
 
-			static bool SupportsMerkleRoot(const TView&, UnsupportedMerkleRootFlag) {
+			template<typename TPruneValue, typename T, typename = void>
+			struct PruneMutator : public UnsupportedFeatureFlag {};
+
+			template<typename TPruneValue, typename T>
+			struct PruneMutator<
+					TPruneValue,
+					T,
+					utils::traits::is_type_expression_t<decltype(reinterpret_cast<T*>(0)->prune(TPruneValue()))>>
+					: public SupportedFeatureFlag
+			{};
+
+			static bool SupportsMerkleRoot(const TView&, UnsupportedFeatureFlag) {
 				return false;
 			}
 
-			static bool SupportsMerkleRoot(const TView& view, SupportedMerkleRootFlag) {
+			static bool SupportsMerkleRoot(const TView& view, SupportedFeatureFlag) {
 				return view->supportsMerkleRoot();
 			}
 
-			static bool TryGetMerkleRoot(const TView&, Hash256&, UnsupportedMerkleRootFlag) {
+			static bool TryGetMerkleRoot(const TView&, Hash256&, UnsupportedFeatureFlag) {
 				return false;
 			}
 
-			static bool TryGetMerkleRoot(const TView& view, Hash256& merkleRoot, SupportedMerkleRootFlag) {
+			static bool TryGetMerkleRoot(const TView& view, Hash256& merkleRoot, SupportedFeatureFlag) {
 				auto result = view->tryGetMerkleRoot();
 				merkleRoot = result.first;
 				return result.second;
 			}
 
-			static bool TrySetMerkleRoot(TView&, const Hash256&, UnsupportedMerkleRootFlag) {
+			static bool TrySetMerkleRoot(TView&, const Hash256&, UnsupportedFeatureFlag) {
 				return false;
 			}
 
-			static bool TrySetMerkleRoot(TView& view, const Hash256& merkleRoot, SupportedMerkleRootFlag) {
+			static bool TrySetMerkleRoot(TView& view, const Hash256& merkleRoot, SupportedFeatureFlag) {
 				if (!view->supportsMerkleRoot())
 					return false;
 
@@ -218,11 +245,20 @@ namespace catapult { namespace cache {
 				return true;
 			}
 
-			static void UpdateMerkleRoot(TView&, Height, UnsupportedMerkleRootFlag)
+			static void UpdateMerkleRoot(TView&, Height, UnsupportedFeatureFlag)
 			{}
 
-			static void UpdateMerkleRoot(TView& view, Height height, SupportedMerkleRootFlag) {
+			static void UpdateMerkleRoot(TView& view, Height height, SupportedFeatureFlag) {
 				view->updateMerkleRoot(height);
+			}
+
+			template<typename TPruneValue>
+			static void Prune(TView&, TPruneValue, UnsupportedFeatureFlag)
+			{}
+
+			template<typename TPruneValue>
+			static void Prune(TView& view, TPruneValue value, SupportedFeatureFlag) {
+				view->prune(value);
 			}
 
 		private:
@@ -243,7 +279,7 @@ namespace catapult { namespace cache {
 			{}
 
 		public:
-			std::unique_ptr<SubCacheView> tryLock() {
+			std::unique_ptr<SubCacheView> tryLock() override {
 				auto delta = m_lockableCacheDelta.tryLock();
 				return delta ? std::make_unique<SubCacheViewAdapter<decltype(delta)>>(std::move(delta), m_id) : nullptr;
 			}

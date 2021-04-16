@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,10 +20,10 @@
 **/
 
 #include "catapult/io/FileQueue.h"
+#include "catapult/thread/ThreadGroup.h"
 #include "tests/test/nodeps/Filesystem.h"
 #include "tests/TestHarness.h"
-#include <boost/filesystem.hpp>
-#include <boost/thread.hpp>
+#include <filesystem>
 
 namespace catapult { namespace io {
 
@@ -59,18 +60,18 @@ namespace catapult { namespace io {
 			}
 
 			size_t countFiles() const {
-				auto begin = boost::filesystem::directory_iterator(m_directory);
-				auto end = boost::filesystem::directory_iterator();
+				auto begin = std::filesystem::directory_iterator(m_directory);
+				auto end = std::filesystem::directory_iterator();
 				return static_cast<size_t>(std::distance(begin, end));
 			}
 
 			bool exists(const std::string& name) const {
-				return boost::filesystem::exists(m_directory / name);
+				return std::filesystem::exists(m_directory / name);
 			}
 
 		private:
 			test::TempDirectoryGuard m_tempDataDir;
-			boost::filesystem::path m_directory;
+			std::filesystem::path m_directory;
 		};
 
 		// endregion
@@ -151,21 +152,21 @@ namespace catapult { namespace io {
 		auto writeBuffers = GenerateRandomBuffers(GetNumIterations());
 
 		// Act: writer thread
-		boost::thread_group threads;
+		thread::ThreadGroup threads;
 		auto writer = context.createWriter();
-		threads.create_thread([&writeBuffers, &writer] {
+		threads.spawn([&writeBuffers, &writer] {
 			WriteAll(writer, writeBuffers);
 		});
 
 		// - reader thread
 		BufferVector readBuffers;
 		auto reader = context.createReader();
-		threads.create_thread([&readBuffers, &reader] {
+		threads.spawn([&readBuffers, &reader] {
 			readBuffers = ReadAll(reader, GetNumIterations());
 		});
 
 		// - wait for all threads
-		threads.join_all();
+		threads.join();
 
 		// Assert: all buffers were read and only index files remain
 		AssertEqualBufferVectors(writeBuffers, readBuffers);
@@ -225,19 +226,19 @@ namespace catapult { namespace io {
 		auto writeBuffers = GenerateRandomBuffers(GetNumIterations());
 
 		// Act: writer thread
-		boost::thread_group threads;
-		threads.create_thread([&context, &writeBuffers] {
+		thread::ThreadGroup threads;
+		threads.spawn([&context, &writeBuffers] {
 			WriteAll(context, writeBuffers);
 		});
 
 		// - reader thread
 		BufferVector readBuffers;
-		threads.create_thread([&context, &readBuffers] {
+		threads.spawn([&context, &readBuffers] {
 			readBuffers = ReadAll(context, GetNumIterations());
 		});
 
 		// - wait for all threads
-		threads.join_all();
+		threads.join();
 
 		// Assert: all buffers were read and only index files remain
 		AssertEqualBufferVectors(writeBuffers, readBuffers);

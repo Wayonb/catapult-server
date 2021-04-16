@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -68,7 +69,7 @@ namespace catapult { namespace local {
 			auto pNamespaceBlock = utils::UniqueToShared(builder.asSingleBlock(transactionsBuilder));
 
 			// Act:
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			auto pIo = test::PushEntity(connection, ionet::PacketType::Push_Block, pNamespaceBlock);
 
 			// - wait for the chain height to change and for all height readers to disconnect
@@ -113,7 +114,7 @@ namespace catapult { namespace local {
 				auto builderBlockPair = PrepareTwoRootNamespaces(m_context, m_accounts, stateHashCalculator, m_stateHashes);
 
 				// - add the specified number of blocks
-				test::ExternalSourceConnection connection;
+				test::ExternalSourceConnection connection(m_context.publicKey());
 				auto builder2 = builderBlockPair.first.createChainedBuilder();
 				auto transferBlocksResult = PushTransferBlocks(m_context, connection, m_accounts, builder2, numBlocks);
 				m_numAliveChains = transferBlocksResult.NumAliveChains;
@@ -217,7 +218,7 @@ namespace catapult { namespace local {
 			});
 
 			// Act:
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			auto pIo1 = test::PushEntities(connection, ionet::PacketType::Push_Block, nextBlocks);
 
 			// - wait for the chain height to change and for all height readers to disconnect
@@ -281,16 +282,20 @@ namespace catapult { namespace local {
 		//   (3) max rollback blocks => 10
 		constexpr auto Blocks_Before_Namespace_Prune = static_cast<uint32_t>(12 + (utils::TimeSpan::FromHours(1).seconds() / 20) + 10);
 
+		void SetMaxRollbackBlocks(const config::CatapultConfiguration& config) {
+			const_cast<uint32_t&>(config.BlockChain.MaxRollbackBlocks) = 10;
+		}
+
 		template<typename TTestContext>
 		NamespaceStateHashes RunPruneNamespaceTest(TTestContext& context) {
 			// Act:
-			return RunNamespaceStateChangeTest(context, Blocks_Before_Namespace_Prune - 1, 1);
+			return RunNamespaceStateChangeTest(context, Blocks_Before_Namespace_Prune, 1);
 		}
 	}
 
 	NO_STRESS_TEST(TEST_CLASS, CanPruneNamespace) {
 		// Arrange:
-		test::StateHashDisabledTestContext context;
+		test::StateHashDisabledTestContext context(test::NonNemesisTransactionPlugins::None, SetMaxRollbackBlocks);
 
 		// Act + Assert:
 		auto stateHashesPair = test::Unzip(RunPruneNamespaceTest(context));
@@ -301,7 +306,7 @@ namespace catapult { namespace local {
 
 	NO_STRESS_TEST(TEST_CLASS, CanPruneNamespaceWithStateHashEnabled) {
 		// Arrange:
-		test::StateHashEnabledTestContext context;
+		test::StateHashEnabledTestContext context(test::NonNemesisTransactionPlugins::None, SetMaxRollbackBlocks);
 
 		// Act + Assert:
 		auto stateHashesPair = test::Unzip(RunPruneNamespaceTest(context));
@@ -340,7 +345,7 @@ namespace catapult { namespace local {
 			});
 
 			// Act:
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			auto pIo1 = test::PushEntities(connection, ionet::PacketType::Push_Block, worseBlocks);
 			auto pIo2 = test::PushEntities(connection, ionet::PacketType::Push_Block, betterBlocks);
 
@@ -408,7 +413,7 @@ namespace catapult { namespace local {
 
 	NO_STRESS_TEST(TEST_CLASS, CanPruneAndRollbackNamespace) {
 		// Arrange:
-		test::StateHashDisabledTestContext context;
+		test::StateHashDisabledTestContext context(test::NonNemesisTransactionPlugins::None, SetMaxRollbackBlocks);
 
 		// Act + Assert:
 		auto stateHashesPair = test::Unzip(RunPruneAndRollbackNamespaceTest(context));
@@ -419,7 +424,7 @@ namespace catapult { namespace local {
 
 	NO_STRESS_TEST(TEST_CLASS, CanPruneAndRollbackNamespaceWithStateHashEnabled) {
 		// Arrange:
-		test::StateHashEnabledTestContext context;
+		test::StateHashEnabledTestContext context(test::NonNemesisTransactionPlugins::None, SetMaxRollbackBlocks);
 
 		// Act + Assert:
 		auto stateHashesPair = test::Unzip(RunPruneAndRollbackNamespaceTest(context));
@@ -471,7 +476,7 @@ namespace catapult { namespace local {
 			BlockChainBuilder builder(accounts, stateHashCalculator);
 			auto blocks = builder.asBlockChain(transactionsBuilder);
 
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			test::PushEntities(connection, ionet::PacketType::Push_Block, blocks);
 			test::WaitForHeightAndElements(context, Height(3 + numAliveBlocks + 1), 1, 1);
 			stateHashes.emplace_back(GetStateHash(context), GetComponentStateHash(context));

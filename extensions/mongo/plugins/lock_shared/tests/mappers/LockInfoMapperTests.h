@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -35,20 +36,26 @@ namespace catapult { namespace mongo { namespace plugins {
 	public:
 		static void AssertCanMapLockInfo_ModelToDbModel() {
 			// Arrange:
-			auto lockInfo = TLockInfoTraits::CreateLockInfo(Height(123));
-			auto address = test::GenerateRandomByteArray<Address>();
-			lockInfo.Status = state::LockStatus::Used;
+			auto lockInfo1 = TLockInfoTraits::CreateLockInfo(Height(123));
+			lockInfo1.Status = state::LockStatus::Used;
+
+			auto lockInfo2 = lockInfo1;
+			lockInfo2.EndHeight = lockInfo1.EndHeight + Height(10);
+			lockInfo2.Status = state::LockStatus::Unused;
+
+			auto history = typename TLockInfoTraits::HistoryType(GetLockIdentifier(lockInfo1));
+			history.push_back(lockInfo1);
+			history.push_back(lockInfo2);
 
 			// Act:
-			auto document = ToDbModel(lockInfo, address);
+			auto document = ToDbModel(history);
 			auto view = document.view();
 
-			// Assert:
+			// Assert: only the most recent lock info is mapped
 			EXPECT_EQ(1u, test::GetFieldCount(view));
 
 			auto lockInfoView = view["lock"].get_document().view();
-			EXPECT_EQ(6u + TLockInfoTraits::Num_Additional_Fields, test::GetFieldCount(lockInfoView));
-			TLockInfoTraits::AssertEqualLockInfoData(lockInfo, address, lockInfoView);
+			TLockInfoTraits::AssertEqualLockInfoData(lockInfo2, lockInfoView);
 		}
 	};
 }}}

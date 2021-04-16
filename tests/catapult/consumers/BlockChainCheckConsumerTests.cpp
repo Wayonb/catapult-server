@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,49 +32,17 @@ namespace catapult { namespace consumers {
 #define TEST_CLASS BlockChainCheckConsumerTests
 
 	namespace {
-		constexpr uint32_t Test_Block_Chain_Limit = 20;
-
 		disruptor::ConstBlockConsumer CreateDefaultBlockChainCheckConsumer() {
-			return CreateBlockChainCheckConsumer(Test_Block_Chain_Limit, utils::TimeSpan::FromHours(1), []() {
+			return CreateBlockChainCheckConsumer(utils::TimeSpan::FromHours(1), []() {
 				return Timestamp(100);
 			});
 		}
 	}
 
+	// region basic
+
 	TEST(TEST_CLASS, CanProcessZeroEntities) {
 		test::AssertPassthroughForEmptyInput(CreateDefaultBlockChainCheckConsumer());
-	}
-
-	// region max chain size
-
-	namespace {
-		void AssertBlockChainSizeValidation(uint32_t chainSize, disruptor::CompletionStatus expectedStatus) {
-			// Arrange:
-			auto elements = test::CreateBlockElements(chainSize);
-			test::LinkBlocks(Height(12), elements);
-			auto consumer = CreateDefaultBlockChainCheckConsumer();
-
-			// Act:
-			auto result = consumer(elements);
-
-			// Assert:
-			if (disruptor::CompletionStatus::Normal == expectedStatus)
-				test::AssertContinued(result);
-			else
-				test::AssertAborted(result, Failure_Consumer_Remote_Chain_Too_Many_Blocks, disruptor::ConsumerResultSeverity::Failure);
-		}
-	}
-
-	TEST(TEST_CLASS, BlockChainSizeCanBeLessThanBlockLimit) {
-		AssertBlockChainSizeValidation(Test_Block_Chain_Limit - 1, disruptor::CompletionStatus::Normal);
-	}
-
-	TEST(TEST_CLASS, BlockChainSizeCanBeEqualToBlockLimit) {
-		AssertBlockChainSizeValidation(Test_Block_Chain_Limit, disruptor::CompletionStatus::Normal);
-	}
-
-	TEST(TEST_CLASS, BlockChainSizeCannotBeGreaterThanBlockLimit) {
-		AssertBlockChainSizeValidation(Test_Block_Chain_Limit + 1, disruptor::CompletionStatus::Aborted);
 	}
 
 	// endregion
@@ -89,7 +58,7 @@ namespace catapult { namespace consumers {
 			// Arrange:
 			auto elements = test::CreateBlockElements(chainSize);
 			test::LinkBlocks(Height(12), elements);
-			auto consumer = CreateBlockChainCheckConsumer(Test_Block_Chain_Limit, maxBlockFutureTime, [currentTime]() {
+			auto consumer = CreateBlockChainCheckConsumer(maxBlockFutureTime, [currentTime]() {
 				return currentTime;
 			});
 
@@ -228,6 +197,55 @@ namespace catapult { namespace consumers {
 
 		// Assert:
 		test::AssertAborted(result, Failure_Consumer_Remote_Chain_Improper_Link, disruptor::ConsumerResultSeverity::Failure);
+	}
+
+	// endregion
+
+	// region chain link (importance)
+
+	namespace {
+		model::ImportanceBlockFooter& GetBlockFooterAt(test::BlockElementsInputFacade& elements, size_t index) {
+			return model::GetBlockFooter<model::ImportanceBlockFooter>(const_cast<model::Block&>(elements[index].Block));
+		}
+
+		void RunImportanceBlockLinkTest(bool expectSuccess, const consumer<model::ImportanceBlockFooter&>& unlink) {
+			// Arrange: create blocks
+			auto pBlock1 = test::GenerateImportanceBlockWithTransactions(1);
+			auto pBlock2 = test::GenerateBlockWithTransactions(1);
+			auto pBlock3 = test::GenerateImportanceBlockWithTransactions(1);
+			auto pBlock4 = test::GenerateBlockWithTransactions(1);
+			auto pBlock5 = test::GenerateImportanceBlockWithTransactions(1);
+			auto elements = test::CreateBlockElements({ pBlock1.get(), pBlock2.get(), pBlock3.get(), pBlock4.get(), pBlock5.get() });
+			test::LinkBlocks(Height(12), elements);
+
+			// - link importances
+			GetBlockFooterAt(elements, 2).PreviousImportanceBlockHash = elements[0].EntityHash;
+			GetBlockFooterAt(elements, 4).PreviousImportanceBlockHash = elements[2].EntityHash;
+			unlink(GetBlockFooterAt(elements, 2));
+
+			auto consumer = CreateDefaultBlockChainCheckConsumer();
+
+			// Act:
+			auto result = consumer(elements);
+
+			// Assert:
+			if (expectSuccess) {
+				test::AssertContinued(result);
+			} else {
+				constexpr auto Failure_Result = Failure_Consumer_Remote_Chain_Improper_Importance_Link;
+				test::AssertAborted(result, Failure_Result, disruptor::ConsumerResultSeverity::Failure);
+			}
+		}
+	}
+
+	TEST(TEST_CLASS, ChainIsValidWhenAllImportanceBlocksHaveCorrectPreviousImportanceBlockHash) {
+		RunImportanceBlockLinkTest(true, [](const auto&) {});
+	}
+
+	TEST(TEST_CLASS, ChainIsInvalidWhenAnyImportanceBlockHasIncorrectPreviousImportanceBlockHash) {
+		RunImportanceBlockLinkTest(false, [](auto& blockFooter) {
+			test::FillWithRandomData(blockFooter.PreviousImportanceBlockHash);
+		});
 	}
 
 	// endregion

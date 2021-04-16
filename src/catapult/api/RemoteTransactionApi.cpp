@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -35,8 +36,12 @@ namespace catapult { namespace api {
 			static constexpr auto Packet_Type = ionet::PacketType::Pull_Transactions;
 			static constexpr auto Friendly_Name = "pull unconfirmed transactions";
 
-			static auto CreateRequestPacketPayload(BlockFeeMultiplier minFeeMultiplier, model::ShortHashRange&& knownShortHashes) {
+			static auto CreateRequestPacketPayload(
+					Timestamp minDeadline,
+					BlockFeeMultiplier minFeeMultiplier,
+					model::ShortHashRange&& knownShortHashes) {
 				ionet::PacketPayloadBuilder builder(Packet_Type);
+				builder.appendValue(minDeadline);
 				builder.appendValue(minFeeMultiplier);
 				builder.appendRange(std::move(knownShortHashes));
 				return builder.build();
@@ -70,9 +75,10 @@ namespace catapult { namespace api {
 
 		public:
 			FutureType<UtTraits> unconfirmedTransactions(
+					Timestamp minDeadline,
 					BlockFeeMultiplier minFeeMultiplier,
 					model::ShortHashRange&& knownShortHashes) const override {
-				return m_impl.dispatch(UtTraits(m_registry), minFeeMultiplier, std::move(knownShortHashes));
+				return m_impl.dispatch(UtTraits(m_registry), minDeadline, minFeeMultiplier, std::move(knownShortHashes));
 			}
 
 		private:

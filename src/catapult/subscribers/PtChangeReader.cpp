@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,6 +25,7 @@
 #include "catapult/io/PodIoUtils.h"
 #include "catapult/io/Stream.h"
 #include "catapult/io/TransactionInfoSerializer.h"
+#include "catapult/model/Cosignature.h"
 
 namespace catapult { namespace subscribers {
 
@@ -41,14 +43,13 @@ namespace catapult { namespace subscribers {
 		}
 
 		void ForwardCosignature(io::InputStream& inputStream, cache::PtChangeSubscriber& subscriber) {
-			Key signer;
-			Signature signature;
+			model::Cosignature cosignature;
 			model::TransactionInfo transactionInfo;
-			inputStream.read(signer);
-			inputStream.read(signature);
+
+			inputStream.read({ reinterpret_cast<uint8_t*>(&cosignature), sizeof(model::Cosignature) });
 			io::ReadTransactionInfo(inputStream, transactionInfo);
 
-			subscriber.notifyAddCosignature(transactionInfo, signer, signature);
+			subscriber.notifyAddCosignature(transactionInfo, cosignature);
 		}
 	}
 

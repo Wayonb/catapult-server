@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,7 +22,6 @@
 #include "Validators.h"
 #include "src/cache/MosaicRestrictionCache.h"
 #include "src/cache/MosaicRestrictionCacheUtils.h"
-#include "catapult/model/Address.h"
 #include "catapult/validators/ValidatorContext.h"
 
 namespace catapult { namespace validators {
@@ -59,10 +59,7 @@ namespace catapult { namespace validators {
 			return ProcessMosaicRules(notification.MosaicId, context, [&notification, &resolvers = context.Resolvers](
 					const auto& cache,
 					const auto& mosaicRules) {
-				auto isSenderAuthorized = cache::EvaluateMosaicRestrictionResolvedRulesForAddress(
-						cache,
-						model::PublicKeyToAddress(notification.Sender, cache.networkIdentifier()),
-						mosaicRules);
+				auto isSenderAuthorized = cache::EvaluateMosaicRestrictionResolvedRulesForAddress(cache, notification.Sender, mosaicRules);
 				auto isRecipientAuthorized = cache::EvaluateMosaicRestrictionResolvedRulesForAddress(
 						cache,
 						resolvers.resolve(notification.Recipient),
@@ -73,10 +70,7 @@ namespace catapult { namespace validators {
 
 		ValidationResult CheckDebitAuthorization(const model::BalanceDebitNotification& notification, const ValidatorContext& context) {
 			return ProcessMosaicRules(notification.MosaicId, context, [&notification](const auto& cache, const auto& mosaicRules) {
-				return cache::EvaluateMosaicRestrictionResolvedRulesForAddress(
-						cache,
-						model::PublicKeyToAddress(notification.Sender, cache.networkIdentifier()),
-						mosaicRules);
+				return cache::EvaluateMosaicRestrictionResolvedRulesForAddress(cache, notification.Sender, mosaicRules);
 			});
 		}
 	}

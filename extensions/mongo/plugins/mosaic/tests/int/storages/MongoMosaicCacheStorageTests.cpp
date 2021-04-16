@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,7 +21,6 @@
 
 #include "src/storages/MongoMosaicCacheStorage.h"
 #include "mongo/src/mappers/MapperUtils.h"
-#include "catapult/model/Address.h"
 #include "mongo/tests/test/MongoFlatCacheStorageTests.h"
 #include "mongo/tests/test/MongoTestUtils.h"
 #include "plugins/txes/mosaic/tests/test/MosaicCacheTestUtils.h"
@@ -40,6 +40,7 @@ namespace catapult { namespace mongo { namespace plugins {
 			using ModelType = state::MosaicEntry;
 
 			static constexpr auto Collection_Name = "mosaics";
+			static constexpr auto Primary_Document_Name = "mosaic";
 			static constexpr auto Network_Id = static_cast<model::NetworkIdentifier>(0x5A);
 			static constexpr auto CreateCacheStorage = CreateMongoMosaicCacheStorage;
 
@@ -48,7 +49,7 @@ namespace catapult { namespace mongo { namespace plugins {
 			}
 
 			static ModelType GenerateRandomElement(uint32_t id) {
-				auto owner = test::GenerateRandomByteArray<Key>();
+				auto owner = test::CreateRandomOwner();
 				return test::CreateMosaicEntry(MosaicId(id), Height(345), owner, Amount(456), BlockDuration(567));
 			}
 
@@ -73,12 +74,11 @@ namespace catapult { namespace mongo { namespace plugins {
 			}
 
 			static auto GetFindFilter(const ModelType& mosaicEntry) {
-				return document() << "mosaic.id" << mappers::ToInt64(mosaicEntry.mosaicId()) << finalize;
+				return document() << std::string(Primary_Document_Name) + ".id" << mappers::ToInt64(mosaicEntry.mosaicId()) << finalize;
 			}
 
 			static void AssertEqual(const ModelType& mosaicEntry, const bsoncxx::document::view& view) {
-				auto ownerAddress = model::PublicKeyToAddress(mosaicEntry.definition().ownerPublicKey(), Network_Id);
-				test::AssertEqualMosaicData(mosaicEntry, ownerAddress, view["mosaic"].get_document().view());
+				test::AssertEqualMosaicData(mosaicEntry, view[Primary_Document_Name].get_document().view());
 			}
 		};
 	}

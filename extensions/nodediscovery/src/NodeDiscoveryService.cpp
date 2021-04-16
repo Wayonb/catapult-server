@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,7 +24,7 @@
 #include "NodePingRequestor.h"
 #include "PeersProcessor.h"
 #include "nodediscovery/src/handlers/NodeDiscoveryHandlers.h"
-#include "catapult/crypto/KeyPair.h"
+#include "catapult/config/CatapultKeys.h"
 #include "catapult/extensions/NetworkUtils.h"
 #include "catapult/extensions/NodeInteractionUtils.h"
 #include "catapult/extensions/ServiceLocator.h"
@@ -91,7 +92,9 @@ namespace catapult { namespace nodediscovery {
 			}
 
 			void registerServices(extensions::ServiceLocator& locator, extensions::ServiceState& state) override {
-				auto networkIdentifier = state.config().BlockChain.Network.Identifier;
+				auto networkFingerprint = model::UniqueNetworkFingerprint(
+						state.config().BlockChain.Network.Identifier,
+						state.config().BlockChain.Network.GenerationHashSeed);
 
 				// create callbacks
 				auto pushNodeConsumer = CreatePushNodeConsumer(state);
@@ -101,26 +104,26 @@ namespace catapult { namespace nodediscovery {
 				auto pServiceGroup = state.pool().pushServiceGroup("node_discovery");
 				auto pNodePingRequestor = pServiceGroup->pushService(
 						CreateNodePingRequestor,
-						locator.keyPair(),
+						locator.keys().caPublicKey(),
 						connectionSettings,
-						networkIdentifier);
+						networkFingerprint);
 
 				locator.registerService(Service_Name, pNodePingRequestor);
 
 				// set handlers
 				auto& nodeContainer = state.nodes();
 				auto& pingRequestor = *pNodePingRequestor;
-				handlers::RegisterNodeDiscoveryPushPingHandler(state.packetHandlers(), networkIdentifier, pushNodeConsumer);
+				handlers::RegisterNodeDiscoveryPushPingHandler(state.packetHandlers(), networkFingerprint, pushNodeConsumer);
 				handlers::RegisterNodeDiscoveryPullPingHandler(state.packetHandlers(), m_pLocalNetworkNode);
 
 				auto pingRequestInitiator = [&pingRequestor](const auto& node, const auto& callback) {
 					return pingRequestor.beginRequest(node, callback);
 				};
 				PeersProcessor peersProcessor(
-						locator.keyPair().publicKey(),
+						locator.keys().caPublicKey(),
 						nodeContainer,
 						pingRequestInitiator,
-						networkIdentifier,
+						networkFingerprint,
 						pushNodeConsumer);
 				auto pushPeersHandler = [peersProcessor](const auto& candidateNodes) {
 					peersProcessor.process(candidateNodes);

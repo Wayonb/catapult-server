@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,6 +24,16 @@
 
 namespace catapult { namespace state {
 
+	bool AccountImportanceSnapshots::empty() const {
+		return std::all_of(m_snapshots.begin(), m_snapshots.end(), [](const auto& bucket) {
+			return model::ImportanceHeight() == bucket.Height;
+		});
+	}
+
+	bool AccountImportanceSnapshots::active() const {
+		return model::ImportanceHeight() != height();
+	}
+
 	Importance AccountImportanceSnapshots::current() const {
 		return m_snapshots.begin()->Importance;
 	}
@@ -41,13 +52,17 @@ namespace catapult { namespace state {
 
 	void AccountImportanceSnapshots::set(Importance importance, model::ImportanceHeight height) {
 		auto lastHeight = this->height();
-		if (lastHeight >= height) {
+		if (model::ImportanceHeight() != lastHeight && lastHeight >= height) {
 			std::ostringstream out;
 			out << "importances must be set with ascending heights (last = " << lastHeight << ", new = " << height << ")";
 			CATAPULT_THROW_RUNTIME_ERROR(out.str().c_str());
 		}
 
 		m_snapshots.push({ importance, height });
+	}
+
+	void AccountImportanceSnapshots::push() {
+		m_snapshots.push(ImportanceSnapshot());
 	}
 
 	void AccountImportanceSnapshots::pop() {

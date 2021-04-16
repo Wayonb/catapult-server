@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.14)
 
 set(PLUGIN_CATAPULT_LIBS catapult.mongo)
 
@@ -54,6 +54,12 @@ function(catapult_mongo_plugin_tests_with_deps TARGET_NAME)
 	target_link_libraries(${TARGET_NAME} tests.catapult.test.mongo.plugins.${PLUGIN_NAME})
 
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}" PARENT_SCOPE)
+endfunction()
+
+function(catapult_mongo_plugin_test_library TARGET_NAME)
+	catapult_add_gtest_dependencies()
+	catapult_library_target(${TARGET_NAME})
+	catapult_add_mongo_dependencies(${TARGET_NAME})
 endfunction()
 
 add_subdirectory(account_link)

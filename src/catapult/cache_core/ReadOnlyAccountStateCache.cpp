@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -56,5 +57,31 @@ namespace catapult { namespace cache {
 
 	MosaicId ReadOnlyAccountStateCache::harvestingMosaicId() const {
 		return m_pCache ? m_pCache->harvestingMosaicId() : m_pCacheDelta->harvestingMosaicId();
+	}
+
+	namespace {
+		template<typename TSource>
+		HighValueAccountStatistics ComputeHighValueAccountStatistics(const TSource& source) {
+			HighValueAccountStatistics statistics;
+			statistics.HarvestingEligibleAccountsCount = source.addresses().size();
+
+			statistics.VotingEligibleAccountsCount = 0;
+			for (const auto& accountHistoryPair : source.accountHistories()) {
+				const auto& balanceHistory = accountHistoryPair.second.balance();
+				if (Amount() == balanceHistory.get())
+					continue;
+
+				++statistics.VotingEligibleAccountsCount;
+				statistics.TotalVotingBalance = statistics.TotalVotingBalance + balanceHistory.get();
+			}
+
+			return statistics;
+		}
+	}
+
+	HighValueAccountStatistics ReadOnlyAccountStateCache::highValueAccountStatistics() const {
+		return m_pCache
+				? ComputeHighValueAccountStatistics(m_pCache->highValueAccounts())
+				: ComputeHighValueAccountStatistics(m_pCacheDelta->highValueAccounts());
 	}
 }}

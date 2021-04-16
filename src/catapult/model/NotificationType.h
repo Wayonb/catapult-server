@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -125,6 +126,24 @@ namespace catapult { namespace model {
 
 	/// Internal padding was identified.
 	DEFINE_CORE_NOTIFICATION(Internal_Padding, 0x000E, Validator);
+
+	/// Voting key was linked/unlinked.
+	DEFINE_CORE_NOTIFICATION(Voting_Key_Link, 0x000F, All);
+
+	/// Vrf key was linked/unlinked.
+	DEFINE_CORE_NOTIFICATION(Vrf_Key_Link, 0x0010, All);
+
+	/// Key link action was received.
+	DEFINE_CORE_NOTIFICATION(Key_Link_Action, 0x0011, Validator);
+
+	/// Importance block was received.
+	/// \note This notification type cannot support observation without more substantial changes.
+	/// CoreSystem observers assume that no notifications raised after Block can trigger state changes.
+	/// ImportanceBlockValidator relies on Block_Importance being raised after Block for the same reason.
+	DEFINE_CORE_NOTIFICATION(Block_Importance, 0x0012, Validator);
+
+	/// Block was received (type information only).
+	DEFINE_CORE_NOTIFICATION(Block_Type, 0x0013, Validator);
 
 #undef DEFINE_CORE_NOTIFICATION
 

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,7 +21,6 @@
 
 #include "Validators.h"
 #include "catapult/cache_core/AccountStateCache.h"
-#include "catapult/model/Address.h"
 #include "catapult/state/CatapultState.h"
 #include "catapult/validators/ValidatorContext.h"
 
@@ -39,6 +39,9 @@ namespace catapult { namespace validators {
 				return true;
 
 			effectiveAmount = Amount(notification.Amount.unwrap() * feeMultiplier.unwrap());
+			if (BlockFeeMultiplier() == feeMultiplier)
+				return true;
+
 			return std::numeric_limits<Amount::ValueType>::max() / feeMultiplier.unwrap() >= notification.Amount.unwrap();
 		}
 
@@ -47,15 +50,8 @@ namespace catapult { namespace validators {
 			return true;
 		}
 
-		bool FindAccountBalance(const cache::ReadOnlyAccountStateCache& cache, const Key& publicKey, MosaicId mosaicId, Amount& amount) {
-			auto accountStateKeyIter = cache.find(publicKey);
-			if (accountStateKeyIter.tryGet()) {
-				amount = accountStateKeyIter.get().Balances.get(mosaicId);
-				return true;
-			}
-
-			// if state could not be accessed by public key, try searching by address
-			auto accountStateAddressIter = cache.find(model::PublicKeyToAddress(publicKey, cache.networkIdentifier()));
+		bool FindAccountBalance(const cache::ReadOnlyAccountStateCache& cache, const Address& address, MosaicId mosaicId, Amount& amount) {
+			auto accountStateAddressIter = cache.find(address);
 			if (accountStateAddressIter.tryGet()) {
 				amount = accountStateAddressIter.get().Balances.get(mosaicId);
 				return true;

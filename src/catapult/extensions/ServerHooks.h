@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -43,27 +44,36 @@ namespace catapult { namespace extensions {
 	/// Packet payload sink.
 	using PacketPayloadSink = consumer<const ionet::PacketPayload&>;
 
+	/// Banned node identity sink.
+	using BannedNodeIdentitySink = consumer<const model::NodeIdentity&>;
+
 	/// Handler that is called when the confirmed state of transactions changes.
 	using TransactionsChangeHandler = consumers::BlockChainSyncHandlers::TransactionsChangeFunc;
 
 	/// Function signature for delivering a block range to a consumer.
 	using BlockRangeConsumerFunc = handlers::BlockRangeHandler;
 
-	/// Factory for creating a BlockRangeConsumerFunc bound to an input source.
-	using BlockRangeConsumerFactoryFunc = std::function<BlockRangeConsumerFunc (disruptor::InputSource)>;
-
-	/// Factory for creating a CompletionAwareBlockRangeConsumerFunc bound to an input source.
-	using CompletionAwareBlockRangeConsumerFactoryFunc =
-			std::function<chain::CompletionAwareBlockRangeConsumerFunc (disruptor::InputSource)>;
-
 	/// Function signature for delivering a transaction range to a consumer.
 	using TransactionRangeConsumerFunc = handlers::TransactionRangeHandler;
 
+	/// Factory for creating a range consumer function bound to an input source.
+	template<typename TConsumer>
+	using RangeConsumerFactoryFunc = std::function<TConsumer (disruptor::InputSource)>;
+
+	/// Factory for creating a BlockRangeConsumerFunc bound to an input source.
+	using BlockRangeConsumerFactoryFunc = RangeConsumerFactoryFunc<BlockRangeConsumerFunc>;
+
+	/// Factory for creating a CompletionAwareBlockRangeConsumerFunc bound to an input source.
+	using CompletionAwareBlockRangeConsumerFactoryFunc = RangeConsumerFactoryFunc<chain::CompletionAwareBlockRangeConsumerFunc>;
+
 	/// Factory for creating a TransactionRangeConsumerFunc bound to an input source.
-	using TransactionRangeConsumerFactoryFunc = std::function<TransactionRangeConsumerFunc (disruptor::InputSource)>;
+	using TransactionRangeConsumerFactoryFunc = RangeConsumerFactoryFunc<TransactionRangeConsumerFunc>;
 
 	/// Retriever that returns the network chain heights for a number of peers.
 	using RemoteChainHeightsRetriever = std::function<thread::future<std::vector<Height>> (size_t)>;
+
+	/// Supplier for retrieving a finalized height hash pair.
+	using FinalizedHeightHashPairSupplier = supplier<model::HeightHashPair>;
 
 	/// Predicate for determining if a chain is synced.
 	using ChainSyncedPredicate = predicate<>;
@@ -91,6 +101,11 @@ namespace catapult { namespace extensions {
 			m_packetPayloadSinks.push_back(sink);
 		}
 
+		/// Adds a banned node identity \a sink.
+		void addBannedNodeIdentitySink(const BannedNodeIdentitySink& sink) {
+			m_bannedNodeIdentitySinks.push_back(sink);
+		}
+
 		/// Adds a transactions change \a handler.
 		void addTransactionsChangeHandler(const TransactionsChangeHandler& handler) {
 			m_transactionsChangeHandlers.push_back(handler);
@@ -116,9 +131,19 @@ namespace catapult { namespace extensions {
 			SetOnce(m_transactionRangeConsumerFactory, factory);
 		}
 
-		/// Sets the remote heights chain \a retriever.
+		/// Sets the remote chain heights \a retriever.
 		void setRemoteChainHeightsRetriever(const RemoteChainHeightsRetriever& retriever) {
 			SetOnce(m_remoteChainHeightsRetriever, retriever);
+		}
+
+		/// Sets the local finalized height hash pair \a supplier.
+		void setLocalFinalizedHeightHashPairSupplier(const FinalizedHeightHashPairSupplier& supplier) {
+			SetOnce(m_localFinalizedHeightHashPairSupplier, supplier);
+		}
+
+		/// Sets the network finalized height hash pair \a supplier.
+		void setNetworkFinalizedHeightHashPairSupplier(const FinalizedHeightHashPairSupplier& supplier) {
+			SetOnce(m_networkFinalizedHeightHashPairSupplier, supplier);
 		}
 
 		/// Sets the chain synced \a predicate.
@@ -145,6 +170,11 @@ namespace catapult { namespace extensions {
 		/// Gets the packet payload sink.
 		auto packetPayloadSink() const {
 			return AggregateConsumers(m_packetPayloadSinks);
+		}
+
+		/// Gets the banned node identity sink.
+		auto bannedNodeIdentitySink() const {
+			return AggregateConsumers(m_bannedNodeIdentitySinks);
 		}
 
 		/// Gets the transactions change handler.
@@ -177,6 +207,18 @@ namespace catapult { namespace extensions {
 			return Require(m_remoteChainHeightsRetriever);
 		}
 
+		/// Gets the local finalized height hash pair supplier.
+		/// \note This height hash pair must be in the local block chain.
+		auto localFinalizedHeightHashPairSupplier() const {
+			return Require(m_localFinalizedHeightHashPairSupplier);
+		}
+
+		/// Gets the network finalized height hash pair supplier.
+		/// \note This height hash pair might not be in the local block chain.
+		auto networkFinalizedHeightHashPairSupplier() const {
+			return Require(m_networkFinalizedHeightHashPairSupplier);
+		}
+
 		/// Gets the chain synced predicate.
 		auto chainSyncedPredicate() const {
 			return m_chainSyncedPredicate ? m_chainSyncedPredicate : []() { return true; };
@@ -201,6 +243,7 @@ namespace catapult { namespace extensions {
 		std::vector<NewBlockSink> m_newBlockSinks;
 		std::vector<SharedNewTransactionsSink> m_newTransactionsSinks;
 		std::vector<PacketPayloadSink> m_packetPayloadSinks;
+		std::vector<BannedNodeIdentitySink> m_bannedNodeIdentitySinks;
 		std::vector<TransactionsChangeHandler> m_transactionsChangeHandlers;
 		std::vector<TransactionEventHandler> m_transactionEventHandlers;
 
@@ -209,6 +252,8 @@ namespace catapult { namespace extensions {
 		TransactionRangeConsumerFactoryFunc m_transactionRangeConsumerFactory;
 
 		RemoteChainHeightsRetriever m_remoteChainHeightsRetriever;
+		FinalizedHeightHashPairSupplier m_localFinalizedHeightHashPairSupplier;
+		FinalizedHeightHashPairSupplier m_networkFinalizedHeightHashPairSupplier;
 		ChainSyncedPredicate m_chainSyncedPredicate;
 		std::vector<KnownHashPredicate> m_knownHashPredicates;
 	};

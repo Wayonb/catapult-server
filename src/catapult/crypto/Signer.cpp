@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,45 +22,9 @@
 #include "Signer.h"
 #include "CryptoUtils.h"
 #include "Hashes.h"
-#include "catapult/utils/RandomGenerator.h"
+#include "SecureZero.h"
 #include "catapult/exceptions.h"
-#include <cstring>
-#include <random>
-
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wold-style-cast"
-#pragma clang diagnostic ignored "-Wcast-align"
-#pragma clang diagnostic ignored "-Wcast-qual"
-#pragma clang diagnostic ignored "-Wimplicit-fallthrough"
-#pragma clang diagnostic ignored "-Wsign-conversion"
-#pragma clang diagnostic ignored "-Wunused-function"
-#pragma clang diagnostic ignored "-Wreserved-id-macro"
-#pragma clang diagnostic ignored "-Wdocumentation"
-#elif defined(__GNUC__)
-#pragma GCC diagnostic ignored "-Wunused-function"
-#pragma GCC diagnostic ignored "-Wstrict-aliasing"
-#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
-#elif defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable : 4324) /* ed25519 structs use __declspec(align()) */
-#pragma warning(disable : 4388) /* signed/unsigned mismatch */
-#pragma warning(disable : 4505) /* unreferenced local function has been removed */
-#endif
-
-extern "C" {
-#include <donna/ed25519-donna-batchverify.h>
-#include <donna/modm-donna-64bit.h>
-#include <sha3/KeccakHash.h>
-}
-
-#ifdef __clang__
-#pragma clang diagnostic pop
-#elif defined(__GNUC__)
-#pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-#pragma warning(pop)
-#endif
+#include <donna/catapult.h>
 
 #ifdef _MSC_VER
 #define RESTRICT __restrict
@@ -108,12 +73,6 @@ namespace catapult { namespace crypto {
 			if (0 == (ValidateEncodedSPart(encodedS) & Is_Reduced))
 				CATAPULT_THROW_OUT_OF_RANGE("S part of signature invalid");
 		}
-
-#ifdef SIGNATURE_SCHEME_KECCAK
-		using HashBuilder = Keccak_512_Builder;
-#else
-		using HashBuilder = Sha3_512_Builder;
-#endif
 	}
 
 	// region Sign
@@ -126,21 +85,11 @@ namespace catapult { namespace crypto {
 		uint8_t *RESTRICT encodedR = computedSignature.data();
 		uint8_t *RESTRICT encodedS = computedSignature.data() + Encoded_Size;
 
-		// hash the private key to improve randomness
-		Hash512 privHash;
-		HashPrivateKey(keyPair.privateKey(), privHash);
-
 		// r = H(privHash[256:512] || data)
-		// "EdDSA avoids these issues by generating r = H(h_b, ..., h_2b?1, M), so that
+		// "EdDSA avoids these issues by generating r = H(h_b, ..., h_2b-1, M), so that
 		//  different messages will lead to different, hard-to-predict values of r."
-		Hash512 hash_r;
-		HashBuilder hasher_r;
-		hasher_r.update({ privHash.data() + Hash512::Size / 2, Hash512::Size / 2 });
-		hasher_r.update(buffersList);
-		hasher_r.final(hash_r);
-
 		bignum256modm r;
-		expand256_modm(r, hash_r.data(), 64);
+		GenerateNonce(keyPair.privateKey(), buffersList, r);
 
 		// R = rModQ * base point
 		ge25519 ALIGN(16) R;
@@ -149,13 +98,17 @@ namespace catapult { namespace crypto {
 
 		// h = H(encodedR || public || data)
 		Hash512 hash_h;
-		HashBuilder hasher_h;
+		Sha512_Builder hasher_h;
 		hasher_h.update({ { encodedR, Encoded_Size }, keyPair.publicKey() });
 		hasher_h.update(buffersList);
 		hasher_h.final(hash_h);
 
 		bignum256modm h;
 		expand256_modm(h, hash_h.data(), 64);
+
+		// hash the private key to improve randomness
+		Hash512 privHash;
+		HashPrivateKey(keyPair.privateKey(), privHash);
 
 		// a = fieldElement(privHash[0:256])
 		privHash[0] &= 0xF8;
@@ -176,6 +129,10 @@ namespace catapult { namespace crypto {
 		// throw if encodedS is not less than the group order, don't fail in case encodedS == 0
 		// (this should only throw if there is a bug in the signing code)
 		CheckEncodedS(encodedS);
+
+		SecureZero(privHash);
+		SecureZero(r);
+		SecureZero(a);
 	}
 
 	// endregion
@@ -200,7 +157,7 @@ namespace catapult { namespace crypto {
 
 		// h = H(encodedR || public || data)
 		Hash512 hash_h;
-		HashBuilder hasher_h;
+		Sha512_Builder hasher_h;
 		hasher_h.update({ { encodedR, Encoded_Size }, publicKey });
 		for (const auto& buffer : buffers)
 			hasher_h.update(buffer);
@@ -212,7 +169,7 @@ namespace catapult { namespace crypto {
 
 		// A = -pub
 		ge25519 ALIGN(16) A;
-		if (!ge25519_unpack_negative_vartime(&A, publicKey.data()))
+		if (!UnpackNegativeAndCheckSubgroup(A, publicKey))
 			return false;
 
 		bignum256modm S;
@@ -233,11 +190,6 @@ namespace catapult { namespace crypto {
 	// region VerifyMulti
 
 	namespace {
-		void RandomBytes(uint8_t* pOut, size_t count) {
-			utils::LowEntropyRandomGenerator generator;
-			generator.fill(pOut, count);
-		}
-
 		std::pair<std::vector<bool>, bool> CheckForCanonicalFormAndNonzeroKeys(const SignatureInput* pSignatureInputs, size_t count) {
 			// reject if not canonical or public key is zero
 			auto aggregateResult = true;
@@ -263,6 +215,7 @@ namespace catapult { namespace crypto {
 		}
 
 		bool VerifyBatches(
+				const RandomFiller& randomFiller,
 				const SignatureInput* pSignatureInputs,
 				size_t count,
 				std::pair<std::vector<bool>, bool>& result,
@@ -280,7 +233,7 @@ namespace catapult { namespace crypto {
 
 				// generate r (scalars[batchSize+1]..scalars[2*batchSize]
 				// compute scalars[0] = ((r1s1 + r2s2 + ...))
-				RandomBytes(reinterpret_cast<uint8_t*>(batch.r), batchSize * 16);
+				randomFiller(reinterpret_cast<uint8_t*>(batch.r), batchSize * 16);
 				r_scalars = &batch.scalars[batchSize + 1];
 				for (auto i = 0u; i < batchSize; ++i) {
 					expand256_modm(r_scalars[i], batch.r[i], 16);
@@ -293,7 +246,7 @@ namespace catapult { namespace crypto {
 				// compute scalars[1]..scalars[batchSize] as r[i]*H(R[i],A[i],m[i])
 				for (auto i = 0u; i < batchSize; ++i) {
 					Hash512 hash_h;
-					HashBuilder hasher_h;
+					Sha512_Builder hasher_h;
 					const auto& signatureInput = pSignatureInputs[offset + i];
 					hasher_h.update({ { signatureInput.Signature.data(), Encoded_Size }, signatureInput.PublicKey });
 					for (const auto& buffer : signatureInput.Buffers)
@@ -310,8 +263,9 @@ namespace catapult { namespace crypto {
 				bool success = true;
 				for (auto i = 0u; i < batchSize; ++i) {
 					const auto& signatureInput = pSignatureInputs[offset + i];
-					success &= 1 == ge25519_unpack_negative_vartime(&batch.points[i + 1], signatureInput.PublicKey.data());
-					success &= 1 == ge25519_unpack_negative_vartime(&batch.points[batchSize + i + 1], signatureInput.Signature.data());
+					auto R = signatureInput.Signature.copyTo<Key>();
+					success &= UnpackNegativeAndCheckSubgroup(batch.points[i + 1], signatureInput.PublicKey);
+					success &= UnpackNegativeAndCheckSubgroup(batch.points[batchSize + i + 1], R);
 					if (!success)
 						break;
 				}
@@ -334,18 +288,21 @@ namespace catapult { namespace crypto {
 		}
 	}
 
-	std::pair<std::vector<bool>, bool> VerifyMulti(const SignatureInput* pSignatureInputs, size_t count) {
+	std::pair<std::vector<bool>, bool> VerifyMulti(
+			const RandomFiller& randomFiller,
+			const SignatureInput* pSignatureInputs,
+			size_t count) {
 		auto result = CheckForCanonicalFormAndNonzeroKeys(pSignatureInputs, count);
-		VerifyBatches(pSignatureInputs, count, result, [&pSignatureInputs, &result](auto offset, auto batchSize) {
+		VerifyBatches(randomFiller, pSignatureInputs, count, result, [&pSignatureInputs, &result](auto offset, auto batchSize) {
 			result.second &= VerifySingle(pSignatureInputs, offset, batchSize, result.first);
 			return true;
 		});
 		return result;
 	}
 
-	bool VerifyMultiShortCircuit(const SignatureInput* pSignatureInputs, size_t count) {
+	bool VerifyMultiShortCircuit(const RandomFiller& randomFiller, const SignatureInput* pSignatureInputs, size_t count) {
 		auto result = CheckForCanonicalFormAndNonzeroKeys(pSignatureInputs, count);
-		return result.second && VerifyBatches(pSignatureInputs, count, result, [](auto, auto) {
+		return result.second && VerifyBatches(randomFiller, pSignatureInputs, count, result, [](auto, auto) {
 			return false;
 		});
 	}

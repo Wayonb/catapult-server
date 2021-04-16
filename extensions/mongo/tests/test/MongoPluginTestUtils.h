@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -33,7 +34,8 @@ namespace catapult { namespace test {
 		// - windows requires the caller to explicitly create a mongocxx instance before certain operations
 		//   like creating a mongocxx::pool (via MongoStorageContext)
 		mongocxx::instance::current();
-		auto pMongoContext = CreateDefaultMongoStorageContext(DatabaseName());
+		auto pPool = CreateStartedIoThreadPool(Num_Default_Mongo_Test_Pool_Threads);
+		auto pMongoContext = CreateDefaultMongoStorageContext(DatabaseName(), *pPool);
 		mongo::MongoPluginManager manager(*pMongoContext, model::NetworkIdentifier::Zero);
 		registerSubsystem(manager);
 

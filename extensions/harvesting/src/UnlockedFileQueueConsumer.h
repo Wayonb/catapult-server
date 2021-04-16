@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,51 +20,24 @@
 **/
 
 #pragma once
-#include "catapult/crypto/KeyPair.h"
+#include "BlockGeneratorAccountDescriptor.h"
+#include "HarvestRequest.h"
 #include "catapult/functions.h"
-#include "catapult/types.h"
 #include <string>
 
-namespace catapult {
-	namespace config { class CatapultDirectory; }
-	namespace crypto { class KeyPair; }
-}
+namespace catapult { namespace config { class CatapultDirectory; } }
 
 namespace catapult { namespace harvesting {
 
-	/// Unlocked entry direction.
-	enum class UnlockedEntryDirection : uint8_t {
-		/// Add unlocked entry.
-		Add,
+	/// Decrypts \a publicKeyPrefixedEncryptedPayload using \a encryptionKeyPair.
+	std::pair<BlockGeneratorAccountDescriptor, bool> TryDecryptBlockGeneratorAccountDescriptor(
+			const RawBuffer& publicKeyPrefixedEncryptedPayload,
+			const crypto::KeyPair& encryptionKeyPair);
 
-		/// Remove unlocked entry.
-		Remove
-	};
-
-	/// Unlocked entry message.
-	struct UnlockedEntryMessage {
-		/// Announcer public key.
-		Key AnnouncerPublicKey;
-
-		/// Unlocked entry direction.
-		UnlockedEntryDirection Direction;
-
-		/// Encrypted entry.
-		RawBuffer EncryptedEntry;
-	};
-
-	/// Gets the size of encrypted entry.
-	size_t EncryptedUnlockedEntrySize();
-
-	/// Decrypts \a saltedEncrypted using \a bootKeyPair and \a publicKey.
-	std::pair<crypto::PrivateKey, bool> TryDecryptUnlockedEntry(
-			const RawBuffer& saltedEncrypted,
-			const crypto::KeyPair& bootKeyPair,
-			const Key& publicKey);
-
-	/// Reads encrypted unlocked entry messages from \a directory, validates using \a bootKeyPair and forwards to \a processEntryKeyPair.
+	/// Reads (encrypted) harvest requests from \a directory, validates using \a encryptionKeyPair
+	/// and forwards to \a processDescriptor.
 	void UnlockedFileQueueConsumer(
 			const config::CatapultDirectory& directory,
-			const crypto::KeyPair& bootKeyPair,
-			const consumer<const UnlockedEntryMessage&, crypto::KeyPair&&>& processEntryKeyPair);
+			const crypto::KeyPair& encryptionKeyPair,
+			const consumer<const HarvestRequest&, BlockGeneratorAccountDescriptor&&>& processDescriptor);
 }}

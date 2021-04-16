@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -74,6 +75,20 @@ namespace catapult { namespace extensions {
 			}
 		};
 
+		struct BannedNodeIdentitySinkTraits {
+			static auto CreateConsumer(const ServerHooks& hooks) {
+				return hooks.bannedNodeIdentitySink();
+			}
+
+			static void AddConsumer(ServerHooks& hooks, const BannedNodeIdentitySink& sink) {
+				hooks.addBannedNodeIdentitySink(sink);
+			}
+
+			static auto CreateConsumerInput() {
+				return model::NodeIdentity();
+			}
+		};
+
 		struct TransactionsChangeHandlerTraits {
 			static auto CreateConsumer(const ServerHooks& hooks) {
 				return hooks.transactionsChangeHandler();
@@ -108,6 +123,7 @@ namespace catapult { namespace extensions {
 	DEFINE_CONSUMER_HANDLER_TESTS(TEST_CLASS, ServerHooks, NewBlockSink)
 	DEFINE_CONSUMER_HANDLER_TESTS(TEST_CLASS, ServerHooks, NewTransactionsSink)
 	DEFINE_CONSUMER_HANDLER_TESTS(TEST_CLASS, ServerHooks, PacketPayloadSink)
+	DEFINE_CONSUMER_HANDLER_TESTS(TEST_CLASS, ServerHooks, BannedNodeIdentitySink)
 	DEFINE_CONSUMER_HANDLER_TESTS(TEST_CLASS, ServerHooks, TransactionsChangeHandler)
 	DEFINE_CONSUMER_HANDLER_TESTS(TEST_CLASS, ServerHooks, TransactionEventHandler)
 
@@ -245,49 +261,117 @@ namespace catapult { namespace extensions {
 
 	// endregion
 
-	// region chainSyncedPredicate
+	// region localFinalizedHeightHashPairSupplier / networkFinalizedHeightHashPairSupplier / chainSyncedPredicate
 
-	TEST(TEST_CLASS, UnsetChainSyncedPredicateReturnsTrue) {
+	namespace {
+		struct LocalFinalizedHeightHashPairSupplierTraits {
+			static constexpr auto Custom_Value = model::HeightHashPair{ Height(101), Hash256() };
+
+			static auto Get(const ServerHooks& hooks) {
+				return hooks.localFinalizedHeightHashPairSupplier();
+			}
+
+			static void Set(ServerHooks& hooks, const FinalizedHeightHashPairSupplier& supplier) {
+				hooks.setLocalFinalizedHeightHashPairSupplier(supplier);
+			}
+		};
+
+		struct NetworkFinalizedHeightHashPairSupplierTraits {
+			static constexpr auto Custom_Value = model::HeightHashPair{ Height(101), Hash256() };
+
+			static auto Get(const ServerHooks& hooks) {
+				return hooks.networkFinalizedHeightHashPairSupplier();
+			}
+
+			static void Set(ServerHooks& hooks, const FinalizedHeightHashPairSupplier& supplier) {
+				hooks.setNetworkFinalizedHeightHashPairSupplier(supplier);
+			}
+		};
+
+		struct ChainSyncedPredicateTraits {
+			static constexpr auto Default_Value = true;
+			static constexpr auto Custom_Value = false;
+
+			static auto Get(const ServerHooks& hooks) {
+				return hooks.chainSyncedPredicate();
+			}
+
+			static void Set(ServerHooks& hooks, const ChainSyncedPredicate& supplier) {
+				hooks.setChainSyncedPredicate(supplier);
+			}
+		};
+	}
+
+#define SUPPLIER_TEST_ENTRY(TEST_NAME, CONSUMER_FACTORY_NAME) \
+	TEST(TEST_CLASS, TEST_NAME##_##CONSUMER_FACTORY_NAME) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME##2)<CONSUMER_FACTORY_NAME##Traits>(); }
+
+#define SUPPLIER_TEST(TEST_NAME) \
+	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME##2)(); \
+	SUPPLIER_TEST_ENTRY(TEST_NAME, LocalFinalizedHeightHashPairSupplier) \
+	SUPPLIER_TEST_ENTRY(TEST_NAME, NetworkFinalizedHeightHashPairSupplier) \
+	SUPPLIER_TEST_ENTRY(TEST_NAME, ChainSyncedPredicate) \
+	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME##2)()
+
+#define SUPPLIER_TEST_WITHOUT_DEFAULT(TEST_NAME) \
+	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME##2)(); \
+	SUPPLIER_TEST_ENTRY(TEST_NAME, LocalFinalizedHeightHashPairSupplier) \
+	SUPPLIER_TEST_ENTRY(TEST_NAME, NetworkFinalizedHeightHashPairSupplier) \
+	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME##2)()
+
+#define SUPPLIER_TEST_WITH_DEFAULT(TEST_NAME) \
+	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME##2)(); \
+	SUPPLIER_TEST_ENTRY(TEST_NAME, ChainSyncedPredicate) \
+	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME##2)()
+
+	SUPPLIER_TEST_WITHOUT_DEFAULT(CannotAccessWhenUnset) {
+		// Arrange:
+		ServerHooks hooks;
+
+		// Act + Assert:
+		EXPECT_THROW(TTraits::Get(hooks), catapult_invalid_argument);
+	}
+
+	SUPPLIER_TEST_WITH_DEFAULT(UnsetReturnsDefaultValue) {
 		// Arrange:
 		ServerHooks hooks;
 
 		// Act:
-		auto predicate = hooks.chainSyncedPredicate();
-		ASSERT_TRUE(!!predicate);
+		auto supplier = TTraits::Get(hooks);
+		ASSERT_TRUE(!!supplier);
 
-		auto isSynced = predicate();
+		auto result = supplier();
 
 		// Assert:
-		EXPECT_TRUE(isSynced);
+		EXPECT_EQ(TTraits::Default_Value, result);
 	}
 
-	TEST(TEST_CLASS, CanSetOnce_ChainSyncedPredicate) {
+	SUPPLIER_TEST(CanSetOnce) {
 		// Arrange:
 		auto numCalls = 0u;
 		ServerHooks hooks;
-		hooks.setChainSyncedPredicate([&numCalls]() {
+		TTraits::Set(hooks, [&numCalls]() {
 			++numCalls;
-			return false;
+			return TTraits::Custom_Value;
 		});
 
 		// Act:
-		auto predicate = hooks.chainSyncedPredicate();
-		ASSERT_TRUE(!!predicate);
+		auto supplier = TTraits::Get(hooks);
+		ASSERT_TRUE(!!supplier);
 
-		auto isSynced = predicate();
+		auto result = supplier();
 
 		// Assert:
 		EXPECT_EQ(1u, numCalls);
-		EXPECT_FALSE(isSynced);
+		EXPECT_EQ(TTraits::Custom_Value, result);
 	}
 
-	TEST(TEST_CLASS, CannotSetMultipleTimes_ChainSyncedPredicate) {
+	SUPPLIER_TEST(CannotSetMultipleTimes) {
 		// Arrange:
 		ServerHooks hooks;
-		hooks.setChainSyncedPredicate([]() { return false; });
+		TTraits::Set(hooks, []() { return TTraits::Custom_Value; });
 
 		// Act + Assert:
-		EXPECT_THROW(hooks.setChainSyncedPredicate([]() { return false; }), catapult_invalid_argument);
+		EXPECT_THROW(TTraits::Set(hooks, []() { return TTraits::Custom_Value; }), catapult_invalid_argument);
 	}
 
 	// endregion
@@ -300,7 +384,7 @@ namespace catapult { namespace extensions {
 		class KnownHashPredicateTestContext {
 		public:
 			KnownHashPredicateTestContext()
-					: m_utCache(cache::MemoryCacheOptions(Num_Infos_Per_Group, Num_Infos_Per_Group))
+					: m_utCache(cache::MemoryCacheOptions(utils::FileSize(), utils::FileSize::FromKilobytes(1)))
 					, m_transactionInfos(test::CreateTransactionInfos(Num_Infos_Per_Group)) {
 				test::AddAll(m_utCache, m_transactionInfos);
 			}

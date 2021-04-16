@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -27,17 +28,21 @@ namespace catapult { namespace ionet {
 #define TEST_CLASS NodeSetTests
 
 	namespace {
+		NodeMetadata CreateMetadata(model::NetworkIdentifier networkIdentifier) {
+			return NodeMetadata(model::UniqueNetworkFingerprint(networkIdentifier));
+		}
+
 		std::unordered_map<std::string, Node> GenerateEqualityInstanceMap() {
 			auto key1 = test::GenerateRandomByteArray<Key>();
 			auto key2 = test::GenerateRandomByteArray<Key>();
 			return {
-				{ "default", { { key1, "11.22.33.44" }, { "bob.com", 1234 }, NodeMetadata(model::NetworkIdentifier::Mijin) } },
-				{ "copy", { { key1, "11.22.33.44" }, { "bob.com", 1234 }, NodeMetadata(model::NetworkIdentifier::Mijin) } },
-				{ "diff-key", { { key2, "11.22.33.44" }, { "bob.com", 1234 }, NodeMetadata(model::NetworkIdentifier::Mijin) } },
-				{ "diff-host", { { key1, "99.88.77.66" }, { "bob.com", 1234 }, NodeMetadata(model::NetworkIdentifier::Mijin) } },
-				{ "diff-key-host", { { key2, "99.88.77.66" }, { "bob.com", 1234 }, NodeMetadata(model::NetworkIdentifier::Mijin) } },
-				{ "diff-endpoint", { { key1, "11.22.33.44" }, { "alice.com", 1234 }, NodeMetadata(model::NetworkIdentifier::Mijin) } },
-				{ "diff-metadata", { { key1, "11.22.33.44" }, { "bob.com", 1234 }, NodeMetadata(model::NetworkIdentifier::Public) } }
+				{ "default", { { key1, "11.22.33.44" }, { "bob.com", 1234 }, CreateMetadata(model::NetworkIdentifier::Private) } },
+				{ "copy", { { key1, "11.22.33.44" }, { "bob.com", 1234 }, CreateMetadata(model::NetworkIdentifier::Private) } },
+				{ "diff-key", { { key2, "11.22.33.44" }, { "bob.com", 1234 }, CreateMetadata(model::NetworkIdentifier::Private) } },
+				{ "diff-host", { { key1, "99.88.77.66" }, { "bob.com", 1234 }, CreateMetadata(model::NetworkIdentifier::Private) } },
+				{ "diff-key-host", { { key2, "99.88.77.66" }, { "bob.com", 1234 }, CreateMetadata(model::NetworkIdentifier::Private) } },
+				{ "diff-endpoint", { { key1, "11.22.33.44" }, { "alice.com", 1234 }, CreateMetadata(model::NetworkIdentifier::Private) } },
+				{ "diff-metadata", { { key1, "11.22.33.44" }, { "bob.com", 1234 }, CreateMetadata(model::NetworkIdentifier::Public) } }
 			};
 		}
 	}

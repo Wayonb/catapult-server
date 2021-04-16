@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -72,7 +73,7 @@ namespace catapult { namespace plugins {
 			EXPECT_EQ_MEMORY(transaction.ProofPtr(), notification.Proof.pData, notification.Proof.Size);
 		});
 		builder.template addExpectation<ProofPublicationNotification>([&transaction](const auto& notification) {
-			EXPECT_EQ(transaction.SignerPublicKey, notification.Signer);
+			EXPECT_EQ(GetSignerAddress(transaction), notification.Owner);
 			EXPECT_EQ(transaction.HashAlgorithm, notification.HashAlgorithm);
 			EXPECT_EQ(transaction.Secret, notification.Secret);
 			EXPECT_EQ(transaction.RecipientAddress, notification.Recipient);

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,6 +24,7 @@
 #include "catapult/utils/Logging.h"
 #include "catapult/functions.h"
 #include "catapult/preprocessor.h"
+#include <atomic>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -56,9 +58,9 @@ namespace catapult { namespace thread {
 		///       which is then kept alive by the accept handlers until they are also shutdown.
 		class ServiceGroup {
 		public:
-			/// Creates a group around \a pPool and \a name.
-			ServiceGroup(const std::shared_ptr<thread::IoThreadPool>& pPool, const std::string& name)
-					: m_pPool(pPool)
+			/// Creates a group around \a pool and \a name.
+			ServiceGroup(thread::IoThreadPool& pool, const std::string& name)
+					: m_pool(pool)
 					, m_name(name)
 			{}
 
@@ -89,7 +91,7 @@ namespace catapult { namespace thread {
 			template<typename TFactory, typename... TArgs>
 			auto pushService(TFactory factory, TArgs&&... args) {
 				// create a service around the pool
-				auto pService = factory(m_pPool, std::forward<TArgs>(args)...);
+				auto pService = factory(m_pool, std::forward<TArgs>(args)...);
 				return registerService(pService);
 			}
 
@@ -107,7 +109,7 @@ namespace catapult { namespace thread {
 			}
 
 		private:
-			std::shared_ptr<thread::IoThreadPool> m_pPool;
+			thread::IoThreadPool& m_pool;
 			std::string m_name;
 			std::vector<std::shared_ptr<void>> m_services;
 			std::vector<action> m_shutdownFunctions;
@@ -171,7 +173,7 @@ namespace catapult { namespace thread {
 	public:
 		/// Creates a new service group with \a name.
 		std::shared_ptr<ServiceGroup> pushServiceGroup(const std::string& name) {
-			auto pGroup = std::make_shared<ServiceGroup>(m_pPool, m_name + "::" + name);
+			auto pGroup = std::make_shared<ServiceGroup>(*m_pPool, m_name + "::" + name);
 			m_serviceGroups.push_back(pGroup);
 			registerService(pGroup, name + " (service group)");
 			++m_numServiceGroups;
@@ -179,36 +181,38 @@ namespace catapult { namespace thread {
 		}
 
 		/// Creates a new isolated thread pool with a default number of threads and \a name.
-		std::shared_ptr<thread::IoThreadPool> pushIsolatedPool(const std::string& name) {
+		thread::IoThreadPool* pushIsolatedPool(const std::string& name) {
 			return pushIsolatedPool(name, DefaultPoolConcurrency());
 		}
 
 		/// Creates a new isolated thread pool with the specified number of threads (\a numWorkerThreads) and \a name.
 		/// \note If \a numWorkerThreads is \c 0, a default number of threads will be used.
-		std::shared_ptr<thread::IoThreadPool> pushIsolatedPool(const std::string& name, size_t numWorkerThreads) {
+		thread::IoThreadPool* pushIsolatedPool(const std::string& name, size_t numWorkerThreads) {
 			class PoolServiceAdapter {
 			public:
-				explicit PoolServiceAdapter(const std::shared_ptr<thread::IoThreadPool>& pPool) : m_pPool(pPool)
+				explicit PoolServiceAdapter(std::unique_ptr<thread::IoThreadPool>&& pPool) : m_pPool(std::move(pPool))
 				{}
 
 			public:
 				void shutdown() {
-					WaitForLastReference(m_pPool);
-					m_pPool->join();
+					DestroyThreadPool(m_pPool);
 				}
 
 			private:
-				std::shared_ptr<thread::IoThreadPool> m_pPool;
+				std::unique_ptr<thread::IoThreadPool> m_pPool;
 			};
 
 			// when isolated pool mode is disabled, use the main pool for everything
 			if (IsolatedPoolMode::Disabled == m_isolatedPoolMode)
-				return m_pPool;
+				return m_pPool.get();
 
 			auto pPool = CreateThreadPool(numWorkerThreads, name);
-			registerService(std::make_shared<PoolServiceAdapter>(pPool), name + " (isolated pool)");
-			m_numTotalIsolatedPoolThreads += pPool->numWorkerThreads();
-			return pPool;
+			auto* pPoolRaw = pPool.get();
+
+			registerService(std::make_shared<PoolServiceAdapter>(std::move(pPool)), name + " (isolated pool)");
+
+			m_numTotalIsolatedPoolThreads += pPoolRaw->numWorkerThreads();
+			return pPoolRaw;
 		}
 
 	public:
@@ -230,16 +234,20 @@ namespace catapult { namespace thread {
 			m_numServiceGroups = 0;
 
 			// 3. after the services are destroyed, the thread pool can be safely destroyed
-			WaitForLastReference(m_pPool);
-			m_pPool.reset();
+			DestroyThreadPool(m_pPool);
 		}
 
 	private:
-		static std::shared_ptr<thread::IoThreadPool> CreateThreadPool(size_t numWorkerThreads, const std::string& name) {
+		static std::unique_ptr<thread::IoThreadPool> CreateThreadPool(size_t numWorkerThreads, const std::string& name) {
 			numWorkerThreads = DefaultPoolConcurrency() == numWorkerThreads ? std::thread::hardware_concurrency() : numWorkerThreads;
 			auto pPool = thread::CreateIoThreadPool(numWorkerThreads, name.c_str());
 			pPool->start();
-			return PORTABLE_MOVE(pPool);
+			return pPool;
+		}
+
+		static void DestroyThreadPool(std::unique_ptr<thread::IoThreadPool>& pPool) {
+			pPool->join();
+			pPool.reset();
 		}
 
 		template<typename T>
@@ -254,7 +262,7 @@ namespace catapult { namespace thread {
 		IsolatedPoolMode m_isolatedPoolMode;
 		std::atomic<size_t> m_numTotalIsolatedPoolThreads;
 		std::atomic<size_t> m_numServiceGroups;
-		std::shared_ptr<thread::IoThreadPool> m_pPool;
+		std::unique_ptr<thread::IoThreadPool> m_pPool;
 		std::vector<std::shared_ptr<ServiceGroup>> m_serviceGroups;
 		std::vector<action> m_shutdownFunctions;
 	};

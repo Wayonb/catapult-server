@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -40,7 +41,7 @@ namespace catapult { namespace validators {
 		const auto& metadataValue = metadataIter.get().value();
 		auto expectedCacheValueSize = notification.ValueSize;
 		if (notification.ValueSizeDelta > 0)
-			expectedCacheValueSize -= notification.ValueSizeDelta;
+			expectedCacheValueSize = static_cast<uint16_t>(expectedCacheValueSize - notification.ValueSizeDelta);
 
 		if (expectedCacheValueSize != metadataValue.size())
 			return Failure_Metadata_Value_Size_Delta_Mismatch;
@@ -52,5 +53,5 @@ namespace catapult { namespace validators {
 		return metadataValue.canTrim({ notification.ValuePtr, notification.ValueSize }, requiredTrimCount)
 				? ValidationResult::Success
 				: Failure_Metadata_Value_Change_Irreversible;
-	}));
+	}))
 }}

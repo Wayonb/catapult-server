@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,13 +21,9 @@
 
 #pragma once
 #include "catapult/crypto/KeyPair.h"
-#include "catapult/model/Address.h"
 #include <vector>
 
 namespace catapult { namespace tools {
-
-	/// Gets the server key pair used by tools.
-	crypto::KeyPair LoadServerKeyPair();
 
 	/// Generates a random key pair.
 	crypto::KeyPair GenerateRandomKeyPair();
@@ -36,10 +33,6 @@ namespace catapult { namespace tools {
 
 	/// Copies a given \a keyPair.
 	crypto::KeyPair CopyKeyPair(const crypto::KeyPair& keyPair);
-
-	/// Extracts a key pair from \a privateKey.
-	/// \note Random key pair is returned when \a privateKey is empty.
-	crypto::KeyPair ExtractKeyPair(const std::string& privateKey);
 
 	/// Generate \a count deterministic addresses.
 	std::vector<Address> PrepareAddresses(size_t count);

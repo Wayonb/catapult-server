@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -26,8 +27,13 @@ namespace catapult { namespace consumers {
 	namespace {
 		class NewTransactionsConsumer {
 		public:
-			explicit NewTransactionsConsumer(const NewTransactionsSink& newTransactionsSink)
-					: m_newTransactionsSink(newTransactionsSink)
+			NewTransactionsConsumer(
+					uint32_t minTransactionFailuresCountForBan,
+					uint32_t minTransactionFailuresPercentForBan,
+					const NewTransactionsProcessor& newTransactionsProcessor)
+					: m_minTransactionFailuresCountForBan(minTransactionFailuresCountForBan)
+					, m_minTransactionFailuresPercentForBan(minTransactionFailuresPercentForBan)
+					, m_newTransactionsProcessor(newTransactionsProcessor)
 			{}
 
 		public:
@@ -48,13 +54,11 @@ namespace catapult { namespace consumers {
 
 				// 3. filter transactions
 				//    - the input elements are still valid even though the backing range has been detached
-				auto i = 0u;
-				auto numSuccesses = 0u;
-				auto numFailures = 0u;
+				size_t i = 0;
+				size_t numFailures = 0;
 				for (const auto& element : input.transactions()) {
 					if (disruptor::ConsumerResultSeverity::Success == element.ResultSeverity) {
 						transactionInfos.emplace_back(model::MakeTransactionInfo(transactions[i], element));
-						++numSuccesses;
 					} else if (disruptor::ConsumerResultSeverity::Failure == element.ResultSeverity) {
 						++numFailures;
 					}
@@ -63,20 +67,32 @@ namespace catapult { namespace consumers {
 				}
 
 				// 4. call the sink
-				m_newTransactionsSink(std::move(transactionInfos));
+				auto aggregateResult = m_newTransactionsProcessor(std::move(transactionInfos));
+				aggregateResult.FailureCount += numFailures;
 
 				// 5. indicate input was consumed and processing is complete
-				return numFailures > 0
-						? Abort(validators::ValidationResult::Failure)
-						: numSuccesses > 0 ? CompleteSuccess() : CompleteNeutral();
+				if (0 == aggregateResult.FailureCount)
+					return aggregateResult.SuccessCount > 0 ? CompleteSuccess() : CompleteNeutral();
+
+				auto shouldBan =
+						aggregateResult.FailureCount >= m_minTransactionFailuresCountForBan
+						&& aggregateResult.FailureCount * 100 / transactions.size() >= m_minTransactionFailuresPercentForBan;
+				return shouldBan
+						? Abort(validators::ValidationResult::Failure, disruptor::ConsumerResultSeverity::Fatal)
+						: Abort(validators::ValidationResult::Failure);
 			}
 
 		private:
-			NewTransactionsSink m_newTransactionsSink;
+			uint32_t m_minTransactionFailuresCountForBan;
+			uint32_t m_minTransactionFailuresPercentForBan;
+			NewTransactionsProcessor m_newTransactionsProcessor;
 		};
 	}
 
-	disruptor::DisruptorConsumer CreateNewTransactionsConsumer(const NewTransactionsSink& newTransactionsSink) {
-		return NewTransactionsConsumer(newTransactionsSink);
+	disruptor::DisruptorConsumer CreateNewTransactionsConsumer(
+			uint32_t minTransactionFailuresCountForBan,
+			uint32_t minTransactionFailuresPercentForBan,
+			const NewTransactionsProcessor& newTransactionsProcessor) {
+		return NewTransactionsConsumer(minTransactionFailuresCountForBan, minTransactionFailuresPercentForBan, newTransactionsProcessor);
 	}
 }}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -112,7 +113,7 @@ namespace catapult { namespace observers {
 		}
 
 		void SeedCacheWithoutLink(cache::NamespaceCacheDelta& namespaceCacheDelta) {
-			auto owner = test::GenerateRandomByteArray<Key>();
+			auto owner = test::CreateRandomOwner();
 			namespaceCacheDelta.insert(state::RootNamespace(Default_Namespace_Id, owner, test::CreateLifetime(10, 20)));
 		}
 

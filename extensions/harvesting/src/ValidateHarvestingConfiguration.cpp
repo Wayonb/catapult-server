@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,24 +21,22 @@
 
 #include "ValidateHarvestingConfiguration.h"
 #include "HarvestingConfiguration.h"
-#include "catapult/crypto/KeyUtils.h"
+#include "catapult/crypto/KeyPair.h"
 #include "catapult/utils/ConfigurationBag.h"
-#include "catapult/utils/HexParser.h"
 
 namespace catapult { namespace harvesting {
 
 	namespace {
-		bool IsHarvesterKeyValid(const HarvestingConfiguration& config) {
-			return crypto::IsValidKeyString(config.HarvesterPrivateKey)
-					|| (!config.EnableAutoHarvesting && config.HarvesterPrivateKey.empty());
+		bool IsHarvesterPrivateKeyValid(bool enableAutoHarvesting, const std::string& privateKey) {
+			return crypto::Ed25519Utils::IsValidPrivateKeyString(privateKey) || (!enableAutoHarvesting && privateKey.empty());
 		}
 	}
 
 	void ValidateHarvestingConfiguration(const HarvestingConfiguration& config) {
-		if (!IsHarvesterKeyValid(config))
-			CATAPULT_THROW_AND_LOG_0(utils::property_malformed_error, "HarvesterPrivateKey must be a valid private key");
+		if (!IsHarvesterPrivateKeyValid(config.EnableAutoHarvesting, config.HarvesterSigningPrivateKey))
+			CATAPULT_THROW_AND_LOG_0(utils::property_malformed_error, "HarvesterSigningPrivateKey must be a valid private key");
 
-		if (!crypto::IsValidKeyString(config.BeneficiaryPublicKey))
-			CATAPULT_THROW_AND_LOG_0(utils::property_malformed_error, "BeneficiaryPublicKey must be a valid public key");
+		if (!IsHarvesterPrivateKeyValid(config.EnableAutoHarvesting, config.HarvesterVrfPrivateKey))
+			CATAPULT_THROW_AND_LOG_0(utils::property_malformed_error, "HarvesterVrfPrivateKey must be a valid private key");
 	}
 }}

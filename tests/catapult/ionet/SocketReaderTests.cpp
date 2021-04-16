@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -134,7 +135,7 @@ namespace catapult { namespace ionet {
 			factory.startReader(handlers, readResult, [&pReader](auto&& pStartedReader) {
 				pReader = std::move(pStartedReader);
 			});
-			test::AddClientWriteBuffersTask(factory.ioContext(), sendBuffers);
+			auto pClientSocket = test::AddClientWriteBuffersTask(factory.ioContext(), sendBuffers);
 
 			// - wait for the test to complete
 			factory.join();
@@ -145,7 +146,7 @@ namespace catapult { namespace ionet {
 		void RespondWithBytes(ServerPacketHandlerContext& handlerContext, const std::vector<uint8_t>& responseBytes) {
 			auto numResponseBytes = static_cast<uint32_t>(responseBytes.size());
 			auto pResponsePacket = CreateSharedPacket<Packet>(numResponseBytes);
-			pResponsePacket->Size = sizeof(PacketHeader) + numResponseBytes;
+			pResponsePacket->Size = SizeOf32<PacketHeader>() + numResponseBytes;
 			utils::memcpy_cond(static_cast<void*>(pResponsePacket.get() + 1), responseBytes.data(), responseBytes.size());
 			handlerContext.response(PacketPayload(pResponsePacket));
 		}
@@ -268,7 +269,7 @@ namespace catapult { namespace ionet {
 			pReader = std::move(pStartedReader);
 		});
 		test::CreateClientSocket(factory.ioContext())->connect().then([&sendBuffers, &responseBytes](auto&& socketFuture) {
-			auto pClientSocket = socketFuture.get();
+			auto* pClientSocket = socketFuture.get();
 			pClientSocket->write(sendBuffers).then([pClientSocket, &responseBytes](auto) {
 				pClientSocket->read(responseBytes);
 			});
@@ -308,12 +309,12 @@ namespace catapult { namespace ionet {
 		SocketReadResult readResult;
 		std::unique_ptr<SocketReader> pReader;
 		test::SpawnPacketServerWork(factory.ioContext(), [&](const auto& pServerSocket) {
-			pServerSocket->close();
+			pServerSocket->abort();
 			factory.startReader(pServerSocket, handlers, readResult, [&pReader](auto&& pStartedReader) {
 				pReader = std::move(pStartedReader);
 			});
 		});
-		test::AddClientWriteBuffersTask(factory.ioContext(), sendBuffers);
+		auto pClientSocket = test::AddClientWriteBuffersTask(factory.ioContext(), sendBuffers);
 
 		// - wait for the test to complete
 		factory.join();
@@ -337,7 +338,7 @@ namespace catapult { namespace ionet {
 		factory.startReader(handlers, readResult, [&pReader](auto&& pStartedReader) {
 			pReader = std::move(pStartedReader);
 		});
-		test::AddClientWriteBuffersTask(factory.ioContext(), sendBuffers);
+		auto pClientSocket = test::AddClientWriteBuffersTask(factory.ioContext(), sendBuffers);
 
 		// - wait for the test to complete
 		factory.join();
@@ -373,7 +374,7 @@ namespace catapult { namespace ionet {
 				pReader = std::move(pStartedReader);
 			});
 		});
-		test::AddClientWriteBuffersTask(factory.ioContext(), sendBuffers);
+		auto pClientSocket = test::AddClientWriteBuffersTask(factory.ioContext(), sendBuffers);
 		factory.join();
 
 		// Assert: the server should get a write error when attempting to write to the client
@@ -410,33 +411,40 @@ namespace catapult { namespace ionet {
 
 		// Act: "server" - reads the first packet from the socket; signals; reads the second packet
 		//      "client" - writes the first packet to the socket; waits; writes the second packet
-		std::atomic_bool isFirstPacketRead(false);
+		std::atomic<size_t> step(0);
 		std::vector<std::vector<SocketOperationCode>> readCodes(2);
 		std::unique_ptr<SocketReader> pReader;
 		test::SpawnPacketServerWork(factory.ioContext(), [&](const auto& pServerSocket) {
 			pReader = factory.createReader(pServerSocket, handlers);
 
 			// - first read
-			pReader->read([&readCodes, &isFirstPacketRead, &pReader](auto readCode1) {
+			pReader->read([&readCodes, &step, &pReader](auto readCode1) {
+				if (SocketOperationCode::Success == readCode1)
+					++step;
+
 				readCodes[0].push_back(readCode1);
 
 				// - only chain the second read on a termination condition
 				if (SocketOperationCode::Success == readCode1)
 					return;
 
-				isFirstPacketRead = true;
-
 				// - second read
-				pReader->read([&readCodes](auto readCode2) {
+				pReader->read([&readCodes, &step](auto readCode2) {
+					if (SocketOperationCode::Success == readCode2)
+						++step;
+
 					readCodes[1].push_back(readCode2);
 				});
 			});
 		});
 		test::CreateClientSocket(factory.ioContext())->connect().then([&](auto&& socketFuture) {
-			auto pClientSocket = socketFuture.get();
+			auto* pClientSocket = socketFuture.get();
 			pClientSocket->write(sendBuffers[0]).then([&, pClientSocket](auto) {
-				WAIT_FOR(isFirstPacketRead);
+				WAIT_FOR_ONE(step); // wait for the first reader callback to be entered
 				pClientSocket->write(sendBuffers[1]);
+
+				WAIT_FOR_VALUE(2u, step); // wait for the second reader callback to be entered
+				pClientSocket->shutdown();
 			});
 		});
 
@@ -469,7 +477,7 @@ namespace catapult { namespace ionet {
 			});
 			pServerSocket->close();
 		});
-		test::AddClientConnectionTask(factory.ioContext());
+		auto pClientSocket = test::AddClientConnectionTask(factory.ioContext());
 
 		// - wait for the test to complete
 		factory.join();
@@ -502,7 +510,7 @@ namespace catapult { namespace ionet {
 			EXPECT_THROW(pReader->read([](auto) {}), catapult_runtime_error);
 			pAllReadsAttempted->set();
 		});
-		test::AddClientWriteBuffersTask(factory.ioContext(), sendBuffers);
+		auto pClientSocket = test::AddClientWriteBuffersTask(factory.ioContext(), sendBuffers);
 
 		// - wait for the test to complete
 		factory.join();
@@ -530,7 +538,7 @@ namespace catapult { namespace ionet {
 		factory.startReader(handlers, readResult, [&pReader](auto&& pStartedReader) {
 			pReader = std::move(pStartedReader);
 		});
-		test::AddClientWriteBuffersTask(factory.ioContext(), sendBuffers);
+		auto pClientSocket = test::AddClientWriteBuffersTask(factory.ioContext(), sendBuffers);
 
 		// - wait for the test to complete
 		factory.join();

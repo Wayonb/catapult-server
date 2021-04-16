@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -43,8 +44,8 @@ namespace catapult { namespace consumers {
 	// region CustomBuffersTraits
 
 	namespace {
-		GenerationHash GetNetworkGenerationHash() {
-			return utils::ParseByteArray<GenerationHash>("CE076EF4ABFBC65B046987429E274EC31506D173E91BF102F16BEB7FB8176230");
+		GenerationHashSeed GetNetworkGenerationHashSeed() {
+			return utils::ParseByteArray<GenerationHashSeed>("CE076EF4ABFBC65B046987429E274EC31506D173E91BF102F16BEB7FB8176230");
 		}
 
 		struct CustomBuffersTraits {
@@ -58,7 +59,7 @@ namespace catapult { namespace consumers {
 			}
 
 			static Hash256 CalculateExpectedEntityHash(const model::Transaction& transaction) {
-				return model::CalculateHash(transaction, GetNetworkGenerationHash(), mocks::ExtractBuffer({ 6, 10 }, &transaction));
+				return model::CalculateHash(transaction, GetNetworkGenerationHashSeed(), mocks::ExtractBuffer({ 6, 10 }, &transaction));
 			}
 
 			static Hash256 CalculateExpectedMerkleComponentHash(const Hash256& entityHash, const model::Transaction& transaction) {
@@ -93,28 +94,27 @@ namespace catapult { namespace consumers {
 				const model::TransactionRegistry& registry,
 				uint32_t numBlocks,
 				uint32_t numTransactionsPerBlock) {
-			uint32_t numBytesPerBlock = sizeof(model::BlockHeader) + numTransactionsPerBlock * Transaction_Size;
+			constexpr auto Block_Header_Size = SizeOf32<model::BlockHeader>() + SizeOf32<model::PaddedBlockFooter>();
+			uint32_t numBytesPerBlock = Block_Header_Size + numTransactionsPerBlock * Transaction_Size;
 			auto txPaddingSize = utils::GetPaddingSize(Transaction_Size, 8);
 			if (0 < numTransactionsPerBlock)
 				numBytesPerBlock += (numTransactionsPerBlock - 1) * txPaddingSize;
 
-			std::vector<uint8_t> buffer(numBlocks * numBytesPerBlock);
-			test::FillWithRandomData(buffer);
-
+			auto buffer = test::GenerateRandomVector(numBlocks * numBytesPerBlock);
 			std::vector<size_t> offsets;
 			for (auto i = 0u; i < numBlocks; ++i) {
 				offsets.push_back(i * numBytesPerBlock);
 				auto& block = reinterpret_cast<model::Block&>(buffer[offsets.back()]);
 				block.Size = numBytesPerBlock;
-				block.Type = model::Entity_Type_Block;
+				block.Type = model::Entity_Type_Block_Normal;
 
 				for (auto j = 0u; j < numTransactionsPerBlock; ++j) {
-					auto txOffset = offsets.back() + sizeof(model::BlockHeader);
+					auto txOffset = offsets.back() + Block_Header_Size;
 					txOffset += j * (Transaction_Size + txPaddingSize);
 					WriteTransactionAt(buffer, txOffset);
 				}
 
-				extensions::BlockExtensions(GetNetworkGenerationHash(), registry).updateBlockTransactionsHash(block);
+				extensions::BlockExtensions(GetNetworkGenerationHashSeed(), registry).updateBlockTransactionsHash(block);
 			}
 
 			auto range = model::BlockRange::CopyVariable(buffer.data(), buffer.size(), offsets);
@@ -157,7 +157,7 @@ namespace catapult { namespace consumers {
 			auto& blockElements = input.blocks();
 
 			// Act:
-			auto result = CreateBlockHashCalculatorConsumer(GetNetworkGenerationHash(), registry)(blockElements);
+			auto result = CreateBlockHashCalculatorConsumer(GetNetworkGenerationHashSeed(), registry)(blockElements);
 
 			// Assert:
 			test::AssertContinued(result);
@@ -169,7 +169,7 @@ namespace catapult { namespace consumers {
 
 	TEST(BLOCK_TEST_CLASS, CanProcessZeroEntities) {
 		auto registry = mocks::CreateDefaultTransactionRegistry();
-		test::AssertPassthroughForEmptyInput(CreateBlockHashCalculatorConsumer(GetNetworkGenerationHash(), registry));
+		test::AssertPassthroughForEmptyInput(CreateBlockHashCalculatorConsumer(GetNetworkGenerationHashSeed(), registry));
 	}
 
 	TEST(BLOCK_TEST_CLASS, CanProcessSingleEntity) {
@@ -190,7 +190,7 @@ namespace catapult { namespace consumers {
 
 	TEST(BLOCK_TEST_CLASS, CalculatesCorrectHashForDeterministicEntity) {
 		// Arrange:
-		auto generationHash = utils::ParseByteArray<GenerationHash>(test::Deterministic_Network_Generation_Hash_String);
+		auto generationHashSeed = utils::ParseByteArray<GenerationHashSeed>(test::Deterministic_Network_Generation_Hash_Seed_String);
 
 		auto registry = mocks::CreateDefaultTransactionRegistry();
 		auto pEntity = test::GenerateDeterministicBlock();
@@ -198,7 +198,7 @@ namespace catapult { namespace consumers {
 		auto& blockElements = input.blocks();
 
 		// Act:
-		auto result = CreateBlockHashCalculatorConsumer(generationHash, registry)(blockElements);
+		auto result = CreateBlockHashCalculatorConsumer(generationHashSeed, registry)(blockElements);
 
 		// Assert:
 		test::AssertContinued(result);
@@ -215,7 +215,7 @@ namespace catapult { namespace consumers {
 		(++++const_cast<model::Block&>(blockElements[1].Block).Transactions().begin())->Size *= 2;
 
 		// Act + Assert: transaction iteration throws an exception
-		EXPECT_THROW(CreateBlockHashCalculatorConsumer(GetNetworkGenerationHash(), registry)(blockElements), catapult_runtime_error);
+		EXPECT_THROW(CreateBlockHashCalculatorConsumer(GetNetworkGenerationHashSeed(), registry)(blockElements), catapult_runtime_error);
 	}
 
 	// endregion
@@ -234,7 +234,7 @@ namespace catapult { namespace consumers {
 			const_cast<model::Block&>(blockElements[mismatchedIndex].Block).TransactionsHash[0] ^= 0xFF;
 
 			// Act:
-			auto result = CreateBlockHashCalculatorConsumer(GetNetworkGenerationHash(), registry)(blockElements);
+			auto result = CreateBlockHashCalculatorConsumer(GetNetworkGenerationHashSeed(), registry)(blockElements);
 
 			// Assert: the elements were skipped because a block transactions hash didn't match
 			test::AssertAborted(result, Failure_Consumer_Block_Transactions_Hash_Mismatch, disruptor::ConsumerResultSeverity::Failure);
@@ -257,9 +257,7 @@ namespace catapult { namespace consumers {
 
 	namespace {
 		ConsumerInput CreateTransactionConsumerInput(uint32_t numTransactions) {
-			std::vector<uint8_t> buffer(numTransactions * Transaction_Size);
-			test::FillWithRandomData(buffer);
-
+			auto buffer = test::GenerateRandomVector(numTransactions * Transaction_Size);
 			std::vector<size_t> offsets;
 			for (auto i = 0u; i < numTransactions; ++i) {
 				auto txOffset = i * Transaction_Size;
@@ -278,7 +276,7 @@ namespace catapult { namespace consumers {
 			auto& transactionElements = input.transactions();
 
 			// Act:
-			auto result = CreateTransactionHashCalculatorConsumer(GetNetworkGenerationHash(), registry)(transactionElements);
+			auto result = CreateTransactionHashCalculatorConsumer(GetNetworkGenerationHashSeed(), registry)(transactionElements);
 
 			// Assert:
 			test::AssertContinued(result);
@@ -290,7 +288,7 @@ namespace catapult { namespace consumers {
 
 	TEST(TRANSACTION_TEST_CLASS, CanProcessZeroEntities) {
 		auto registry = mocks::CreateDefaultTransactionRegistry();
-		test::AssertPassthroughForEmptyInput(CreateTransactionHashCalculatorConsumer(GetNetworkGenerationHash(), registry));
+		test::AssertPassthroughForEmptyInput(CreateTransactionHashCalculatorConsumer(GetNetworkGenerationHashSeed(), registry));
 	}
 
 	TEST(TRANSACTION_TEST_CLASS, CanProcessSingleEntity) {
@@ -303,7 +301,7 @@ namespace catapult { namespace consumers {
 
 	TEST(TRANSACTION_TEST_CLASS, CalculatesCorrectHashForDeterministicEntity) {
 		// Arrange:
-		auto generationHash = utils::ParseByteArray<GenerationHash>(test::Deterministic_Network_Generation_Hash_String);
+		auto generationHashSeed = utils::ParseByteArray<GenerationHashSeed>(test::Deterministic_Network_Generation_Hash_Seed_String);
 
 		auto registry = mocks::CreateDefaultTransactionRegistry();
 		auto pEntity = test::GenerateDeterministicTransaction();
@@ -311,7 +309,7 @@ namespace catapult { namespace consumers {
 		auto& transactionElements = input.transactions();
 
 		// Act:
-		auto result = CreateTransactionHashCalculatorConsumer(generationHash, registry)(transactionElements);
+		auto result = CreateTransactionHashCalculatorConsumer(generationHashSeed, registry)(transactionElements);
 
 		// Assert:
 		test::AssertContinued(result);
@@ -335,7 +333,7 @@ namespace catapult { namespace consumers {
 				}
 
 				static auto Consume(const model::TransactionRegistry& registry, ConsumerInput& input) {
-					return CreateBlockHashCalculatorConsumer(GetNetworkGenerationHash(), registry)(input.blocks());
+					return CreateBlockHashCalculatorConsumer(GetNetworkGenerationHashSeed(), registry)(input.blocks());
 				}
 
 				static const auto& GetTransaction(const ConsumerInput& input) {
@@ -356,7 +354,7 @@ namespace catapult { namespace consumers {
 				{}
 
 				static auto Consume(const model::TransactionRegistry& registry, ConsumerInput& input) {
-					return CreateTransactionHashCalculatorConsumer(GetNetworkGenerationHash(), registry)(input.transactions());
+					return CreateTransactionHashCalculatorConsumer(GetNetworkGenerationHashSeed(), registry)(input.transactions());
 				}
 
 				static const auto& GetTransaction(const ConsumerInput& input) {
@@ -385,8 +383,8 @@ namespace catapult { namespace consumers {
 		const auto& transaction = TTraits::GetTransaction(input);
 
 		// - since there are no supplementary buffers, the transaction hash is equal to the merkle hash
-		auto generationHash = GetNetworkGenerationHash();
-		auto expectedEntityHash = model::CalculateHash(transaction, generationHash, mocks::ExtractBuffer({ 5, 15 }, &transaction));
+		auto generationHashSeed = GetNetworkGenerationHashSeed();
+		auto expectedEntityHash = model::CalculateHash(transaction, generationHashSeed, mocks::ExtractBuffer({ 5, 15 }, &transaction));
 		TTraits::UpdateWithExpectedMerkleHash(input, expectedEntityHash);
 
 		// Act:

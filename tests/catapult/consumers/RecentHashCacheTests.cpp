@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -336,6 +337,28 @@ namespace catapult { namespace consumers {
 		EXPECT_TRUE(result);
 		EXPECT_TRUE(cache.contains(hash));
 		EXPECT_FALSE(cache.contains(hashes[0]));
+	}
+
+	// endregion
+
+	// region SynchronizedRecentHashCache - add
+
+	TEST(TEST_CLASS, SynchronizedRecentHashCache_AddBehaviorIsConsistentWithNonSynchronizedCache) {
+		// Arrange:
+		auto cache = SynchronizedRecentHashCache(DefaultTimeSupplier(), Default_Options);
+		auto hashes = test::GenerateRandomDataVector<Hash256>(3);
+
+		// Act:
+		auto result1 = cache.add(hashes[0]);
+		auto result2 = cache.add(hashes[1]);
+		auto result3 = cache.add(hashes[0]); // duplicate
+		auto result4 = cache.add(hashes[2]);
+
+		// Assert:
+		EXPECT_TRUE(result1);
+		EXPECT_TRUE(result2);
+		EXPECT_FALSE(result3);
+		EXPECT_TRUE(result4);
 	}
 
 	// endregion

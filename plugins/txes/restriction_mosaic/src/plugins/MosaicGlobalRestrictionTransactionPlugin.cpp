@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -32,10 +33,10 @@ namespace catapult { namespace plugins {
 		constexpr uint8_t Mosaic_Flags_Restrictable = 0x04;
 
 		template<typename TTransaction>
-		void Publish(const TTransaction& transaction, NotificationSubscriber& sub) {
+		void Publish(const TTransaction& transaction, const PublishContext& context, NotificationSubscriber& sub) {
 			sub.notify(MosaicRestrictionTypeNotification(transaction.NewRestrictionType));
 
-			sub.notify(MosaicRequiredNotification(transaction.SignerPublicKey, transaction.MosaicId, Mosaic_Flags_Restrictable));
+			sub.notify(MosaicRequiredNotification(context.SignerAddress, transaction.MosaicId, Mosaic_Flags_Restrictable));
 
 			if (UnresolvedMosaicId() != transaction.ReferenceMosaicId)
 				sub.notify(MosaicRestrictionRequiredNotification(transaction.ReferenceMosaicId, transaction.RestrictionKey));

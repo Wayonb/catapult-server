@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,9 +25,12 @@
 namespace catapult { namespace ionet {
 
 	namespace {
-		const std::array<std::pair<const char*, NodeRoles>, 2> String_To_Node_Role_Pairs{{
+		const std::array<std::pair<const char*, NodeRoles>, 5> String_To_Node_Role_Pairs{{
 			{ "Peer", NodeRoles::Peer },
-			{ "Api", NodeRoles::Api }
+			{ "Api", NodeRoles::Api },
+			{ "Voting", NodeRoles::Voting },
+			{ "IPv4", NodeRoles::IPv4 },
+			{ "IPv6", NodeRoles::IPv6 }
 		}};
 	}
 

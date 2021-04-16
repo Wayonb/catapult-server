@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -50,6 +51,10 @@ namespace catapult { namespace model {
 	TEST(TEST_CLASS, CanCalculateTransactionFeeWhenFeeMultiplierIsNonzero) {
 		AssertCanCalculateTransactionFee(123, BlockFeeMultiplier(4), Amount(123 * 4));
 		AssertCanCalculateTransactionFee(842, BlockFeeMultiplier(11), Amount(842 * 11));
+	}
+
+	TEST(TEST_CLASS, CanCalculateTransactionFeeWhenFeeMultiplierIsNonzero_32BitOverflow) {
+		AssertCanCalculateTransactionFee(842, BlockFeeMultiplier(15134406), Amount(842ull * 15134406));
 	}
 
 	// endregion

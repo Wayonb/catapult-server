@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -34,7 +35,7 @@ namespace catapult { namespace model {
 
 	// region size + alignment + properties
 
-#define TRANSACTION_FIELDS FIELD(Secret) FIELD(ProofSize) FIELD(HashAlgorithm) FIELD(RecipientAddress)
+#define TRANSACTION_FIELDS FIELD(RecipientAddress) FIELD(Secret) FIELD(ProofSize) FIELD(HashAlgorithm)
 
 	namespace {
 		template<typename T>
@@ -42,13 +43,13 @@ namespace catapult { namespace model {
 			// Arrange:
 			auto expectedSize = baseSize;
 
-#define FIELD(X) expectedSize += sizeof(T::X);
+#define FIELD(X) expectedSize += SizeOf32<decltype(T::X)>();
 			TRANSACTION_FIELDS
 #undef FIELD
 
 			// Assert:
 			EXPECT_EQ(expectedSize, sizeof(T));
-			EXPECT_EQ(baseSize + 60u, sizeof(T));
+			EXPECT_EQ(baseSize + 59u, sizeof(T));
 		}
 
 		template<typename T>
@@ -77,7 +78,7 @@ namespace catapult { namespace model {
 	namespace {
 		struct SecretProofTransactionTraits {
 			static auto GenerateEntityWithAttachments(uint16_t proofSize) {
-				uint32_t entitySize = sizeof(TransactionType) + proofSize;
+				uint32_t entitySize = SizeOf32<TransactionType>() + proofSize;
 				auto pTransaction = utils::MakeUniqueWithSize<TransactionType>(entitySize);
 				pTransaction->Size = entitySize;
 				pTransaction->ProofSize = proofSize;

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,7 +22,6 @@
 #include "src/storages/MongoNamespaceCacheStorageUtils.h"
 #include "src/mappers/NamespaceDescriptor.h"
 #include "plugins/txes/namespace/src/state/RootNamespaceHistory.h"
-#include "catapult/model/Address.h"
 #include "plugins/txes/namespace/tests/test/NamespaceTestUtils.h"
 #include "tests/TestHarness.h"
 
@@ -30,12 +30,7 @@ namespace catapult { namespace mongo { namespace plugins {
 #define TEST_CLASS MongoNamespaceCacheStorageUtilsTests
 
 	namespace {
-		enum class EntityStatus { Active, Inactive };
-		constexpr auto Default_Network_Id = static_cast<model::NetworkIdentifier>(0x5A);
-
-		auto NamespaceDescriptorsFromHistory(const state::RootNamespaceHistory& history) {
-			return plugins::NamespaceDescriptorsFromHistory(history, Default_Network_Id);
-		}
+		enum class EntityStatus { Latest, Old };
 	}
 
 	// region NamespaceDescriptorsFromHistory
@@ -94,12 +89,11 @@ namespace catapult { namespace mongo { namespace plugins {
 				const state::RootNamespace& root,
 				const DescriptorMap& descriptorMap) {
 			const auto& descriptor = descriptorMap.at(PathIndexPair(path, rootIndex));
-			auto ownerAddress = model::PublicKeyToAddress(root.ownerPublicKey(), Default_Network_Id);
 			EXPECT_EQ(path, descriptor.Path);
 			EXPECT_EQ(&root, descriptor.pRoot.get());
-			EXPECT_EQ(ownerAddress, descriptor.OwnerAddress);
+			EXPECT_EQ(root.ownerAddress(), descriptor.OwnerAddress);
 			EXPECT_EQ(rootIndex, descriptor.Index);
-			EXPECT_EQ(EntityStatus::Active == status, descriptor.IsActive);
+			EXPECT_EQ(EntityStatus::Latest == status, descriptor.IsLatest);
 
 			const auto& alias = root.alias(state::Namespace(path).id());
 			test::AssertEqualAlias(alias, descriptor.Alias);
@@ -127,7 +121,7 @@ namespace catapult { namespace mongo { namespace plugins {
 		void AssertCanConvertFromRootNamespaceHistoryWithDepthOne_WithoutChildren(TMutate mutate) {
 			// Arrange:
 			state::RootNamespaceHistory history(NamespaceId(123));
-			history.push_back(test::GenerateRandomByteArray<Key>(), test::CreateLifetime(234, 345));
+			history.push_back(test::CreateRandomOwner(), test::CreateLifetime(234, 345));
 
 			auto& root = history.back();
 			mutate(root);
@@ -139,7 +133,7 @@ namespace catapult { namespace mongo { namespace plugins {
 			// Assert:
 			EXPECT_EQ(1u, descriptors.size());
 
-			AssertNamespaceDescriptorExists(0, EntityStatus::Active, test::CreatePath({ 123 }), root, descriptorMap);
+			AssertNamespaceDescriptorExists(0, EntityStatus::Latest, test::CreatePath({ 123 }), root, descriptorMap);
 		}
 	}
 
@@ -159,7 +153,7 @@ namespace catapult { namespace mongo { namespace plugins {
 		void AssertCanConvertFromRootNamespaceHistoryWithDepthOne_WithChildren(TMutate mutate) {
 			// Arrange:
 			state::RootNamespaceHistory history(NamespaceId(123));
-			history.push_back(test::GenerateRandomByteArray<Key>(), test::CreateLifetime(234, 345));
+			history.push_back(test::CreateRandomOwner(), test::CreateLifetime(234, 345));
 
 			auto& root = history.back();
 			AddChildren(root, { test::CreatePath({ 123, 124 }), test::CreatePath({ 123, 124, 126 }) });
@@ -172,9 +166,9 @@ namespace catapult { namespace mongo { namespace plugins {
 			// Assert:
 			EXPECT_EQ(3u, descriptors.size());
 
-			AssertNamespaceDescriptorExists(0, EntityStatus::Active, test::CreatePath({ 123 }), root, descriptorMap);
-			AssertNamespaceDescriptorExists(0, EntityStatus::Active, test::CreatePath({ 123, 124 }), root, descriptorMap);
-			AssertNamespaceDescriptorExists(0, EntityStatus::Active, test::CreatePath({ 123, 124, 126 }), root, descriptorMap);
+			AssertNamespaceDescriptorExists(0, EntityStatus::Latest, test::CreatePath({ 123 }), root, descriptorMap);
+			AssertNamespaceDescriptorExists(0, EntityStatus::Latest, test::CreatePath({ 123, 124 }), root, descriptorMap);
+			AssertNamespaceDescriptorExists(0, EntityStatus::Latest, test::CreatePath({ 123, 124, 126 }), root, descriptorMap);
 		}
 	}
 
@@ -193,9 +187,9 @@ namespace catapult { namespace mongo { namespace plugins {
 	TEST(TEST_CLASS, CanConvertFromRootNamespaceHistoryWithDepthGreaterThanOne_WithoutChildren) {
 		// Arrange:
 		state::RootNamespaceHistory history(NamespaceId(123));
-		history.push_back(test::GenerateRandomByteArray<Key>(), test::CreateLifetime(234, 345));
-		history.push_back(test::GenerateRandomByteArray<Key>(), test::CreateLifetime(456, 567));
-		history.push_back(test::GenerateRandomByteArray<Key>(), test::CreateLifetime(678, 789));
+		history.push_back(test::CreateRandomOwner(), test::CreateLifetime(234, 345));
+		history.push_back(test::CreateRandomOwner(), test::CreateLifetime(456, 567));
+		history.push_back(test::CreateRandomOwner(), test::CreateLifetime(678, 789));
 
 		// Act:
 		auto descriptors = NamespaceDescriptorsFromHistory(history);
@@ -205,54 +199,22 @@ namespace catapult { namespace mongo { namespace plugins {
 		EXPECT_EQ(3u, descriptors.size());
 
 		const auto& root1 = history.back();
-		AssertNamespaceDescriptorExists(2, EntityStatus::Active, test::CreatePath({ 123 }), root1, descriptorMap);
+		AssertNamespaceDescriptorExists(2, EntityStatus::Latest, test::CreatePath({ 123 }), root1, descriptorMap);
 		history.pop_back();
 		const auto& root2 = history.back();
-		AssertNamespaceDescriptorExists(1, EntityStatus::Inactive, test::CreatePath({ 123 }), root2, descriptorMap);
+		AssertNamespaceDescriptorExists(1, EntityStatus::Old, test::CreatePath({ 123 }), root2, descriptorMap);
 		history.pop_back();
 		const auto& root3 = history.back();
-		AssertNamespaceDescriptorExists(0, EntityStatus::Inactive, test::CreatePath({ 123 }), root3, descriptorMap);
-	}
-
-	TEST(TEST_CLASS, CanConvertFromRootNamespaceHistoryWithDepthGreaterThanOne_WithChildren) {
-		// Arrange:
-		state::RootNamespaceHistory history(NamespaceId(123));
-		history.push_back(test::GenerateRandomByteArray<Key>(), test::CreateLifetime(234, 345));
-		AddChildren(history.back(), { test::CreatePath({ 123, 124 }), test::CreatePath({ 123, 124, 126 }) });
-		history.push_back(test::GenerateRandomByteArray<Key>(), test::CreateLifetime(456, 567));
-		AddChildren(history.back(), { test::CreatePath({ 123, 130 }), test::CreatePath({ 123, 131 }) });
-		history.push_back(test::GenerateRandomByteArray<Key>(), test::CreateLifetime(678, 789));
-		AddChildren(history.back(), { test::CreatePath({ 123, 150 }) });
-
-		// Act:
-		auto descriptors = NamespaceDescriptorsFromHistory(history);
-		auto descriptorMap = ToDescriptorMap(descriptors);
-
-		// Assert:
-		EXPECT_EQ(8u, descriptors.size());
-
-		const auto& root1 = history.back();
-		AssertNamespaceDescriptorExists(2, EntityStatus::Active, test::CreatePath({ 123, 150 }), root1, descriptorMap);
-		AssertNamespaceDescriptorExists(2, EntityStatus::Active, test::CreatePath({ 123 }), root1, descriptorMap);
-		history.pop_back();
-		const auto& root2 = history.back();
-		AssertNamespaceDescriptorExists(1, EntityStatus::Inactive, test::CreatePath({ 123, 131 }), root2, descriptorMap);
-		AssertNamespaceDescriptorExists(1, EntityStatus::Inactive, test::CreatePath({ 123, 130 }), root2, descriptorMap);
-		AssertNamespaceDescriptorExists(1, EntityStatus::Inactive, test::CreatePath({ 123 }), root2, descriptorMap);
-		history.pop_back();
-		const auto& root3 = history.back();
-		AssertNamespaceDescriptorExists(0, EntityStatus::Inactive, test::CreatePath({ 123, 124, 126 }), root3, descriptorMap);
-		AssertNamespaceDescriptorExists(0, EntityStatus::Inactive, test::CreatePath({ 123, 124 }), root3, descriptorMap);
-		AssertNamespaceDescriptorExists(0, EntityStatus::Inactive, test::CreatePath({ 123 }), root3, descriptorMap);
+		AssertNamespaceDescriptorExists(0, EntityStatus::Old, test::CreatePath({ 123 }), root3, descriptorMap);
 	}
 
 	TEST(TEST_CLASS, CanConvertFromRootNamespaceHistoryWithDepthGreaterThanOne_SameOwner_WithChildren) {
 		// Arrange:
-		auto owner = test::GenerateRandomByteArray<Key>();
+		auto owner = test::CreateRandomOwner();
 		state::RootNamespaceHistory history(NamespaceId(123));
 		history.push_back(owner, test::CreateLifetime(234, 345));
 		AddChildren(history.back(), { test::CreatePath({ 123, 124 }), test::CreatePath({ 123, 124, 126 }) });
-		history.push_back(owner, test::CreateLifetime(456, 567));
+		history.push_back(owner, test::CreateLifetime(340, 567));
 		AddChildren(history.back(), { test::CreatePath({ 123, 130 }) });
 
 		// Act:
@@ -264,17 +226,68 @@ namespace catapult { namespace mongo { namespace plugins {
 		EXPECT_EQ(8u, descriptors.size());
 
 		const auto& root1 = history.back();
-		AssertNamespaceDescriptorExists(1, EntityStatus::Active, test::CreatePath({ 123, 130 }), root1, descriptorMap);
-		AssertNamespaceDescriptorExists(1, EntityStatus::Active, test::CreatePath({ 123, 124 }), root1, descriptorMap);
-		AssertNamespaceDescriptorExists(1, EntityStatus::Active, test::CreatePath({ 123, 124, 126 }), root1, descriptorMap);
-		AssertNamespaceDescriptorExists(1, EntityStatus::Active, test::CreatePath({ 123 }), root1, descriptorMap);
+		AssertNamespaceDescriptorExists(1, EntityStatus::Latest, test::CreatePath({ 123, 130 }), root1, descriptorMap);
+		AssertNamespaceDescriptorExists(1, EntityStatus::Latest, test::CreatePath({ 123, 124 }), root1, descriptorMap);
+		AssertNamespaceDescriptorExists(1, EntityStatus::Latest, test::CreatePath({ 123, 124, 126 }), root1, descriptorMap);
+		AssertNamespaceDescriptorExists(1, EntityStatus::Latest, test::CreatePath({ 123 }), root1, descriptorMap);
 		history.pop_back();
 		const auto& root2 = history.back();
-		AssertNamespaceDescriptorExists(0, EntityStatus::Inactive, test::CreatePath({ 123, 130 }), root2, descriptorMap);
-		AssertNamespaceDescriptorExists(0, EntityStatus::Inactive, test::CreatePath({ 123, 124 }), root2, descriptorMap);
-		AssertNamespaceDescriptorExists(0, EntityStatus::Inactive, test::CreatePath({ 123, 124, 126 }), root2, descriptorMap);
-		AssertNamespaceDescriptorExists(0, EntityStatus::Inactive, test::CreatePath({ 123 }), root2, descriptorMap);
+		AssertNamespaceDescriptorExists(0, EntityStatus::Old, test::CreatePath({ 123, 130 }), root2, descriptorMap);
+		AssertNamespaceDescriptorExists(0, EntityStatus::Old, test::CreatePath({ 123, 124 }), root2, descriptorMap);
+		AssertNamespaceDescriptorExists(0, EntityStatus::Old, test::CreatePath({ 123, 124, 126 }), root2, descriptorMap);
+		AssertNamespaceDescriptorExists(0, EntityStatus::Old, test::CreatePath({ 123 }), root2, descriptorMap);
 		history.pop_back();
+	}
+
+	namespace {
+		void AssertCanConvertFromRootNamespaceHistoryWithDepthGreaterThanOneUnlinkedWithChildren(
+				const Address& owner1,
+				const Address& owner2,
+				const Address& owner3,
+				Height::ValueType renewHeight1,
+				Height::ValueType renewHeight2) {
+			// Arrange:
+			state::RootNamespaceHistory history(NamespaceId(123));
+			history.push_back(owner1, test::CreateLifetime(234, 345));
+			AddChildren(history.back(), { test::CreatePath({ 123, 124 }), test::CreatePath({ 123, 124, 126 }) });
+			history.push_back(owner2, test::CreateLifetime(renewHeight1, 567));
+			AddChildren(history.back(), { test::CreatePath({ 123, 130 }), test::CreatePath({ 123, 131 }) });
+			history.push_back(owner3, test::CreateLifetime(renewHeight2, 789));
+			AddChildren(history.back(), { test::CreatePath({ 123, 150 }) });
+
+			// Act:
+			auto descriptors = NamespaceDescriptorsFromHistory(history);
+			auto descriptorMap = ToDescriptorMap(descriptors);
+
+			// Assert:
+			EXPECT_EQ(8u, descriptors.size());
+
+			const auto& root1 = history.back();
+			AssertNamespaceDescriptorExists(2, EntityStatus::Latest, test::CreatePath({ 123, 150 }), root1, descriptorMap);
+			AssertNamespaceDescriptorExists(2, EntityStatus::Latest, test::CreatePath({ 123 }), root1, descriptorMap);
+			history.pop_back();
+			const auto& root2 = history.back();
+			AssertNamespaceDescriptorExists(1, EntityStatus::Old, test::CreatePath({ 123, 131 }), root2, descriptorMap);
+			AssertNamespaceDescriptorExists(1, EntityStatus::Old, test::CreatePath({ 123, 130 }), root2, descriptorMap);
+			AssertNamespaceDescriptorExists(1, EntityStatus::Old, test::CreatePath({ 123 }), root2, descriptorMap);
+			history.pop_back();
+			const auto& root3 = history.back();
+			AssertNamespaceDescriptorExists(0, EntityStatus::Old, test::CreatePath({ 123, 124, 126 }), root3, descriptorMap);
+			AssertNamespaceDescriptorExists(0, EntityStatus::Old, test::CreatePath({ 123, 124 }), root3, descriptorMap);
+			AssertNamespaceDescriptorExists(0, EntityStatus::Old, test::CreatePath({ 123 }), root3, descriptorMap);
+		}
+	}
+
+	TEST(TEST_CLASS, CanConvertFromRootNamespaceHistoryWithDepthGreaterThanOne_SameOwnerInactive_WithChildren) {
+		auto owner = test::CreateRandomOwner();
+		AssertCanConvertFromRootNamespaceHistoryWithDepthGreaterThanOneUnlinkedWithChildren(owner, owner, owner, 350, 567);
+	}
+
+	TEST(TEST_CLASS, CanConvertFromRootNamespaceHistoryWithDepthGreaterThanOne_DifferentOwnerInactive_WithChildren) {
+		auto owner1 = test::CreateRandomOwner();
+		auto owner2 = test::CreateRandomOwner();
+		auto owner3 = test::CreateRandomOwner();
+		AssertCanConvertFromRootNamespaceHistoryWithDepthGreaterThanOneUnlinkedWithChildren(owner1, owner2, owner3, 340, 566);
 	}
 
 	// endregion

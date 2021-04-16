@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -64,14 +65,19 @@ namespace catapult { namespace test {
 		connection[dbName].drop();
 		auto database = connection[dbName];
 
-		// indexes for the accounts collection
+		// indexes for the 'accounts' collection
 		auto accounts = database["accounts"];
 		auto accountsAddressIndex = document() << "account.address" << 1 << finalize;
 		auto publicKeyIndex = document() << "account.publicKey" << 1 << finalize;
 		accounts.create_index(accountsAddressIndex.view(), mongocxx::options::index().unique(true));
 		accounts.create_index(publicKeyIndex.view(), mongocxx::options::index());
 
-		// indexes for the transactions collection
+		// indexes for the 'finalizedBlocks' collection
+		auto finalizedBlocks = database["finalizedBlocks"];
+		auto finalizationRoundIndex = document() << "block.finalizationEpoch" << -1 << "block.finalizationPoint" << -1 << finalize;
+		finalizedBlocks.create_index(finalizationRoundIndex.view(), mongocxx::options::index().unique(true));
+
+		// indexes for the 'transactions' collection
 		auto transactions = database["transactions"];
 		auto deadlineIndex = document() << "transaction.deadline" << -1 << finalize;
 		auto signerIndex = document() << "transaction.signerPublicKey" << 1 << "_id" << -1 << finalize;
@@ -82,10 +88,18 @@ namespace catapult { namespace test {
 		transactions.create_index(recipientIndex.view(), mongocxx::options::index());
 		transactions.create_index(heightIndex.view(), mongocxx::options::index());
 
-		// indexes for the unconfirmed transactions collection
+		// indexes for the 'unconfirmedTransactions' collection
 		auto unconfirmedTransactions = database["unconfirmedTransactions"];
 		auto hashIndex = document() << "meta.hash" << 1 << finalize;
 		unconfirmedTransactions.create_index(hashIndex.view(), mongocxx::options::index().unique(true));
+
+		// cap 'transactionStatuses' collection
+		auto transactionStatusesOptions = document()
+				<< "capped" << true
+				<< "size" << std::numeric_limits<int>::max()
+				<< "max" << 25
+				<< finalize;
+		database.create_collection("transactionStatuses", transactionStatusesOptions.view());
 	}
 
 	bsoncxx::document::value CreateFilter(const std::shared_ptr<state::AccountState>& pAccountState) {
@@ -97,9 +111,12 @@ namespace catapult { namespace test {
 		return filter;
 	}
 
-	std::unique_ptr<mongo::MongoStorageContext> CreateDefaultMongoStorageContext(const std::string& dbName) {
-		auto pWriter = mongo::MongoBulkWriter::Create(DefaultDbUri(), dbName, CreateStartedIoThreadPool(8));
-		return std::make_unique<mongo::MongoStorageContext>(DefaultDbUri(), dbName, pWriter, mongo::MongoErrorPolicy::Mode::Strict);
+	std::unique_ptr<mongo::MongoStorageContext> CreateDefaultMongoStorageContext(
+			const std::string& dbName,
+			thread::IoThreadPool& pool,
+			mongo::MongoErrorPolicy::Mode errorPolicyMode) {
+		auto pWriter = mongo::MongoBulkWriter::Create(DefaultDbUri(), dbName, utils::TimeSpan::FromMinutes(10), pool);
+		return std::make_unique<mongo::MongoStorageContext>(DefaultDbUri(), dbName, pWriter, errorPolicyMode);
 	}
 
 	mongo::MongoTransactionRegistry CreateDefaultMongoTransactionRegistry() {

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -105,10 +106,10 @@ namespace catapult { namespace local {
 			static constexpr auto WriteMessage = test::WriteRandomPtChange;
 		};
 
-		struct TransactionStatusTraits {
-			static constexpr auto Queue_Directory_Name = "transaction_status";
+		struct FinalizationTraits {
+			static constexpr auto Queue_Directory_Name = "finalization";
 
-			static constexpr auto WriteMessage = test::WriteRandomTransactionStatus;
+			static constexpr auto WriteMessage = test::WriteRandomFinalization;
 		};
 
 		struct StateChangeTraits {
@@ -120,6 +121,12 @@ namespace catapult { namespace local {
 				io::Write64(outputStream, test::Random());
 			}
 		};
+
+		struct TransactionStatusTraits {
+			static constexpr auto Queue_Directory_Name = "transaction_status";
+
+			static constexpr auto WriteMessage = test::WriteRandomTransactionStatus;
+		};
 	}
 
 #define SUBSCRIBER_TRAITS_BASED_TEST(TEST_NAME) \
@@ -127,8 +134,9 @@ namespace catapult { namespace local {
 	TEST(TEST_CLASS, TEST_NAME##_BlockChange) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<BlockChangeTraits>(); } \
 	TEST(TEST_CLASS, TEST_NAME##_UtChange) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<UtChangeTraits>(); } \
 	TEST(TEST_CLASS, TEST_NAME##_PtChange) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<PtChangeTraits>(); } \
-	TEST(TEST_CLASS, TEST_NAME##_TransactionStatus) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<TransactionStatusTraits>(); } \
+	TEST(TEST_CLASS, TEST_NAME##_Finalization) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<FinalizationTraits>(); } \
 	TEST(TEST_CLASS, TEST_NAME##_StateChange) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<StateChangeTraits>(); } \
+	TEST(TEST_CLASS, TEST_NAME##_TransactionStatus) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<TransactionStatusTraits>(); } \
 	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)()
 
 	// endregion

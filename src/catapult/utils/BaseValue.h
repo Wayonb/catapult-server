@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -107,12 +108,12 @@ namespace catapult { namespace utils {
 	public:
 		/// Adds \a rhs and this value and returns a new value.
 		constexpr BaseValue operator+(BaseValue rhs) const {
-			return BaseValue(this->unwrap() + rhs.unwrap());
+			return BaseValue(static_cast<TValue>(this->unwrap() + rhs.unwrap()));
 		}
 
 		/// Subtracts \a rhs from this value and returns a new value.
 		constexpr BaseValue operator-(BaseValue rhs) const {
-			return BaseValue(this->unwrap() - rhs.unwrap());
+			return BaseValue(static_cast<TValue>(this->unwrap() - rhs.unwrap()));
 		}
 	};
 }}

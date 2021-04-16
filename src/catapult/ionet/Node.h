@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,21 +21,13 @@
 
 #pragma once
 #include "NodeRoles.h"
-#include "catapult/model/NetworkInfo.h"
+#include "NodeVersion.h"
+#include "catapult/model/NetworkIdentifier.h"
 #include "catapult/model/NodeIdentity.h"
 #include "catapult/utils/Hashers.h"
 #include <unordered_set>
 
 namespace catapult { namespace ionet {
-
-	// region NodeVersion
-
-	struct NodeVersion_tag {};
-
-	/// 32-bit node version where first three bytes represent { major, minor, build } and last byte is user defined.
-	using NodeVersion = utils::BaseValue<uint32_t, NodeVersion_tag>;
-
-	// endregion
 
 	// region NodeEndpoint
 
@@ -55,29 +48,33 @@ namespace catapult { namespace ionet {
 	struct NodeMetadata {
 	public:
 		/// Creates default metadata.
-		NodeMetadata() : NodeMetadata(model::NetworkIdentifier::Zero)
+		NodeMetadata() : NodeMetadata(model::UniqueNetworkFingerprint())
 		{}
 
-		/// Creates metadata for a node in the network identified by \a networkIdentifier.
-		explicit NodeMetadata(model::NetworkIdentifier networkIdentifier) : NodeMetadata(networkIdentifier, "")
+		/// Creates metadata for a node in the network identified by \a networkFingerprint.
+		explicit NodeMetadata(const model::UniqueNetworkFingerprint& networkFingerprint) : NodeMetadata(networkFingerprint, "")
 		{}
 
-		/// Creates metadata for a node with \a name in the network identified by \a networkIdentifier.
-		NodeMetadata(model::NetworkIdentifier networkIdentifier, const std::string& name)
-				: NodeMetadata(networkIdentifier, name, NodeVersion(), NodeRoles::None)
+		/// Creates metadata for a node with \a name in the network identified by \a networkFingerprint.
+		NodeMetadata(const model::UniqueNetworkFingerprint& networkFingerprint, const std::string& name)
+				: NodeMetadata(networkFingerprint, name, NodeVersion(), NodeRoles::None)
 		{}
 
-		/// Creates metadata for a node with \a name, \a version and \a roles in the network identified by \a networkIdentifier.
-		NodeMetadata(model::NetworkIdentifier networkIdentifier, const std::string& name, NodeVersion version, NodeRoles roles)
-				: NetworkIdentifier(networkIdentifier)
+		/// Creates metadata for a node with \a name, \a version and \a roles in the network identified by \a networkFingerprint.
+		NodeMetadata(
+				const model::UniqueNetworkFingerprint& networkFingerprint,
+				const std::string& name,
+				NodeVersion version,
+				NodeRoles roles)
+				: NetworkFingerprint(networkFingerprint)
 				, Name(name)
 				, Version(version)
 				, Roles(roles)
 		{}
 
 	public:
-		/// Network identifier.
-		model::NetworkIdentifier NetworkIdentifier;
+		/// Network fingerprint.
+		model::UniqueNetworkFingerprint NetworkFingerprint;
 
 		/// Friendly name (optional).
 		std::string Name;

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,15 +24,32 @@
 #include <limits>
 #include <type_traits>
 
+namespace catapult {
+	namespace utils {
+		template<typename TValue, typename TTag>
+		class BaseValue;
+	}
+}
+
 namespace catapult { namespace utils {
 
 	/// Adds \a delta to \a value if and only if there is no overflow.
-	template<typename T>
+	template<typename T, typename X = std::enable_if_t<std::is_unsigned_v<T>>>
 	bool CheckedAdd(T& value, T delta) {
 		if (value > std::numeric_limits<T>::max() - delta)
 			return false;
 
-		value += delta;
+		value = static_cast<T>(value + delta);
+		return true;
+	}
+
+	/// Adds \a delta to \a value if and only if there is no overflow.
+	template<typename TValue, typename TTag>
+	bool CheckedAdd(BaseValue<TValue, TTag>& value, BaseValue<TValue, TTag> delta) {
+		if (value > BaseValue<TValue, TTag>(std::numeric_limits<TValue>::max()) - delta)
+			return false;
+
+		value = value + delta;
 		return true;
 	}
 
@@ -69,12 +87,6 @@ namespace catapult { namespace utils {
 
 	/// Calculates 2^(\a value) with fixed point s15.16.
 	uint32_t FixedPointPowerOfTwo(int32_t value);
-
-	/// Calculates 2^(\a value).
-	template<typename T, typename X = std::enable_if_t<std::is_unsigned_v<T>>>
-	constexpr T Pow2(T value) {
-		return value >= GetNumBits<T>() ? 0 : static_cast<T>(static_cast<T>(1) << value);
-	}
 
 	/// Divides \a value by \a divisor and returns the remainder.
 	template<typename T, typename X = std::enable_if_t<std::is_unsigned_v<T>>>

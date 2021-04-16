@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,6 +20,7 @@
 **/
 
 #pragma once
+#include "catapult/crypto/KeyPair.h"
 #include "catapult/model/Transaction.h"
 
 namespace catapult { namespace extensions {
@@ -26,8 +28,8 @@ namespace catapult { namespace extensions {
 	/// Extensions for working with transactions.
 	class TransactionExtensions {
 	public:
-		/// Creates extensions for transactions for the network with the specified generation hash (\a generationHash).
-		explicit TransactionExtensions(const GenerationHash& generationHash);
+		/// Creates extensions for transactions for the network with the specified generation hash seed (\a generationHashSeed).
+		explicit TransactionExtensions(const GenerationHashSeed& generationHashSeed);
 
 	public:
 		/// Hashes the \a transaction.
@@ -40,6 +42,6 @@ namespace catapult { namespace extensions {
 		bool verify(const model::Transaction& transaction) const;
 
 	private:
-		GenerationHash m_generationHash;
+		GenerationHashSeed m_generationHashSeed;
 	};
 }}

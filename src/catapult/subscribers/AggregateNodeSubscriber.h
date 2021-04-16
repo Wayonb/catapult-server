@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -43,7 +44,7 @@ namespace catapult { namespace subscribers {
 			return result;
 		}
 
-		void notifyBan(const model::NodeIdentity& identity, validators::ValidationResult reason) override {
+		void notifyBan(const model::NodeIdentity& identity, uint32_t reason) override {
 			this->forEach([&identity, reason](auto& subscriber) { subscriber.notifyBan(identity, reason); });
 		}
 	};

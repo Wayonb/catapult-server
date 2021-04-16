@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,11 +20,11 @@
 **/
 
 #include "CatapultConfiguration.h"
+#include "CatapultKeys.h"
 #include "ConfigurationFileLoader.h"
-#include "catapult/crypto/KeyPair.h"
+#include "catapult/crypto/OpensslKeyUtils.h"
 #include "catapult/utils/ConfigurationBag.h"
 #include "catapult/utils/ConfigurationUtils.h"
-#include <boost/filesystem.hpp>
 
 namespace catapult { namespace config {
 
@@ -59,7 +60,7 @@ namespace catapult { namespace config {
 	{}
 
 	CatapultConfiguration CatapultConfiguration::LoadFromPath(
-			const boost::filesystem::path& resourcesPath,
+			const std::filesystem::path& resourcesPath,
 			const std::string& extensionsHost) {
 		return CatapultConfiguration(
 				LoadIniConfiguration<model::BlockChainConfiguration>(resourcesPath / Qualify("network")),
@@ -75,17 +76,20 @@ namespace catapult { namespace config {
 	ionet::Node ToLocalNode(const CatapultConfiguration& config) {
 		const auto& localNodeConfig = config.Node.Local;
 
-		auto identityKey = crypto::KeyPair::FromString(config.User.BootPrivateKey).publicKey();
+		auto identityKey = crypto::ReadPublicKeyFromPublicKeyPemFile(GetCaPublicKeyPemFilename(config.User.CertificateDirectory));
 
 		auto endpoint = ionet::NodeEndpoint();
 		endpoint.Host = localNodeConfig.Host;
 		endpoint.Port = config.Node.Port;
 
-		auto metadata = ionet::NodeMetadata(config.BlockChain.Network.Identifier);
+		auto networkFingerprint = model::UniqueNetworkFingerprint(
+				config.BlockChain.Network.Identifier,
+				config.BlockChain.Network.GenerationHashSeed);
+		auto metadata = ionet::NodeMetadata(networkFingerprint);
 		metadata.Name = localNodeConfig.FriendlyName;
 		metadata.Version = ionet::NodeVersion(localNodeConfig.Version);
 		metadata.Roles = localNodeConfig.Roles;
 
-		return ionet::Node({ identityKey, "127.0.0.1" }, endpoint, metadata);
+		return ionet::Node({ identityKey, "_local_" }, endpoint, metadata);
 	}
 }}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -43,7 +44,7 @@ namespace catapult { namespace state {
 		}
 
 		MosaicDefinition CreateMosaicDefinition(uint64_t duration) {
-			auto owner = test::GenerateRandomByteArray<Key>();
+			auto owner = test::CreateRandomOwner();
 			return MosaicDefinition(Default_Height, owner, 3, test::CreateMosaicPropertiesWithDuration(BlockDuration(duration)));
 		}
 	}
@@ -52,7 +53,7 @@ namespace catapult { namespace state {
 
 	TEST(TEST_CLASS, CanCreateMosaicDefinition_DefaultProperties) {
 		// Arrange:
-		auto owner = test::GenerateRandomByteArray<Key>();
+		auto owner = test::CreateRandomOwner();
 		auto properties = model::MosaicProperties();
 
 		// Act:
@@ -60,7 +61,7 @@ namespace catapult { namespace state {
 
 		// Assert:
 		EXPECT_EQ(Height(877), definition.startHeight());
-		EXPECT_EQ(owner, definition.ownerPublicKey());
+		EXPECT_EQ(owner, definition.ownerAddress());
 		EXPECT_EQ(3u, definition.revision());
 		AssertDefaultRequiredProperties(definition.properties());
 		AssertCustomOptionalProperties(properties, definition.properties());
@@ -68,7 +69,7 @@ namespace catapult { namespace state {
 
 	TEST(TEST_CLASS, CanCreateMosaicDefinition_CustomProperties) {
 		// Arrange:
-		auto owner = test::GenerateRandomByteArray<Key>();
+		auto owner = test::CreateRandomOwner();
 		auto properties = test::CreateMosaicPropertiesWithDuration(BlockDuration(3));
 
 		// Act:
@@ -76,7 +77,7 @@ namespace catapult { namespace state {
 
 		// Assert:
 		EXPECT_EQ(Height(877), definition.startHeight());
-		EXPECT_EQ(owner, definition.ownerPublicKey());
+		EXPECT_EQ(owner, definition.ownerAddress());
 		EXPECT_EQ(3u, definition.revision());
 		AssertDefaultRequiredProperties(definition.properties());
 		AssertCustomOptionalProperties(properties, definition.properties());

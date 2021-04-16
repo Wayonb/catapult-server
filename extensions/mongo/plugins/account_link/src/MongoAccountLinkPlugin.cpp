@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,5 +24,6 @@
 
 extern "C" PLUGIN_API
 void RegisterMongoSubsystem(catapult::mongo::MongoPluginManager& manager) {
-	manager.addTransactionSupport(catapult::mongo::plugins::CreateAccountLinkTransactionMongoPlugin());
+	manager.addTransactionSupport(catapult::mongo::plugins::CreateAccountKeyLinkTransactionMongoPlugin());
+	manager.addTransactionSupport(catapult::mongo::plugins::CreateNodeKeyLinkTransactionMongoPlugin());
 }

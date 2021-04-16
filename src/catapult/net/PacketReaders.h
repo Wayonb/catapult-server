@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -27,7 +28,6 @@
 #include <memory>
 
 namespace catapult {
-	namespace crypto { class KeyPair; }
 	namespace ionet {
 		class PacketIo;
 		class PacketSocket;
@@ -39,7 +39,7 @@ namespace catapult {
 namespace catapult { namespace net {
 
 	/// Manages a collection of connections that receive data from external nodes.
-	class PacketReaders : public ConnectionContainer {
+	class PacketReaders : public AcceptedConnectionContainer {
 	public:
 		/// Gets the number of active readers.
 		virtual size_t numActiveReaders() const = 0;
@@ -49,12 +49,12 @@ namespace catapult { namespace net {
 		virtual void shutdown() = 0;
 	};
 
-	/// Creates a packet readers container for a server with a key pair of \a keyPair using \a pPool and \a handlers,
+	/// Creates a packet readers container for a server with specified \a serverPublicKey using \a pool and \a handlers,
 	/// configured with \a settings and allowing \a maxConnectionsPerIdentity.
 	std::shared_ptr<PacketReaders> CreatePacketReaders(
-			const std::shared_ptr<thread::IoThreadPool>& pPool,
+			thread::IoThreadPool& pool,
 			const ionet::ServerPacketHandlers& handlers,
-			const crypto::KeyPair& keyPair,
+			const Key& serverPublicKey,
 			const ConnectionSettings& settings,
 			uint32_t maxConnectionsPerIdentity);
 }}

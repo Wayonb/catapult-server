@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -95,6 +96,17 @@ namespace catapult { namespace test {
 			// Assert:
 			EXPECT_EQ(1u, context.pMockPacketSocket->numCloseCalls());
 		}
+
+		static void AssertCanAbort() {
+			// Arrange:
+			typename TTraits::TestContextType context;
+
+			// Act:
+			context.pDecoratedSocket->abort();
+
+			// Assert:
+			EXPECT_EQ(1u, context.pMockPacketSocket->numAbortCalls());
+		}
 	};
 }}
 
@@ -107,4 +119,5 @@ namespace catapult { namespace test {
 	MAKE_PACKET_SOCKET_DECORATOR_TEST(TRAITS_NAME, PREFIX, CanRoundtripBufferedPackets) \
 	MAKE_PACKET_SOCKET_DECORATOR_TEST(TRAITS_NAME, PREFIX, CanAccessStats) \
 	MAKE_PACKET_SOCKET_DECORATOR_TEST(TRAITS_NAME, PREFIX, CanWaitForData) \
-	MAKE_PACKET_SOCKET_DECORATOR_TEST(TRAITS_NAME, PREFIX, CanClose)
+	MAKE_PACKET_SOCKET_DECORATOR_TEST(TRAITS_NAME, PREFIX, CanClose) \
+	MAKE_PACKET_SOCKET_DECORATOR_TEST(TRAITS_NAME, PREFIX, CanAbort)

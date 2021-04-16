@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -26,7 +27,6 @@
 #include <memory>
 
 namespace catapult {
-	namespace crypto { class KeyPair; }
 	namespace ionet {
 		class Node;
 		class PacketSocket;
@@ -39,6 +39,9 @@ namespace catapult { namespace net {
 
 	/// Manages a collection of connections that send data to external nodes.
 	class PacketWriters : public ConnectionContainer, public PacketIoPicker {
+	public:
+		using ConnectCallback = consumer<const PeerConnectResultEx&>;
+
 	public:
 		/// Gets the number of active writers.
 		virtual size_t numActiveWriters() const = 0;
@@ -53,16 +56,16 @@ namespace catapult { namespace net {
 
 	public:
 		/// Attempts to connect to \a node and calls \a callback on completion.
-		virtual void connect(const ionet::Node& node, const AcceptCallback& callback) = 0;
+		virtual void connect(const ionet::Node& node, const ConnectCallback& callback) = 0;
 
 		/// Shuts down all connections.
 		virtual void shutdown() = 0;
 	};
 
-	/// Creates a packet writers container for a server with a key pair of \a keyPair using \a pPool and configured with
+	/// Creates a packet writers container for a server with specified \a serverPublicKey using \a pool and configured with
 	/// \a settings.
 	std::shared_ptr<PacketWriters> CreatePacketWriters(
-			const std::shared_ptr<thread::IoThreadPool>& pPool,
-			const crypto::KeyPair& keyPair,
+			thread::IoThreadPool& pool,
+			const Key& serverPublicKey,
 			const ConnectionSettings& settings);
 }}

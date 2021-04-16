@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,7 +21,7 @@
 
 #pragma once
 #include "catapult/model/ContainerTypes.h"
-#include "catapult/model/NetworkInfo.h"
+#include "catapult/model/NetworkIdentifier.h"
 #include <memory>
 
 namespace catapult { namespace test {
@@ -33,6 +34,9 @@ namespace catapult { namespace test {
 
 	/// Generates a random (unresolved) address.
 	UnresolvedAddress GenerateRandomUnresolvedAddress();
+
+	/// Generates a random vector of \a count addresses.
+	std::vector<Address> GenerateRandomAddresses(size_t count);
 
 	/// Generates a random set of \a count (unresolved) addresses.
 	std::shared_ptr<model::UnresolvedAddressSet> GenerateRandomUnresolvedAddressSetPointer(size_t count);

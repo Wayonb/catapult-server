@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -38,7 +39,7 @@ namespace catapult { namespace harvesting {
 		Harvester(
 				const cache::CatapultCache& cache,
 				const model::BlockChainConfiguration& config,
-				const Key& beneficiary,
+				const Address& beneficiary,
 				const UnlockedAccounts& unlockedAccounts,
 				const BlockGenerator& blockGenerator);
 
@@ -50,7 +51,7 @@ namespace catapult { namespace harvesting {
 	private:
 		const cache::CatapultCache& m_cache;
 		const model::BlockChainConfiguration m_config;
-		const Key m_beneficiary;
+		const Address m_beneficiary;
 		const UnlockedAccounts& m_unlockedAccounts;
 		BlockGenerator m_blockGenerator;
 	};

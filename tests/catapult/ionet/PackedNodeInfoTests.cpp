@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -37,7 +38,7 @@ namespace catapult { namespace ionet {
 		// Arrange:
 		auto expectedSize = 0u;
 
-#define FIELD(X) expectedSize += sizeof(PackedConnectionState::X);
+#define FIELD(X) expectedSize += SizeOf32<decltype(PackedConnectionState::X)>();
 		PACKED_CONNECTION_STATE_FIELDS
 #undef FIELD
 
@@ -66,7 +67,7 @@ namespace catapult { namespace ionet {
 		// Arrange:
 		auto expectedSize = 0u;
 
-#define FIELD(X) expectedSize += sizeof(PackedNodeInteractions::X);
+#define FIELD(X) expectedSize += SizeOf32<decltype(PackedNodeInteractions::X)>();
 		PACKED_NODE_INTERACTIONS_FIELDS
 #undef FIELD
 
@@ -93,7 +94,7 @@ namespace catapult { namespace ionet {
 		// Arrange:
 		auto expectedSize = sizeof(model::TrailingVariableDataLayout<PackedNodeInfo, PackedConnectionState>) + 7;
 
-#define FIELD(X) expectedSize += sizeof(PackedNodeInfo::X);
+#define FIELD(X) expectedSize += SizeOf32<decltype(PackedNodeInfo::X)>();
 		PACKED_NODE_INFO_FIELDS
 #undef FIELD
 
@@ -150,7 +151,7 @@ namespace catapult { namespace ionet {
 	namespace {
 		struct PackedNodeInfoTraits {
 			static auto GenerateEntityWithAttachments(uint16_t count) {
-				uint32_t entitySize = sizeof(PackedNodeInfo) + count * sizeof(PackedConnectionState);
+				uint32_t entitySize = SizeOf32<PackedNodeInfo>() + count * SizeOf32<PackedConnectionState>();
 				auto pNodeInfo = utils::MakeUniqueWithSize<PackedNodeInfo>(entitySize);
 				pNodeInfo->Size = entitySize;
 				pNodeInfo->ConnectionStatesCount = static_cast<uint8_t>(count);

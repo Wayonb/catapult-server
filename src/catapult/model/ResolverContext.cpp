@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -26,11 +27,7 @@ namespace catapult { namespace model {
 	ResolverContext::ResolverContext()
 			: ResolverContext(
 					[](auto mosaicId) { return MosaicId(mosaicId.unwrap()); },
-					[](const auto& address) {
-						Address resolvedAddress;
-						std::memcpy(resolvedAddress.data(), address.data(), address.size());
-						return resolvedAddress;
-					})
+					[](const auto& address) { return address.template copyTo<Address>(); })
 	{}
 
 	ResolverContext::ResolverContext(const MosaicResolver& mosaicResolver, const AddressResolver& addressResolver)

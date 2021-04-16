@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -25,4 +26,7 @@ namespace catapult { namespace io {
 
 	/// Deletes everything in \a directory but does not delete the directory itself.
 	void PurgeDirectory(const std::string& directory);
+
+	/// Moves all files from \a sourceDirectory to \a destDirectory.
+	void MoveAllFiles(const std::string& sourceDirectory, const std::string& destDirectory);
 }}

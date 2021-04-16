@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -67,11 +68,11 @@ namespace catapult { namespace observers {
 			}
 
 			uint64_t readIndexFile() const {
-				return io::IndexFile((boost::filesystem::path(m_tempDir.name()) / "index.dat").generic_string()).get();
+				return io::IndexFile((std::filesystem::path(m_tempDir.name()) / "index.dat").generic_string()).get();
 			}
 
 			std::vector<uint8_t> readAll(const std::string& name) {
-				io::RawFile dataFile((boost::filesystem::path(m_tempDir.name()) / name).generic_string(), io::OpenMode::Read_Only);
+				io::RawFile dataFile((std::filesystem::path(m_tempDir.name()) / name).generic_string(), io::OpenMode::Read_Only);
 				std::vector<uint8_t> buffer(dataFile.size());
 				dataFile.read(buffer);
 				return buffer;
@@ -170,6 +171,7 @@ namespace catapult { namespace observers {
 		auto expectedMessagePayloadSize = 3u;
 		auto messageFileContents = context.readAll("0000000000000000.dat");
 		ASSERT_EQ(1 + Key::Size + expectedMessagePayloadSize, messageFileContents.size());
+
 		EXPECT_EQ(TTraits::Message_First_Byte, messageFileContents[0]);
 		EXPECT_EQ(sender, reinterpret_cast<const Key&>(messageFileContents[1]));
 		EXPECT_EQ_MEMORY(&message[sizeof(uint64_t)], &messageFileContents[1 + Key::Size], expectedMessagePayloadSize);

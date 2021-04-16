@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,7 +25,7 @@
 #include "catapult/extensions/LocalNodeChainScore.h"
 #include "tests/test/nodeps/Filesystem.h"
 #include "tests/TestHarness.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 namespace catapult { namespace sync {
 
@@ -74,8 +75,8 @@ namespace catapult { namespace sync {
 
 				// Assert:
 				EXPECT_EQ(1u, m_counters.NumPreStateWrittenCalls);
-				EXPECT_TRUE(boost::filesystem::exists(supplementalPath("state.tmp")));
-				EXPECT_FALSE(boost::filesystem::exists(supplementalPath("state")));
+				EXPECT_TRUE(std::filesystem::exists(supplementalPath("state.tmp")));
+				EXPECT_FALSE(std::filesystem::exists(supplementalPath("state")));
 			}
 
 		private:
@@ -112,8 +113,8 @@ namespace catapult { namespace sync {
 			// Assert:
 			EXPECT_EQ(1u, context.counters().NumPreStateWrittenCalls);
 			EXPECT_EQ(1u, context.counters().NumCommitStepCalls);
-			EXPECT_TRUE(boost::filesystem::exists(context.supplementalPath("state.tmp")));
-			EXPECT_FALSE(boost::filesystem::exists(context.supplementalPath("state")));
+			EXPECT_TRUE(std::filesystem::exists(context.supplementalPath("state.tmp")));
+			EXPECT_FALSE(std::filesystem::exists(context.supplementalPath("state")));
 		}
 	}
 
@@ -136,8 +137,8 @@ namespace catapult { namespace sync {
 		// Assert:
 		EXPECT_EQ(1u, context.counters().NumPreStateWrittenCalls);
 		EXPECT_EQ(1u, context.counters().NumCommitStepCalls);
-		EXPECT_FALSE(boost::filesystem::exists(context.supplementalPath("state.tmp")));
-		EXPECT_TRUE(boost::filesystem::exists(context.supplementalPath("state")));
+		EXPECT_FALSE(std::filesystem::exists(context.supplementalPath("state.tmp")));
+		EXPECT_TRUE(std::filesystem::exists(context.supplementalPath("state")));
 	}
 
 	// endregion

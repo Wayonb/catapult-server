@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,17 +24,27 @@
 #include <vector>
 
 namespace catapult {
-	namespace config { class CatapultConfiguration; }
 	namespace model {
+		struct BlockChainConfiguration;
 		struct BlockElement;
 		struct BlockStatement;
 	}
+	namespace plugins { class PluginManager; }
 }
 
 namespace catapult { namespace tools { namespace nemgen {
 
 	/// Information about block execution dependent hashes.
 	struct BlockExecutionHashesInfo {
+		/// Number of voting eligible accounts.
+		uint32_t VotingEligibleAccountsCount;
+
+		/// Number of harvesting eligible accounts.
+		uint64_t HarvestingEligibleAccountsCount;
+
+		/// Total balance eligible for voting.
+		Amount TotalVotingBalance;
+
 		/// Block receipts hash.
 		Hash256 ReceiptsHash;
 
@@ -47,8 +58,10 @@ namespace catapult { namespace tools { namespace nemgen {
 		std::unique_ptr<model::BlockStatement> pBlockStatement;
 	};
 
-	/// Calculates the block execution dependent hashes after executing nemesis \a blockElement for network configured with \a config.
+	/// Calculates the block execution dependent hashes after executing nemesis \a blockElement for network configured with \a config
+	/// and \a pluginManager.
 	BlockExecutionHashesInfo CalculateNemesisBlockExecutionHashes(
 			const model::BlockElement& blockElement,
-			const config::CatapultConfiguration& config);
+			const model::BlockChainConfiguration& config,
+			plugins::PluginManager& pluginManager);
 }}}

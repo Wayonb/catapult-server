@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,21 +22,20 @@
 #include "LocalTestUtils.h"
 #include "catapult/cache_tx/MemoryUtCache.h"
 #include "catapult/chain/UtUpdater.h"
-#include "catapult/crypto/KeyUtils.h"
 #include "catapult/extensions/PluginUtils.h"
 #include "catapult/plugins/PluginLoader.h"
 #include "catapult/utils/NetworkTime.h"
+#include "tests/test/net/CertificateLocator.h"
 #include "tests/test/net/NodeTestUtils.h"
-#include "tests/test/nodeps/MijinConstants.h"
 #include "tests/test/nodeps/Nemesis.h"
 #include "tests/test/nodeps/TestConstants.h"
+#include "tests/test/nodeps/TestNetworkConstants.h"
 #include "tests/test/other/MutableCatapultConfiguration.h"
 
 namespace catapult { namespace test {
 
 	namespace {
 		constexpr auto Default_Network_Epoch_Adjustment = utils::TimeSpan::FromMilliseconds(1459468800000);
-		constexpr auto Local_Node_Private_Key = "4A236D9F894CF0C4FC8C042DB5DB41CCF35118B7B220163E5B4BC1872C1CD618";
 
 		void SetConnectionsSubConfiguration(config::NodeConfiguration::ConnectionsSubConfiguration& config) {
 			config.MaxConnections = 25;
@@ -47,17 +47,22 @@ namespace catapult { namespace test {
 		config::NodeConfiguration CreateNodeConfiguration() {
 			auto config = config::NodeConfiguration::Uninitialized();
 			config.Port = GetLocalHostPort();
-			config.ApiPort = GetLocalHostPort() + 1;
 			config.MaxIncomingConnectionsPerIdentity = 2;
 
 			config.EnableAddressReuse = true;
 
-			config.MaxBlocksPerSyncAttempt = 4 * 100;
+			config.FileDatabaseBatchSize = File_Database_Batch_Size;
+
+			config.MaxHashesPerSyncAttempt = 4 * 100;
+			config.MaxBlocksPerSyncAttempt = 2 * 100;
 			config.MaxChainBytesPerSyncAttempt = utils::FileSize::FromKilobytes(8 * 512);
 
 			config.ShortLivedCacheMaxSize = 10;
 
-			config.UnconfirmedTransactionsCacheMaxSize = 100;
+			// allow transactions with current time to be included in block two
+			config.MaxTimeBehindPullTransactionsStart = utils::TimeSpan::FromMilliseconds(
+					(CreateDefaultNetworkTimeSupplier()() + utils::TimeSpan::FromHours(1)).unwrap());
+			config.UnconfirmedTransactionsCacheMaxSize = utils::FileSize::FromMegabytes(5);
 
 			config.ConnectTimeout = utils::TimeSpan::FromSeconds(10);
 			config.SyncTimeout = utils::TimeSpan::FromSeconds(10);
@@ -65,18 +70,21 @@ namespace catapult { namespace test {
 			config.SocketWorkingBufferSize = utils::FileSize::FromKilobytes(4);
 			config.MaxPacketDataSize = utils::FileSize::FromMegabytes(100);
 
-			config.BlockDisruptorSize = 4 * 1024;
-			config.TransactionDisruptorSize = 16 * 1024;
+			config.BlockDisruptorSlotCount = 4 * 1024;
+			config.BlockDisruptorMaxMemorySize = utils::FileSize::FromMegabytes(100);
 
-			config.OutgoingSecurityMode = ionet::ConnectionSecurityMode::None;
-			config.IncomingSecurityModes = ionet::ConnectionSecurityMode::None;
+			config.TransactionDisruptorSlotCount = 16 * 1024;
+			config.TransactionDisruptorMaxMemorySize = utils::FileSize::FromMegabytes(100);
 
-			config.MaxCacheDatabaseWriteBatchSize = utils::FileSize::FromMegabytes(5);
 			config.MaxTrackedNodes = 5'000;
+
+			config.ListenInterface = "0.0.0.0";
+
+			config.CacheDatabase.MaxWriteBatchSize = utils::FileSize::FromMegabytes(5);
 
 			config.Local.Host = "127.0.0.1";
 			config.Local.FriendlyName = "LOCAL";
-			config.Local.Roles = ionet::NodeRoles::Peer;
+			config.Local.Roles = ionet::NodeRoles::IPv4 | ionet::NodeRoles::Peer;
 
 			SetConnectionsSubConfiguration(config.OutgoingConnections);
 
@@ -91,19 +99,15 @@ namespace catapult { namespace test {
 		}
 
 		void SetNetwork(model::NetworkInfo& network) {
-			network.Identifier = model::NetworkIdentifier::Mijin_Test;
-			network.PublicKey = crypto::KeyPair::FromString(Mijin_Test_Nemesis_Private_Key).publicKey();
-			network.GenerationHash = GetNemesisGenerationHash();
+			network.Identifier = model::NetworkIdentifier::Private_Test;
+			network.NemesisSignerPublicKey = crypto::KeyPair::FromString(Test_Network_Nemesis_Private_Key).publicKey();
+			network.GenerationHashSeed = GetNemesisGenerationHashSeed();
 			network.EpochAdjustment = Default_Network_Epoch_Adjustment;
 		}
 	}
 
 	supplier<Timestamp> CreateDefaultNetworkTimeSupplier() {
 		return []() { return utils::NetworkTime(Default_Network_Epoch_Adjustment).now(); };
-	}
-
-	crypto::KeyPair LoadServerKeyPair() {
-		return crypto::KeyPair::FromPrivate(crypto::PrivateKey::FromString(Local_Node_Private_Key));
 	}
 
 	model::BlockChainConfiguration CreatePrototypicalBlockChainConfiguration() {
@@ -118,7 +122,7 @@ namespace catapult { namespace test {
 		config.MaxTransactionLifetime = utils::TimeSpan::FromHours(1);
 
 		config.ImportanceGrouping = 1;
-		config.MaxRollbackBlocks = 10;
+		config.MaxRollbackBlocks = 0;
 		config.MaxDifficultyBlocks = 60;
 		config.DefaultDynamicFeeMultiplier = BlockFeeMultiplier(1);
 
@@ -129,7 +133,8 @@ namespace catapult { namespace test {
 		config.MinHarvesterBalance = Amount(500'000);
 		config.MaxHarvesterBalance = config.InitialCurrencyAtomicUnits;
 
-		config.BlockPruneInterval = 360;
+		config.VotingSetGrouping = 1;
+
 		config.MaxTransactionsPerBlock = 200'000;
 		return config;
 	}
@@ -138,7 +143,6 @@ namespace catapult { namespace test {
 		MutableCatapultConfiguration config;
 		config.BlockChain.ImportanceGrouping = 1;
 		config.BlockChain.MaxRollbackBlocks = 0;
-		config.User.BootPrivateKey = Local_Node_Private_Key;
 		return config.ToConst();
 	}
 
@@ -157,17 +161,22 @@ namespace catapult { namespace test {
 		config.BlockChain = std::move(blockChainConfig);
 		config.Node = CreateNodeConfiguration();
 
-		config.User.BootPrivateKey = Local_Node_Private_Key;
+		config.User.SeedDirectory = (std::filesystem::path(dataDirectory) / "seed").generic_string();
 		config.User.DataDirectory = dataDirectory;
+		config.User.CertificateDirectory = dataDirectory.empty()
+				? GetDefaultCertificateDirectory()
+				: (std::filesystem::path(dataDirectory) / "cert").generic_string();
 		return config.ToConst();
 	}
 
 	std::unique_ptr<cache::MemoryUtCache> CreateUtCache() {
-		return std::make_unique<cache::MemoryUtCache>(cache::MemoryCacheOptions(1024, 1000));
+		auto cacheOptions = cache::MemoryCacheOptions(utils::FileSize::FromKilobytes(1), utils::FileSize::FromMegabytes(1));
+		return std::make_unique<cache::MemoryUtCache>(cacheOptions);
 	}
 
 	std::unique_ptr<cache::MemoryUtCacheProxy> CreateUtCacheProxy() {
-		return std::make_unique<cache::MemoryUtCacheProxy>(cache::MemoryCacheOptions(1024, 1000));
+		auto cacheOptions = cache::MemoryCacheOptions(utils::FileSize::FromKilobytes(1), utils::FileSize::FromMegabytes(1));
+		return std::make_unique<cache::MemoryUtCacheProxy>(cacheOptions);
 	}
 
 	std::shared_ptr<plugins::PluginManager> CreateDefaultPluginManagerWithRealPlugins() {
@@ -177,7 +186,6 @@ namespace catapult { namespace test {
 		config.ImportanceGrouping = 123;
 		config.MaxDifficultyBlocks = 123;
 		config.TotalChainImportance = Importance(15);
-		config.BlockPruneInterval = 360;
 		return CreatePluginManagerWithRealPlugins(config);
 	}
 
@@ -185,10 +193,8 @@ namespace catapult { namespace test {
 		std::shared_ptr<plugins::PluginManager> CreatePluginManager(
 				const model::BlockChainConfiguration& config,
 				const plugins::StorageConfiguration& storageConfig,
+				const config::UserConfiguration& userConfig,
 				const config::InflationConfiguration& inflationConfig) {
-			auto userConfig = config::UserConfiguration::Uninitialized();
-			userConfig.BootPrivateKey = ToString(Key());
-
 			std::vector<plugins::PluginModule> modules;
 			auto pPluginManager = std::make_shared<plugins::PluginManager>(config, storageConfig, userConfig, inflationConfig);
 			LoadPluginByName(*pPluginManager, modules, "", "catapult.plugins.coresystem");
@@ -206,10 +212,14 @@ namespace catapult { namespace test {
 	}
 
 	std::shared_ptr<plugins::PluginManager> CreatePluginManagerWithRealPlugins(const model::BlockChainConfiguration& config) {
-		return CreatePluginManager(config, plugins::StorageConfiguration(), config::InflationConfiguration::Uninitialized());
+		return CreatePluginManager(
+				config,
+				plugins::StorageConfiguration(),
+				config::UserConfiguration::Uninitialized(),
+				config::InflationConfiguration::Uninitialized());
 	}
 
 	std::shared_ptr<plugins::PluginManager> CreatePluginManagerWithRealPlugins(const config::CatapultConfiguration& config) {
-		return CreatePluginManager(config.BlockChain, extensions::CreateStorageConfiguration(config), config.Inflation);
+		return CreatePluginManager(config.BlockChain, extensions::CreateStorageConfiguration(config), config.User, config.Inflation);
 	}
 }}

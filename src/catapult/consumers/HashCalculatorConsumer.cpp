@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -30,8 +31,10 @@ namespace catapult { namespace consumers {
 	namespace {
 		class BlockHashCalculatorConsumer {
 		public:
-			BlockHashCalculatorConsumer(const GenerationHash& generationHash, const model::TransactionRegistry& transactionRegistry)
-					: m_generationHash(generationHash)
+			BlockHashCalculatorConsumer(
+					const GenerationHashSeed& generationHashSeed,
+					const model::TransactionRegistry& transactionRegistry)
+					: m_generationHashSeed(generationHashSeed)
 					, m_transactionRegistry(transactionRegistry)
 			{}
 
@@ -46,7 +49,7 @@ namespace catapult { namespace consumers {
 					crypto::MerkleHashBuilder transactionsHashBuilder;
 					for (const auto& transaction : element.Block.Transactions()) {
 						model::TransactionElement transactionElement(transaction);
-						model::UpdateHashes(m_transactionRegistry, m_generationHash, transactionElement);
+						model::UpdateHashes(m_transactionRegistry, m_generationHashSeed, transactionElement);
 						element.Transactions.push_back(transactionElement);
 
 						transactionsHashBuilder.update(transactionElement.MerkleComponentHash);
@@ -64,22 +67,24 @@ namespace catapult { namespace consumers {
 			}
 
 		private:
-			GenerationHash m_generationHash;
+			GenerationHashSeed m_generationHashSeed;
 			const model::TransactionRegistry& m_transactionRegistry;
 		};
 	}
 
 	disruptor::BlockConsumer CreateBlockHashCalculatorConsumer(
-			const GenerationHash& generationHash,
+			const GenerationHashSeed& generationHashSeed,
 			const model::TransactionRegistry& transactionRegistry) {
-		return BlockHashCalculatorConsumer(generationHash, transactionRegistry);
+		return BlockHashCalculatorConsumer(generationHashSeed, transactionRegistry);
 	}
 
 	namespace {
 		class TransactionHashCalculatorConsumer {
 		public:
-			TransactionHashCalculatorConsumer(const GenerationHash& generationHash, const model::TransactionRegistry& transactionRegistry)
-					: m_generationHash(generationHash)
+			TransactionHashCalculatorConsumer(
+					const GenerationHashSeed& generationHashSeed,
+					const model::TransactionRegistry& transactionRegistry)
+					: m_generationHashSeed(generationHashSeed)
 					, m_transactionRegistry(transactionRegistry)
 			{}
 
@@ -89,20 +94,20 @@ namespace catapult { namespace consumers {
 					return Abort(Failure_Consumer_Empty_Input);
 
 				for (auto& element : elements)
-					model::UpdateHashes(m_transactionRegistry, m_generationHash, element);
+					model::UpdateHashes(m_transactionRegistry, m_generationHashSeed, element);
 
 				return Continue();
 			}
 
 		private:
-			GenerationHash m_generationHash;
+			GenerationHashSeed m_generationHashSeed;
 			const model::TransactionRegistry& m_transactionRegistry;
 		};
 	}
 
 	disruptor::TransactionConsumer CreateTransactionHashCalculatorConsumer(
-			const GenerationHash& generationHash,
+			const GenerationHashSeed& generationHashSeed,
 			const model::TransactionRegistry& transactionRegistry) {
-		return TransactionHashCalculatorConsumer(generationHash, transactionRegistry);
+		return TransactionHashCalculatorConsumer(generationHashSeed, transactionRegistry);
 	}
 }}

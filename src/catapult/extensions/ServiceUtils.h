@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,6 +20,7 @@
 **/
 
 #pragma once
+#include "ServerHooks.h"
 #include "ServiceLocator.h"
 #include "catapult/ionet/BroadcastUtils.h"
 #include "catapult/net/PacketWriters.h"
@@ -31,6 +33,9 @@ namespace catapult { namespace extensions {
 	TSink CreatePushEntitySink(const extensions::ServiceLocator& locator, const std::string& serviceName) {
 		return [&locator, serviceName](const auto& entities) {
 			auto payload = ionet::CreateBroadcastPayload(entities);
+			if (sizeof(ionet::PacketHeader) == payload.header().Size)
+				return;
+
 			locator.service<net::PacketWriters>(serviceName)->broadcast(payload);
 		};
 	}
@@ -40,7 +45,17 @@ namespace catapult { namespace extensions {
 	TSink CreatePushEntitySink(const extensions::ServiceLocator& locator, const std::string& serviceName, ionet::PacketType packetType) {
 		return [&locator, serviceName, packetType](const auto& entities) {
 			auto payload = ionet::CreateBroadcastPayload(entities, packetType);
+			if (sizeof(ionet::PacketHeader) == payload.header().Size)
+				return;
+
 			locator.service<net::PacketWriters>(serviceName)->broadcast(payload);
+		};
+	}
+
+	/// Creates a sink that closes the propagated node identity in \a container.
+	inline BannedNodeIdentitySink CreateCloseConnectionSink(net::ConnectionContainer& container) {
+		return [&container](const auto& identity) {
+			container.closeOne(identity);
 		};
 	}
 }}

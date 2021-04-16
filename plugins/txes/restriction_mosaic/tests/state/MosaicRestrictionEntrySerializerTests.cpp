@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -255,11 +256,12 @@ namespace catapult { namespace state {
 	RESTRICTION_TRAITS_BASED_TEST(CannotLoadWithInvalidEntryType) {
 		// Arrange:
 		std::vector<uint8_t> buffer;
-		mocks::MockMemoryStream outputStream(buffer);
+		mocks::MockMemoryStream stream(buffer);
 
 		auto entry = TTraits::GenerateRandomEntry(3);
 
-		MosaicRestrictionEntrySerializer::Save(entry, outputStream);
+		MosaicRestrictionEntrySerializer::Save(entry, stream);
+		stream.seek(0);
 
 		// Sanity:
 		ASSERT_EQ(sizeof(typename TTraits::HeaderType) + 3 * sizeof(typename TTraits::TupleType), buffer.size());
@@ -269,7 +271,7 @@ namespace catapult { namespace state {
 		header.EntryType = static_cast<MosaicRestrictionEntry::EntryType>(3);
 
 		// Act + Assert:
-		EXPECT_THROW(MosaicRestrictionEntrySerializer::Load(outputStream), catapult_invalid_argument);
+		EXPECT_THROW(MosaicRestrictionEntrySerializer::Load(stream), catapult_invalid_argument);
 	}
 
 	// endregion

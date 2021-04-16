@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -146,8 +147,8 @@ namespace catapult { namespace validators {
 	// region MapToLogLevel
 
 	TEST(TEST_CLASS, MapToLogLevelReturnsCorrectLevelBasedOnVerbosity) {
-		EXPECT_EQ(utils::LogLevel::Trace, MapToLogLevel(MakeValidationResult(ResultSeverity::Success, 0, 0, ResultFlags::Verbose)));
-		EXPECT_EQ(utils::LogLevel::Warning, MapToLogLevel(MakeValidationResult(ResultSeverity::Success, 0, 0, ResultFlags::None)));
+		EXPECT_EQ(utils::LogLevel::trace, MapToLogLevel(MakeValidationResult(ResultSeverity::Success, 0, 0, ResultFlags::Verbose)));
+		EXPECT_EQ(utils::LogLevel::warning, MapToLogLevel(MakeValidationResult(ResultSeverity::Success, 0, 0, ResultFlags::None)));
 	}
 
 	// endregion
@@ -164,7 +165,7 @@ namespace catapult { namespace validators {
 		// Assert: ordered by facility code name
 		EXPECT_EQ("Failure_Aggregate_Too_Many_Cosignatures", test::ToString(static_cast<ValidationResult>(0x80410003)));
 		EXPECT_EQ("Failure_Chain_Unlinked", test::ToString(static_cast<ValidationResult>(0x80FF0001)));
-		EXPECT_EQ("Failure_Consumer_Remote_Chain_Improper_Link", test::ToString(static_cast<ValidationResult>(0x80FE0005)));
+		EXPECT_EQ("Failure_Consumer_Remote_Chain_Improper_Link", test::ToString(static_cast<ValidationResult>(0x80FE0004)));
 		EXPECT_EQ("Failure_Core_Insufficient_Balance", test::ToString(static_cast<ValidationResult>(0x80430003)));
 		EXPECT_EQ("Failure_Extension_Partial_Transaction_Cache_Prune", test::ToString(static_cast<ValidationResult>(0x80450001)));
 		EXPECT_EQ("Failure_Hash_Already_Exists", test::ToString(static_cast<ValidationResult>(0x81490001)));

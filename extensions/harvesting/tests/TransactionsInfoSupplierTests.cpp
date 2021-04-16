@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -53,19 +54,28 @@ namespace catapult { namespace harvesting {
 		}
 
 		class TestContext {
+		private:
+			// constant returned by countRetriever and multiplied by count argument in order to implicitly check
+			// countRetriever parameter is used
+			static constexpr uint32_t Multiplier = 7;
+
+			static auto EmptyHashSupplier(Height) {
+				return Hash256();
+			}
+
 		public:
 			explicit TestContext(TransactionSelectionStrategy strategy, uint32_t utCacheSize = 0)
 					: m_catapultCache(test::CreateCatapultCacheWithMarkerAccount(Height(7)))
-					, m_utFacadeFactory(m_catapultCache, CreateBlockChainConfiguration(), m_executionConfig.Config)
+					, m_utFacadeFactory(m_catapultCache, CreateBlockChainConfiguration(), m_executionConfig.Config, EmptyHashSupplier)
 					, m_pUtCache(test::CreateSeededMemoryUtCache(utCacheSize))
-					, m_supplier(CreateTransactionsInfoSupplier(strategy, *m_pUtCache))
+					, m_supplier(CreateTransactionsInfoSupplier(strategy, [](const auto&) { return Multiplier; }, *m_pUtCache))
 			{}
 
 		public:
 			auto supply(uint32_t count) {
 				// Act:
 				auto pUtFacade = m_utFacadeFactory.create(Timestamp(1234));
-				auto transactionsInfo = m_supplier(*pUtFacade, count);
+				auto transactionsInfo = m_supplier(*pUtFacade, count * Multiplier);
 
 				// Assert: supplied transactions should populate the ut facade
 				AssertConsistent(transactionsInfo, *pUtFacade);

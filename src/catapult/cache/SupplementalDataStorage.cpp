@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,6 +32,7 @@ namespace catapult { namespace cache {
 			CATAPULT_LOG(debug)
 					<< prefix
 					<< " last recalculation height " << supplementalData.State.LastRecalculationHeight
+					<< " last finalized height " << supplementalData.State.LastFinalizedHeight
 					<< " dynamic fee multiplier " << supplementalData.State.DynamicFeeMultiplier
 					<< " total transactions " << supplementalData.State.NumTotalTransactions
 					<< " (score = [" << scoreArray[0] << ", " << scoreArray[1] << "]"
@@ -46,6 +48,7 @@ namespace catapult { namespace cache {
 		io::Write64(output, scoreArray[1]);
 
 		io::Write(output, supplementalData.State.LastRecalculationHeight);
+		io::Write(output, supplementalData.State.LastFinalizedHeight);
 		io::Write64(output, supplementalData.State.NumTotalTransactions);
 		io::Write(output, supplementalData.State.DynamicFeeMultiplier); // write last for alignment
 
@@ -61,6 +64,7 @@ namespace catapult { namespace cache {
 		supplementalData.ChainScore = model::ChainScore(scoreHigh, scoreLow);
 
 		io::Read(input, supplementalData.State.LastRecalculationHeight);
+		io::Read(input, supplementalData.State.LastFinalizedHeight);
 		supplementalData.State.NumTotalTransactions = io::Read64(input);
 		io::Read(input, supplementalData.State.DynamicFeeMultiplier);
 

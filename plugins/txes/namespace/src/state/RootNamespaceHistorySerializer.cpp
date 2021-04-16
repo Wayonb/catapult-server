@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -68,18 +69,18 @@ namespace catapult { namespace state {
 			}
 		}
 
-		const Key& SaveRootNamespace(io::OutputStream& output, const RootNamespace& root, const Key* pLastOwner) {
-			output.write(root.ownerPublicKey());
+		const RootNamespace& SaveRootNamespace(io::OutputStream& output, const RootNamespace& root, const RootNamespace* pPreviousRoot) {
+			output.write(root.ownerAddress());
 			io::Write(output, root.lifetime().Start);
 			io::Write(output, root.lifetime().End);
 			SaveAlias(output, root.alias(root.id()));
 
-			if (pLastOwner && *pLastOwner == root.ownerPublicKey())
+			if (pPreviousRoot && root.canExtend(*pPreviousRoot))
 				io::Write64(output, 0); // shared owner, don't rewrite children
 			else
 				SaveChildren(output, root);
 
-			return root.ownerPublicKey();
+			return root;
 		}
 	}
 
@@ -148,7 +149,7 @@ namespace catapult { namespace state {
 		}
 
 		void LoadRootNamespace(io::InputStream& input, RootNamespaceHistory& history) {
-			Key owner;
+			Address owner;
 			input.read(owner);
 			auto lifetimeStart = io::Read<Height>(input);
 			auto lifetimeEnd = io::Read<Height>(input);
@@ -184,9 +185,9 @@ namespace catapult { namespace state {
 	void RootNamespaceHistorySerializer::Save(const RootNamespaceHistory& history, io::OutputStream& output) {
 		SaveHeader(output, history, HeaderMode::Include_History_Depth);
 
-		const Key* pLastOwner = nullptr;
+		const RootNamespace* pPreviousRoot = nullptr;
 		for (const auto& root : history)
-			pLastOwner = &SaveRootNamespace(output, root, pLastOwner);
+			pPreviousRoot = &SaveRootNamespace(output, root, pPreviousRoot);
 	}
 
 	RootNamespaceHistory RootNamespaceHistorySerializer::Load(io::InputStream& input) {

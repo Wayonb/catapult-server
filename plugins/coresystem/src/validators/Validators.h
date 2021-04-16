@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,8 +29,12 @@ namespace catapult { namespace validators {
 	// region Address / Key
 
 	/// Validator that applies to all account address notifications and validates that:
-	/// - the address is valid and targets the expected network (\a networkIdentifier)
-	DECLARE_STATEFUL_VALIDATOR(Address, model::AccountAddressNotification)(model::NetworkIdentifier networkIdentifier);
+	/// - the address is valid and targets the expected network
+	DECLARE_STATEFUL_VALIDATOR(Address, model::AccountAddressNotification)();
+
+	/// Validator that applies to all account public key notifications and validates that:
+	/// - the public key is associated with a unique address (i.e. it does not collide with a previously registered public key)
+	DECLARE_STATEFUL_VALIDATOR(PublicKey, model::AccountPublicKeyNotification)();
 
 	/// Validator that applies to all account address notifications and validates that:
 	/// - the address is nonzero given the expected network (\a networkIdentifier)
@@ -57,7 +62,11 @@ namespace catapult { namespace validators {
 
 	// endregion
 
-	// region Block
+	// region Block / ImportanceBlock
+
+	/// Validator that applies to all block notifications and validates that:
+	/// - block type matches expected block type given \a importanceGrouping
+	DECLARE_STATELESS_VALIDATOR(BlockType, model::BlockTypeNotification)(uint64_t importanceGrouping);
 
 	/// Validator that applies to all block notifications and validates that:
 	/// - the block signer was eligible to create the block
@@ -66,6 +75,10 @@ namespace catapult { namespace validators {
 	/// Validator that applies to all block notifications and validates that:
 	/// - the block does not contain more than \a maxTransactions transactions
 	DECLARE_STATELESS_VALIDATOR(MaxTransactions, model::BlockNotification)(uint32_t maxTransactions);
+
+	/// Validator that applies to all importance block notifications and validates that:
+	/// - notification values match calculated values (excluding PreviousImportanceBlockHash, which is validated separately)
+	DECLARE_STATEFUL_VALIDATOR(ImportanceBlock, model::ImportanceBlockNotification)();
 
 	// endregion
 

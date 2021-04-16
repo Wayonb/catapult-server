@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -25,8 +26,7 @@
 #include "catapult/utils/ExceptionLogging.h"
 #include "catapult/version/version.h"
 #include "catapult/preprocessor.h"
-#include <boost/filesystem/path.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <iostream>
 
 namespace catapult { namespace tools {
@@ -36,23 +36,23 @@ namespace catapult { namespace tools {
 
 		config::LoggingConfiguration LoadLoggingConfiguration(const std::string& userLoggingConfigurationPath) {
 			// if the user has provided a path, try that first
-			std::vector<boost::filesystem::path> loggingConfigurationPaths;
+			std::vector<std::filesystem::path> loggingConfigurationPaths;
 			if (!userLoggingConfigurationPath.empty())
 				loggingConfigurationPaths.emplace_back(userLoggingConfigurationPath);
 
 			// fallback to searching in some default locations
 			constexpr auto Default_Logging_Configuration_Filename = "config-logging.properties";
 			loggingConfigurationPaths.emplace_back(Default_Logging_Configuration_Filename);
-			loggingConfigurationPaths.emplace_back(boost::filesystem::path("..") / "resources" / Default_Logging_Configuration_Filename);
+			loggingConfigurationPaths.emplace_back(std::filesystem::path("..") / "resources" / Default_Logging_Configuration_Filename);
 
 			for (const auto& loggingConfigurationPath : loggingConfigurationPaths) {
-				if (boost::filesystem::exists(loggingConfigurationPath))
+				if (std::filesystem::exists(loggingConfigurationPath))
 					return config::LoadIniConfiguration<config::LoggingConfiguration>(loggingConfigurationPath);
 			}
 
 			auto config = config::LoggingConfiguration::Uninitialized();
 			config.Console.SinkType = utils::LogSinkType::Sync;
-			config.Console.Level = utils::LogLevel::Debug;
+			config.Console.Level = utils::LogLevel::debug;
 			return config;
 		}
 
@@ -121,8 +121,8 @@ namespace catapult { namespace tools {
 			// add options common for all tools
 			optionsBuilder("help,h", "print help message");
 			optionsBuilder("loggingConfigurationPath,l",
-						OptionsValue<std::string>(options.LoggingConfigurationPath),
-						"the path to the logging configuration file");
+					OptionsValue<std::string>(options.LoggingConfigurationPath),
+					"path to the logging configuration file");
 
 			// 1. add tool-specific options
 			OptionsPositional positional;

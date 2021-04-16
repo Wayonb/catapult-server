@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,7 +22,7 @@
 #pragma once
 #include "LocalTestUtils.h"
 #include "catapult/cache_tx/MemoryUtCache.h"
-#include "catapult/crypto/KeyPair.h"
+#include "catapult/config/CatapultKeys.h"
 #include "catapult/extensions/LocalNodeChainScore.h"
 #include "catapult/extensions/ServiceLocator.h"
 #include "catapult/extensions/ServiceState.h"
@@ -31,6 +32,7 @@
 #include "tests/test/core/SchedulerTestUtils.h"
 #include "tests/test/core/mocks/MockMemoryBlockStorage.h"
 #include "tests/test/nodeps/KeyTestUtils.h"
+#include "tests/test/other/mocks/MockFinalizationSubscriber.h"
 #include "tests/test/other/mocks/MockNodeSubscriber.h"
 #include "tests/test/other/mocks/MockStateChangeSubscriber.h"
 #include "tests/test/other/mocks/MockTransactionStatusSubscriber.h"
@@ -55,10 +57,12 @@ namespace catapult { namespace test {
 						std::numeric_limits<size_t>::max(),
 						model::NodeIdentityEqualityStrategy::Key_And_Host,
 						GetBanSettings(m_config),
-						timeSupplier)
+						timeSupplier,
+						[](auto) { return true; })
 				, m_catapultCache(std::move(cache))
 				, m_storage(std::make_unique<mocks::MockMemoryBlockStorage>(), std::make_unique<mocks::MockMemoryBlockStorage>())
 				, m_pUtCache(CreateUtCacheProxy())
+				, m_nodeSubscriber(m_nodes)
 				, m_pluginManager(m_config.BlockChain, plugins::StorageConfiguration(), m_config.User, m_config.Inflation)
 				, m_pool("service locator test context", 2)
 				, m_state(
@@ -67,11 +71,12 @@ namespace catapult { namespace test {
 						m_catapultCache,
 						m_storage,
 						m_score,
-						m_pUtCache->get(),
+						*m_pUtCache,
 						timeSupplier,
-						m_transactionStatusSubscriber,
-						m_stateChangeSubscriber,
+						m_finalizationSubscriber,
 						m_nodeSubscriber,
+						m_stateChangeSubscriber,
+						m_transactionStatusSubscriber,
 						m_counters,
 						m_pluginManager,
 						m_pool)
@@ -89,9 +94,19 @@ namespace catapult { namespace test {
 			return m_config;
 		}
 
-		/// Gets the transaction status subscriber.
-		const auto& transactionStatusSubscriber() const {
-			return m_transactionStatusSubscriber;
+		/// Gets the finalization subscriber.
+		const auto& finalizationSubscriber() const {
+			return m_finalizationSubscriber;
+		}
+
+		/// Gets the node subscriber.
+		const auto& nodeSubscriber() const {
+			return m_nodeSubscriber;
+		}
+
+		/// Gets the node subscriber.
+		auto& nodeSubscriber() {
+			return m_nodeSubscriber;
 		}
 
 		/// Gets the state change subscriber.
@@ -99,9 +114,9 @@ namespace catapult { namespace test {
 			return m_stateChangeSubscriber;
 		}
 
-		/// Gets the node subscriber.
-		const auto& nodeSubscriber() const {
-			return m_nodeSubscriber;
+		/// Gets the transaction status subscriber.
+		const auto& transactionStatusSubscriber() const {
+			return m_transactionStatusSubscriber;
 		}
 
 		/// Gets the counters.
@@ -133,9 +148,10 @@ namespace catapult { namespace test {
 		extensions::LocalNodeChainScore m_score;
 		std::unique_ptr<cache::MemoryUtCacheProxy> m_pUtCache;
 
-		mocks::MockTransactionStatusSubscriber m_transactionStatusSubscriber;
-		mocks::MockStateChangeSubscriber m_stateChangeSubscriber;
+		mocks::MockFinalizationSubscriber m_finalizationSubscriber;
 		mocks::MockNodeSubscriber m_nodeSubscriber;
+		mocks::MockStateChangeSubscriber m_stateChangeSubscriber;
+		mocks::MockTransactionStatusSubscriber m_transactionStatusSubscriber;
 
 		std::vector<utils::DiagnosticCounter> m_counters;
 		plugins::PluginManager m_pluginManager;
@@ -150,8 +166,8 @@ namespace catapult { namespace test {
 	public:
 		/// Creates the test context.
 		ServiceLocatorTestContext()
-				: m_keyPair(GenerateKeyPair())
-				, m_locator(m_keyPair)
+				: m_keys(test::GenerateRandomByteArray<Key>(), GenerateKeyPair())
+				, m_pLocator(std::make_unique<extensions::ServiceLocator>(m_keys))
 		{}
 
 		/// Creates the test context around \a cache.
@@ -161,15 +177,15 @@ namespace catapult { namespace test {
 
 		/// Creates the test context around \a cache and \a timeSupplier.
 		ServiceLocatorTestContext(cache::CatapultCache&& cache, const supplier<Timestamp>& timeSupplier)
-				: m_keyPair(GenerateKeyPair())
-				, m_locator(m_keyPair)
+				: m_keys(test::GenerateRandomByteArray<Key>(), GenerateKeyPair())
+				, m_pLocator(std::make_unique<extensions::ServiceLocator>(m_keys))
 				, m_testState(std::move(cache), timeSupplier)
 		{}
 
 	public:
 		/// Gets the value of the counter named \a counterName.
 		uint64_t counter(const std::string& counterName) const {
-			for (const auto& counter : m_locator.counters()) {
+			for (const auto& counter : m_pLocator->counters()) {
 				if (HasName(counter, counterName))
 					return counter.value();
 			}
@@ -180,17 +196,17 @@ namespace catapult { namespace test {
 	public:
 		/// Gets the public key.
 		const auto& publicKey() const {
-			return m_keyPair.publicKey();
+			return m_keys.caPublicKey();
 		}
 
 		/// Gets the service locator.
 		auto& locator() {
-			return m_locator;
+			return *m_pLocator;
 		}
 
 		/// Gets the service locator.
 		const auto& locator() const {
-			return m_locator;
+			return *m_pLocator;
 		}
 
 		/// Gets the test state.
@@ -208,13 +224,20 @@ namespace catapult { namespace test {
 		template<typename... TArgs>
 		void boot(TArgs&&... args) {
 			auto pRegistrar = TTraits::CreateRegistrar(std::forward<TArgs>(args)...);
-			pRegistrar->registerServiceCounters(m_locator);
-			pRegistrar->registerServices(m_locator, m_testState.state());
+			pRegistrar->registerServiceCounters(*m_pLocator);
+			pRegistrar->registerServices(*m_pLocator, m_testState.state());
 		}
 
 		/// Shuts down the service.
 		void shutdown() {
 			m_testState.state().pool().shutdown();
+		}
+
+	protected:
+		/// Destroys the underlying service locator.
+		void destroy() {
+			shutdown();
+			m_pLocator.reset();
 		}
 
 	private:
@@ -223,15 +246,15 @@ namespace catapult { namespace test {
 		}
 
 	private:
-		crypto::KeyPair m_keyPair;
-		extensions::ServiceLocator m_locator;
+		config::CatapultKeys m_keys;
+		std::unique_ptr<extensions::ServiceLocator> m_pLocator;
 
 		ServiceTestState m_testState;
 	};
 
 	/// Extracts a task named \a taskName from \a context, which is expected to contain \a numExpectedTasks tasks,
 	/// and forwards it to \a action.
-	/// \note Context is expected to be booted.
+	/// \note \a context is expected to be booted.
 	template<typename TTestContext, typename TAction>
 	void RunTaskTestPostBoot(TTestContext& context, size_t numExpectedTasks, const std::string& taskName, TAction action) {
 		// Sanity: expected number of tasks should be registered
@@ -260,13 +283,34 @@ namespace catapult { namespace test {
 		RunTaskTestPostBoot(context, numExpectedTasks, taskName, std::move(action));
 	}
 
-	/// Asserts a task named \a taskName is registered by \a context, which is expected to contain \a numExpectedTasks tasks.
+	/// Asserts that the named tasks (\a expectedTaskNames) exactly match the tasks registered in \a context.
+	/// \note \a context is expected to be booted.
 	template<typename TTestContext>
-	void AssertRegisteredTask(TTestContext&& context, size_t numExpectedTasks, const std::string& taskName) {
+	void AssertRegisteredTasksPostBoot(TTestContext&& context, const std::unordered_set<std::string>& expectedTaskNames) {
+		// Sanity: expected number of tasks should be registered
+		const auto& tasks = context.testState().state().tasks();
+		EXPECT_EQ(expectedTaskNames.size(), tasks.size());
+
 		// Act:
-		test::RunTaskTest(context, numExpectedTasks, taskName, [&taskName](const auto& task) {
-			// Assert:
-			AssertUnscheduledTask(task, taskName);
-		});
+		std::unordered_set<std::string> actualTaskNames;
+		for (const auto& task : tasks) {
+			actualTaskNames.insert(task.Name);
+
+			// Sanity: check non-name properties
+			AssertUnscheduledTask(task, task.Name);
+		}
+
+		// Assert:
+		EXPECT_EQ(expectedTaskNames, actualTaskNames);
+	}
+
+	/// Asserts that the named tasks (\a expectedTaskNames) exactly match the tasks registered in \a context.
+	template<typename TTestContext>
+	void AssertRegisteredTasks(TTestContext&& context, const std::unordered_set<std::string>& expectedTaskNames) {
+		// Arrange:
+		context.boot();
+
+		// Act + Assert:
+		AssertRegisteredTasksPostBoot(context, expectedTaskNames);
 	}
 }}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -68,9 +69,16 @@ namespace catapult { namespace ionet {
 		m_buckets.erase(endIter, m_buckets.cend());
 	}
 
-	void NodeInteractionsContainer::addInteraction(Timestamp timestamp, const consumer<NodeInteractionsBucket&>& consumer) {
+	bool NodeInteractionsContainer::shouldCreateNewBucket(Timestamp timestamp) const {
+		if (m_buckets.empty())
+			return true;
+
 		auto bucketAge = utils::TimeSpan::FromDifference(timestamp, m_buckets.back().CreationTime);
-		if (m_buckets.empty() || BucketDuration() <= bucketAge)
+		return BucketDuration() <= bucketAge;
+	}
+
+	void NodeInteractionsContainer::addInteraction(Timestamp timestamp, const consumer<NodeInteractionsBucket&>& consumer) {
+		if (shouldCreateNewBucket(timestamp))
 			m_buckets.push_back(NodeInteractionsBucket(timestamp));
 
 		consumer(m_buckets.back());

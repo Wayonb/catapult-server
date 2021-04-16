@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -27,9 +28,6 @@ namespace catapult { namespace model {
 	enum class LockHashAlgorithm : uint8_t {
 		/// Input is hashed using Sha-3-256.
 		Op_Sha3_256,
-
-		/// Input is hashed using Keccak-256.
-		Op_Keccak_256,
 
 		/// Input is hashed twice: first with SHA-256 and then with RIPEMD-160.
 		Op_Hash_160,

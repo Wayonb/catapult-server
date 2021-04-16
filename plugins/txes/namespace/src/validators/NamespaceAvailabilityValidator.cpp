@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -52,6 +53,6 @@ namespace catapult { namespace validators {
 		if (!root.lifetime().isActive(height))
 			return ValidationResult::Success;
 
-		return root.ownerPublicKey() == notification.Signer ? ValidationResult::Success : Failure_Namespace_Owner_Conflict;
-	});
+		return root.ownerAddress() == notification.Owner ? ValidationResult::Success : Failure_Namespace_Owner_Conflict;
+	})
 }}

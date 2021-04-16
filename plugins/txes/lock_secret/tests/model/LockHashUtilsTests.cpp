@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -34,12 +35,6 @@ namespace catapult { namespace model {
 			using HashType = Hash256;
 			static constexpr auto HashAlgorithm = LockHashAlgorithm::Op_Sha3_256;
 			static constexpr auto HashFunc = crypto::Sha3_256;
-		};
-
-		struct OpKeccak_256_Traits {
-			using HashType = Hash256;
-			static constexpr auto HashAlgorithm = LockHashAlgorithm::Op_Keccak_256;
-			static constexpr auto HashFunc = crypto::Keccak_256;
 		};
 
 		struct OpHash_160_Traits {
@@ -79,8 +74,6 @@ namespace catapult { namespace model {
 	}
 
 	MAKE_CALCULATE_HASH_TEST(OpSha3_256)
-
-	MAKE_CALCULATE_HASH_TEST(OpKeccak_256)
 
 	MAKE_CALCULATE_HASH_TEST(OpHash_160)
 

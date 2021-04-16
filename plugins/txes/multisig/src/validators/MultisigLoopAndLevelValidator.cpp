@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,20 +37,20 @@ namespace catapult { namespace validators {
 			{}
 
 		public:
-			ValidationResult validate(const Key& topKey, const Key& bottomKey) {
-				utils::KeySet ancestorKeys;
-				ancestorKeys.insert(topKey);
-				auto numTopLevels = FindAncestors(m_multisigCache, topKey, ancestorKeys);
+			ValidationResult validate(const Address& top, const Address& bottom) {
+				model::AddressSet ancestors;
+				ancestors.insert(top);
+				auto numTopLevels = FindAncestors(m_multisigCache, top, ancestors);
 
-				utils::KeySet descendantKeys;
-				descendantKeys.insert(bottomKey);
-				auto numBottomLevels = FindDescendants(m_multisigCache, bottomKey, descendantKeys);
+				model::AddressSet descendants;
+				descendants.insert(bottom);
+				auto numBottomLevels = FindDescendants(m_multisigCache, bottom, descendants);
 
 				if (numTopLevels + numBottomLevels + 1 > m_maxMultisigDepth)
 					return Failure_Multisig_Max_Multisig_Depth;
 
-				auto hasLoop = std::any_of(ancestorKeys.cbegin(), ancestorKeys.cend(), [&descendantKeys](const auto& key) {
-					return descendantKeys.cend() != descendantKeys.find(key);
+				auto hasLoop = std::any_of(ancestors.cbegin(), ancestors.cend(), [&descendants](const auto& address) {
+					return descendants.cend() != descendants.find(address);
 				});
 				return hasLoop ? Failure_Multisig_Loop : ValidationResult::Success;
 			}
@@ -65,7 +66,7 @@ namespace catapult { namespace validators {
 					const Notification& notification,
 					const ValidatorContext& context) {
 			auto checker = LoopAndLevelChecker(context.Cache.sub<cache::MultisigCache>(), maxMultisigDepth);
-			return checker.validate(notification.MultisigAccountKey, notification.CosignatoryKey);
+			return checker.validate(notification.Multisig, context.Resolvers.resolve(notification.Cosignatory));
 		});
 	}
 }}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -43,7 +44,7 @@ namespace catapult { namespace mongo { namespace plugins {
 			uint32_t transactionSize = sizeof(EmbeddedTransactionType);
 			uint32_t payloadSize = numTransactions * (transactionSize + utils::GetPaddingSize(transactionSize, 8));
 
-			uint32_t entitySize = sizeof(TransactionType) + payloadSize + numCosignatures * sizeof(model::Cosignature);
+			uint32_t entitySize = SizeOf32<TransactionType>() + payloadSize + numCosignatures * SizeOf32<model::Cosignature>();
 			auto pTransaction = utils::MakeUniqueWithSize<TransactionType>(entitySize);
 			pTransaction->Size = entitySize;
 			pTransaction->PayloadSize = payloadSize;

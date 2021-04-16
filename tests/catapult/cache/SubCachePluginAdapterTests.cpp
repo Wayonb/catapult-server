@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -407,6 +408,69 @@ namespace catapult { namespace cache {
 		RunTestForMerkleRootNotSupported([](auto& view) {
 			// Act:
 			view.updateMerkleRoot(Height(3));
+
+			// Assert:
+			Hash256 merkleRoot;
+			EXPECT_FALSE(view.tryGetMerkleRoot(merkleRoot));
+		});
+	}
+
+	// endregion
+
+	// region prune
+
+	namespace {
+		struct PruneHeightTraits {
+			static constexpr auto Prune_Value = Height(3);
+			static constexpr auto Modified_Hash_Index = 1u;
+		};
+
+		struct PruneTimestampTraits {
+			static constexpr auto Prune_Value = Timestamp(4);
+			static constexpr auto Modified_Hash_Index = 2u;
+		};
+	}
+
+#define PRUNE_TEST(TEST_NAME) \
+	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)(); \
+	TEST(TEST_CLASS, TEST_NAME##_Height) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<PruneHeightTraits>(); } \
+	TEST(TEST_CLASS, TEST_NAME##_Timestamp) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<PruneTimestampTraits>(); } \
+	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)()
+
+	PRUNE_TEST(CanPruneWhenSupportedAndDelta) {
+		// Arrange:
+		RunTestForMerkleRootSupportedAndEnabled([](auto& view, const auto& expectedMerkleRoot) {
+			auto expectedUpdatedMerkleRoot = expectedMerkleRoot;
+			expectedUpdatedMerkleRoot[TTraits::Modified_Hash_Index] = static_cast<uint8_t>(TTraits::Prune_Value.unwrap());
+
+			// Act:
+			view.prune(TTraits::Prune_Value);
+
+			// Assert:
+			Hash256 merkleRoot;
+			EXPECT_TRUE(view.tryGetMerkleRoot(merkleRoot));
+			EXPECT_EQ(expectedUpdatedMerkleRoot, merkleRoot);
+		});
+	}
+
+	PRUNE_TEST(CannotPruneWhenSupportedButView) {
+		// Arrange:
+		RunTestForMerkleRootSupportedAndEnabledView([](auto& view, const auto& expectedMerkleRoot) {
+			// Act: even if const is improperly casted away, operation should fail on const view
+			const_cast<SubCacheView&>(view).prune(TTraits::Prune_Value);
+
+			// Assert:
+			Hash256 merkleRoot;
+			EXPECT_TRUE(view.tryGetMerkleRoot(merkleRoot));
+			EXPECT_EQ(expectedMerkleRoot, merkleRoot);
+		});
+	}
+
+	PRUNE_TEST(CannotPruneWhenUnsupported) {
+		// Arrange:
+		RunTestForMerkleRootNotSupported([](auto& view) {
+			// Act:
+			view.prune(TTraits::Prune_Value);
 
 			// Assert:
 			Hash256 merkleRoot;

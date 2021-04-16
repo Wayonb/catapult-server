@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,7 +32,7 @@ namespace catapult { namespace config {
 	TransferConfiguration TransferConfiguration::LoadFromBag(const utils::ConfigurationBag& bag) {
 		TransferConfiguration config;
 		utils::LoadIniProperty(bag, "", "MaxMessageSize", config.MaxMessageSize);
-		utils::VerifyBagSizeLte(bag, 1);
+		utils::VerifyBagSizeExact(bag, 1);
 		return config;
 	}
 }}

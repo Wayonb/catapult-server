@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,18 +37,12 @@ namespace catapult { namespace local {
 			using test::LocalNodeTestContext<test::LocalNodePeerTraits>::LocalNodeTestContext;
 
 		public:
-			void waitForNumActiveBroadcastWriters(size_t value) const {
-				WAIT_FOR_VALUE_EXPR(value, stats().NumActiveBroadcastWriters);
-			}
-
-		public:
 			void assertShutdown() const {
 				// Assert:
 				auto stats = this->stats();
 				EXPECT_EQ(Sentinel_Counter_Value, stats.NumActiveReaders);
 				EXPECT_EQ(Sentinel_Counter_Value, stats.NumActiveWriters);
 				EXPECT_EQ(Sentinel_Counter_Value, stats.NumScheduledTasks);
-				EXPECT_EQ(Sentinel_Counter_Value, stats.NumActiveBroadcastWriters);
 			}
 		};
 
@@ -56,9 +51,8 @@ namespace catapult { namespace local {
 
 			static constexpr auto Num_Tasks = 10u;
 
-			static void AssertBoot(const test::PeerLocalNodeStats& stats) {
-				EXPECT_EQ(0u, stats.NumActiveBroadcastWriters);
-			}
+			static void AssertBoot(const test::PeerLocalNodeStats&)
+			{}
 		};
 	}
 
@@ -79,6 +73,7 @@ namespace catapult { namespace local {
 		EXPECT_TRUE(test::HasCounter(counters, "TX ELEM TOT")) << "service local node counters";
 		EXPECT_TRUE(test::HasCounter(counters, "UNLKED ACCTS")) << "peer local node counters";
 		EXPECT_TRUE(test::HasCounter(counters, "UT CACHE")) << "local node counters";
+		EXPECT_TRUE(test::HasCounter(counters, "UT CACHE MEM")) << "local node counters";
 		EXPECT_TRUE(test::HasCounter(counters, "TOT CONF TXES")) << "local node counters";
 		EXPECT_TRUE(test::HasCounter(counters, "MEM CUR RSS")) << "memory counters";
 		EXPECT_TRUE(test::HasCounter(counters, "NODES")) << "node container counters";
@@ -123,7 +118,7 @@ namespace catapult { namespace local {
 		template<typename THandler>
 		void RunExternalConnectionTest(unsigned short port, THandler handler) {
 			// Arrange: boot a local node and wait for the node to connect to the peer
-			TestContext context(NodeFlag::With_Partner, { test::CreateLocalPartnerNode() });
+			TestContext context(NodeFlag::With_Partner, {});
 			context.waitForNumActiveWriters(1);
 
 			// Act: create an external connection to the node
@@ -141,33 +136,17 @@ namespace catapult { namespace local {
 			// Assert:
 			EXPECT_EQ(1u, stats.NumActiveReaders);
 			EXPECT_EQ(1u, stats.NumActiveWriters);
-			EXPECT_EQ(0u, stats.NumActiveBroadcastWriters);
-		});
-	}
-
-	TEST(TEST_CLASS, CanConnectToLocalNodeAsBroadcastWriter) {
-		// Act:
-		RunExternalConnectionTest(test::GetLocalNodeApiPort(), [](auto& context) {
-			context.waitForNumActiveBroadcastWriters(1);
-			auto stats = context.stats();
-
-			// Assert:
-			EXPECT_EQ(0u, stats.NumActiveReaders);
-			EXPECT_EQ(1u, stats.NumActiveWriters);
-			EXPECT_EQ(1u, stats.NumActiveBroadcastWriters);
 		});
 	}
 
 	TEST(TEST_CLASS, CanShutdownLocalNodeWithExternalConnections) {
 		// Arrange: boot a local node and wait for the node to connect to the peer
-		TestContext context(NodeFlag::With_Partner, { test::CreateLocalPartnerNode() });
+		TestContext context(NodeFlag::With_Partner, {});
 		context.waitForNumActiveWriters(1);
 
-		// Act: create external connections to the node
-		auto connection1 = test::CreateExternalConnection(test::GetLocalNodePort());
-		auto connection2 = test::CreateExternalConnection(test::GetLocalNodeApiPort());
+		// Act: create an external connection to the node
+		auto connection = test::CreateExternalConnection(test::GetLocalNodePort());
 		context.waitForNumActiveReaders(1);
-		context.waitForNumActiveBroadcastWriters(1);
 
 		// Act: shutdown the local node
 		CATAPULT_LOG(debug) << "shutting down local node";

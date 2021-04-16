@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -105,26 +106,13 @@ namespace catapult { namespace networkheight {
 	// region chainSyncedPredicate
 
 	namespace {
-		void SetChainHeight(io::BlockStorageCache& storage, uint32_t numBlocks) {
-			auto modifier = storage.modifier();
-
-			for (auto i = 2u; i <= numBlocks; ++i) {
-				model::Block block;
-				block.Size = sizeof(model::BlockHeader);
-				block.Height = Height(i);
-				modifier.saveBlock(test::BlockToBlockElement(block));
-			}
-
-			modifier.commit();
-		}
-
 		void AssertChainSyncedPredicate(uint32_t localChainHeight, uint32_t remoteChainHeight, bool expectedResult) {
 			// Arrange:
 			TestContext context;
 			context.boot();
 
 			// - set local chain height
-			SetChainHeight(context.testState().state().storage(), localChainHeight);
+			mocks::SeedStorageWithFixedSizeBlocks(context.testState().state().storage(), localChainHeight);
 
 			// - set network chain height
 			auto pNetworkChainHeight = GetNetworkChainHeight(context.locator());
@@ -187,8 +175,8 @@ namespace catapult { namespace networkheight {
 		}
 	}
 
-	TEST(TEST_CLASS, NetworkChainHeightDetectionTaskIsScheduled) {
-		test::AssertRegisteredTask(TestContext(), 1, Task_Name);
+	TEST(TEST_CLASS, TasksAreRegistered) {
+		test::AssertRegisteredTasks(TestContext(), { Task_Name });
 	}
 
 	TEST(TEST_CLASS, MedianIsCalculatedAsExpected) {

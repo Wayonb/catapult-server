@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,7 +22,8 @@
 #include "AccountLinkMapper.h"
 #include "mongo/src/MongoTransactionPluginFactory.h"
 #include "mongo/src/mappers/MapperUtils.h"
-#include "plugins/txes/account_link/src/model/AccountLinkTransaction.h"
+#include "plugins/txes/account_link/src/model/AccountKeyLinkTransaction.h"
+#include "plugins/txes/account_link/src/model/NodeKeyLinkTransaction.h"
 
 using namespace catapult::mongo::mappers;
 
@@ -31,10 +33,11 @@ namespace catapult { namespace mongo { namespace plugins {
 		template<typename TTransaction>
 		void StreamTransaction(bson_stream::document& builder, const TTransaction& transaction) {
 			builder
-					<< "remotePublicKey" << ToBinary(transaction.RemotePublicKey)
+					<< "linkedPublicKey" << ToBinary(transaction.LinkedPublicKey)
 					<< "linkAction" << utils::to_underlying_type(transaction.LinkAction);
 		}
 	}
 
-	DEFINE_MONGO_TRANSACTION_PLUGIN_FACTORY(AccountLink, StreamTransaction)
+	DEFINE_MONGO_TRANSACTION_PLUGIN_FACTORY(AccountKeyLink, StreamTransaction)
+	DEFINE_MONGO_TRANSACTION_PLUGIN_FACTORY(NodeKeyLink, StreamTransaction)
 }}}

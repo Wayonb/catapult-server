@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -39,4 +40,17 @@ namespace catapult { namespace test {
 
 	/// Creates \a count account states with successive public keys starting at \c 1.
 	AccountStates CreateAccountStates(size_t count);
+
+	/// Sets all supplemental public keys specified in \a mask to random values in \a accountState and adds \a numVotingKeys
+	/// random voting keys.
+	void SetRandomSupplementalPublicKeys(state::AccountState& accountState, state::AccountPublicKeys::KeyType mask, uint8_t numVotingKeys);
+
+	/// Forcibly clears and sets linked public key in \a accountState to \a linkedPublicKey.
+	void ForceSetLinkedPublicKey(state::AccountState& accountState, const Key& linkedPublicKey);
+
+	/// Gets the heights of all \a snapshots.
+	std::vector<Height::ValueType> GetSnapshotHeights(const state::AccountImportanceSnapshots& snapshots);
+
+	/// Gets the heights of all \a buckets.
+	std::vector<Height::ValueType> GetBucketHeights(const state::AccountActivityBuckets& buckets);
 }}

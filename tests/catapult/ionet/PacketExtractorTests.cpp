@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -27,7 +28,7 @@ namespace catapult { namespace ionet {
 
 	namespace {
 		uint32_t Default_Max_Packet_Data_Size = 150 * 1024;
-		uint32_t Default_Max_Packet_Size = Default_Max_Packet_Data_Size + sizeof(PacketHeader);
+		uint32_t Default_Max_Packet_Size = Default_Max_Packet_Data_Size + SizeOf32<PacketHeader>();
 
 		PacketExtractor CreateExtractor(ByteBuffer& buffer, size_t maxPacketDataSize = Default_Max_Packet_Data_Size) {
 			return PacketExtractor(buffer, maxPacketDataSize);

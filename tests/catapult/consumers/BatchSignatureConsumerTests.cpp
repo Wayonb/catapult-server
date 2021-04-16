@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,6 +24,7 @@
 #include "catapult/crypto/Signer.h"
 #include "catapult/model/NotificationSubscriber.h"
 #include "catapult/model/TransactionStatus.h"
+#include "catapult/utils/RandomGenerator.h"
 #include "tests/catapult/consumers/test/ConsumerTestUtils.h"
 #include "tests/test/core/BlockTestUtils.h"
 #include "tests/test/core/ThreadPoolTestUtils.h"
@@ -86,10 +88,10 @@ namespace catapult { namespace consumers {
 		class MockSignatureNotificationPublisher : public model::NotificationPublisher {
 		public:
 			MockSignatureNotificationPublisher(
-					const GenerationHash& generationHash,
+					const GenerationHashSeed& generationHashSeed,
 					const std::vector<NotificationDescriptor>& descriptors,
 					const std::unordered_set<size_t>& alwaysVerifiableIndexes)
-					: m_generationHash(generationHash)
+					: m_generationHashSeed(generationHashSeed)
 					, m_descriptors(descriptors)
 					, m_alwaysVerifiableIndexes(alwaysVerifiableIndexes)
 			{}
@@ -116,7 +118,7 @@ namespace catapult { namespace consumers {
 
 					auto replayProtectionMode = model::SignatureNotification::ReplayProtectionMode::Disabled;
 					if (HasFlag(NotificationDescriptor::Replay, descriptor)) {
-						crypto::Sign(input.Signer, { RawBuffer(m_generationHash), RawBuffer(input.Data) }, input.Signature);
+						crypto::Sign(input.Signer, { RawBuffer(m_generationHashSeed), RawBuffer(input.Data) }, input.Signature);
 						replayProtectionMode = model::SignatureNotification::ReplayProtectionMode::Enabled;
 					} else {
 						crypto::Sign(input.Signer, input.Data, input.Signature);
@@ -132,7 +134,7 @@ namespace catapult { namespace consumers {
 			}
 
 		private:
-			const GenerationHash& m_generationHash;
+			const GenerationHashSeed& m_generationHashSeed;
 			std::vector<NotificationDescriptor> m_descriptors;
 			std::unordered_set<size_t> m_alwaysVerifiableIndexes;
 			mutable model::WeakEntityInfos m_entityInfos;
@@ -150,6 +152,13 @@ namespace catapult { namespace consumers {
 			return true;
 		}
 
+		crypto::RandomFiller CreateRandomFiller() {
+			return [](auto* pOut, auto count) {
+				// can use low entropy source for tests
+				utils::LowEntropyRandomGenerator().fill(pOut, count);
+			};
+		}
+
 		struct BlockTraits {
 		public:
 			struct TestContext {
@@ -158,19 +167,24 @@ namespace catapult { namespace consumers {
 						const std::vector<NotificationDescriptor>& descriptors,
 						const std::unordered_set<size_t>& alwaysVerifiableIndexes = {},
 						const RequiresValidationPredicate& requiresValidationPredicate = RequiresAllPredicate)
-						: GenerationHash(test::GenerateRandomByteArray<catapult::GenerationHash>())
+						: GenerationHashSeed(test::GenerateRandomByteArray<catapult::GenerationHashSeed>())
 						, pPublisher(std::make_shared<MockSignatureNotificationPublisher>(
-								GenerationHash,
+								GenerationHashSeed,
 								descriptors,
 								alwaysVerifiableIndexes))
 						, pPool(test::CreateStartedIoThreadPool())
-						, Consumer(CreateBlockBatchSignatureConsumer(GenerationHash, pPublisher, pPool, requiresValidationPredicate))
+						, Consumer(CreateBlockBatchSignatureConsumer(
+								GenerationHashSeed,
+								CreateRandomFiller(),
+								pPublisher,
+								*pPool,
+								requiresValidationPredicate))
 				{}
 
 			public:
-				catapult::GenerationHash GenerationHash;
+				catapult::GenerationHashSeed GenerationHashSeed;
 				std::shared_ptr<MockSignatureNotificationPublisher> pPublisher;
-				std::shared_ptr<thread::IoThreadPool> pPool;
+				std::unique_ptr<thread::IoThreadPool> pPool;
 
 				disruptor::ConstBlockConsumer Consumer;
 			};
@@ -264,25 +278,27 @@ namespace catapult { namespace consumers {
 				explicit TestContext(
 						const std::vector<NotificationDescriptor>& descriptors,
 						const std::unordered_set<size_t>& alwaysVerifiableIndexes = {})
-						: GenerationHash(test::GenerateRandomByteArray<catapult::GenerationHash>())
+						: GenerationHashSeed(test::GenerateRandomByteArray<catapult::GenerationHashSeed>())
 						, pPublisher(std::make_shared<MockSignatureNotificationPublisher>(
-								GenerationHash,
+								GenerationHashSeed,
 								descriptors,
 								alwaysVerifiableIndexes))
 						, pPool(test::CreateStartedIoThreadPool())
-						, Consumer(CreateTransactionBatchSignatureConsumer(GenerationHash, pPublisher, pPool, [this](
-								const auto& transaction,
-								const auto& hash,
-								auto result) {
-							// notice that transaction.Deadline is used as transaction marker
-							FailedTransactionStatuses.emplace_back(hash, utils::to_underlying_type(result), transaction.Deadline);
-						}))
+						, Consumer(CreateTransactionBatchSignatureConsumer(
+								GenerationHashSeed,
+								CreateRandomFiller(),
+								pPublisher,
+								*pPool,
+								[this](const auto& transaction, const auto& hash, auto result) {
+									// notice that transaction.Deadline is used as transaction marker
+									FailedTransactionStatuses.emplace_back(hash, transaction.Deadline, utils::to_underlying_type(result));
+								}))
 				{}
 
 			public:
-				catapult::GenerationHash GenerationHash;
+				catapult::GenerationHashSeed GenerationHashSeed;
 				std::shared_ptr<MockSignatureNotificationPublisher> pPublisher;
-				std::shared_ptr<thread::IoThreadPool> pPool;
+				std::unique_ptr<thread::IoThreadPool> pPool;
 
 				std::vector<model::TransactionStatus> FailedTransactionStatuses;
 				disruptor::TransactionConsumer Consumer;

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -30,7 +31,7 @@ namespace catapult { namespace timesync {
 
 	namespace {
 		constexpr utils::LogLevel MapToLogLevel(int64_t warningThresholdMillis, int64_t offset) {
-			return warningThresholdMillis > offset ? utils::LogLevel::Trace : utils::LogLevel::Warning;
+			return warningThresholdMillis > offset ? utils::LogLevel::trace : utils::LogLevel::warning;
 		}
 
 		double GetCoupling(NodeAge nodeAge) {
@@ -66,9 +67,9 @@ namespace catapult { namespace timesync {
 			return TimeOffset(0);
 		}
 
-		auto highValueAddressesSize = accountStateCacheView.highValueAddresses().size();
-		auto viewPercentage = static_cast<double>(samples.size()) / static_cast<double>(highValueAddressesSize);
-		auto importancePercentage = static_cast<double>(cumulativeImportance) / static_cast<double>(m_totalChainImportance.unwrap());
+		auto highValueAddressesSize = accountStateCacheView.highValueAccounts().addresses().size();
+		auto viewPercentage = utils::to_ratio(samples.size(), highValueAddressesSize);
+		auto importancePercentage = utils::to_ratio(cumulativeImportance, m_totalChainImportance.unwrap());
 		auto scaling = importancePercentage > viewPercentage ? 1.0 / importancePercentage : 1.0 / viewPercentage;
 		auto sum = sumScaledOffsets(importanceView, height, samples, scaling);
 		return TimeOffset(static_cast<int64_t>(GetCoupling(nodeAge) * sum));
@@ -96,7 +97,7 @@ namespace catapult { namespace timesync {
 					<< sample.identityKey() << ": network time offset to local node is " << offset << "ms";
 
 			auto importance = importanceView.getAccountImportanceOrDefault(sample.identityKey(), height);
-			auto importancePercentage = static_cast<double>(importance.unwrap()) / static_cast<double>(totalChainImportance);
+			auto importancePercentage = utils::to_ratio(importance.unwrap(), totalChainImportance);
 			return scaling * static_cast<double>(offset) * importancePercentage;
 		});
 	}

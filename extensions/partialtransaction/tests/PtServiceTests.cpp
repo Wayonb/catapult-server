@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,6 +25,7 @@
 #include "tests/test/core/PacketTestUtils.h"
 #include "tests/test/local/PacketWritersServiceTestUtils.h"
 #include "tests/test/local/ServiceTestUtils.h"
+#include "tests/test/net/RemoteAcceptServer.h"
 #include "tests/test/net/mocks/MockPacketWriters.h"
 #include "tests/TestHarness.h"
 
@@ -32,18 +34,13 @@ namespace catapult { namespace partialtransaction {
 #define TEST_CLASS PtServiceTests
 
 	namespace {
-		constexpr auto Num_Expected_Tasks = 2u;
-
 		struct PtServiceTraits {
 			static constexpr auto Counter_Name = "PT WRITERS";
 			static constexpr auto Num_Expected_Services = 3u; // writers (1) + dependent services (2)
+			static constexpr auto CreateRegistrar = CreatePtServiceRegistrar;
 
 			static auto GetWriters(const extensions::ServiceLocator& locator) {
-				return locator.service<net::PacketWriters>("api.partial");
-			}
-
-			static auto CreateRegistrar() {
-				return CreatePtServiceRegistrar();
+				return locator.service<net::PacketWriters>("pt.writers");
 			}
 		};
 
@@ -52,7 +49,7 @@ namespace catapult { namespace partialtransaction {
 			TestContext() {
 				// Arrange: register service dependencies
 				auto pBootstrapperRegistrar = CreatePtBootstrapperServiceRegistrar([]() {
-					return std::make_unique<cache::MemoryPtCacheProxy>(cache::MemoryCacheOptions(100, 100));
+					return std::make_unique<cache::MemoryPtCacheProxy>(cache::MemoryCacheOptions());
 				});
 				pBootstrapperRegistrar->registerServices(locator(), testState().state());
 
@@ -72,16 +69,14 @@ namespace catapult { namespace partialtransaction {
 	ADD_PACKET_WRITERS_SERVICE_TEST(TEST_CLASS, Mixin, CanBootService)
 	ADD_PACKET_WRITERS_SERVICE_TEST(TEST_CLASS, Mixin, CanShutdownService)
 	ADD_PACKET_WRITERS_SERVICE_TEST(TEST_CLASS, Mixin, CanConnectToExternalServer)
+	ADD_PACKET_WRITERS_SERVICE_TEST(TEST_CLASS, Mixin, WritersAreRegisteredInBannedNodeIdentitySink)
 
 	// region packetIoPickers
 
 	TEST(TEST_CLASS, WritersAreRegisteredInPacketIoPickers) {
 		// Arrange: create a (tcp) server
-		auto pPool = test::CreateStartedIoThreadPool();
-		auto serverKeyPair = test::GenerateKeyPair();
-		test::SpawnPacketServerWork(pPool->ioContext(), [&serverKeyPair](const auto& pServer) {
-			net::VerifyClient(pServer, serverKeyPair, ionet::ConnectionSecurityMode::None, [](auto, const auto&) {});
-		});
+		test::RemoteAcceptServer server;
+		server.start();
 
 		// Act: create and boot the service
 		TestContext context;
@@ -89,7 +84,7 @@ namespace catapult { namespace partialtransaction {
 		auto pickers = context.testState().state().packetIoPickers();
 
 		// - get the packet writers and attempt to connect to the server
-		test::ConnectToLocalHost(*PtServiceTraits::GetWriters(context.locator()), serverKeyPair.publicKey());
+		test::ConnectToLocalHost(*PtServiceTraits::GetWriters(context.locator()), server.caPublicKey());
 
 		// Assert: the writers are registered with role `Api`
 		EXPECT_EQ(0u, pickers.pickMatching(utils::TimeSpan::FromSeconds(1), ionet::NodeRoles::Peer).size());
@@ -100,12 +95,11 @@ namespace catapult { namespace partialtransaction {
 
 	// region tasks
 
-	TEST(TEST_CLASS, ConnectPeersTaskIsScheduled) {
-		test::AssertRegisteredTask(TestContext(), Num_Expected_Tasks, "connect peers task for service Pt");
-	}
-
-	TEST(TEST_CLASS, PullPtTaskIsScheduled) {
-		test::AssertRegisteredTask(TestContext(), Num_Expected_Tasks, "pull partial transactions task");
+	TEST(TEST_CLASS, TasksAreRegistered) {
+		test::AssertRegisteredTasks(TestContext(), {
+			"connect peers task for service Pt",
+			"pull partial transactions task"
+		});
 	}
 
 	// endregion

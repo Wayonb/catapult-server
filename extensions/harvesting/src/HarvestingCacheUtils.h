@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,15 +25,6 @@
 namespace catapult { namespace cache { class AccountStateCacheDelta; } }
 
 namespace catapult { namespace harvesting {
-
-	/// Identifiers of accounts processed by harvesting account observers.
-	struct HarvestingAffectedAccounts {
-		/// Affected addresses.
-		RefCountedAccountIds<Address> Addresses;
-
-		/// Affected public keys.
-		RefCountedAccountIds<Key> PublicKeys;
-	};
 
 	/// Updates \a accountStateCacheDelta to preserve all accounts referenced in \a accounts at \a height.
 	void PreserveAllAccounts(

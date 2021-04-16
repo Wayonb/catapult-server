@@ -3,6 +3,240 @@ All notable changes to this project will be documented in this file.
 
 The changelog format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.0.0] - 12-Mar-2021
+
+Mainnet launch.
+
+## [0.10.0.8] - 26-Feb-2021
+
+### Added
+ - sdk: basic support for BIP32 and BIP39
+
+### Fixed
+ - fix deadlock between timesync and node selection, #162
+ - addressgen - fix matching logic when no substrings match
+
+## [0.10.0.7] - 15-Feb-2021
+
+### Added
+ - tool: importer to populate database from block files
+ - tool: verify to check the validity of blocks before import
+
+### Fixed
+ - breaking: fix overflow in CalculateTransactionFee, #151
+ - recovery process needs to drop orphaned documents associated with previous block, #155
+ - check linked public key (remote) instead of main public key, #142
+ - minor issues: #153, #158, #159
+
+### Changed
+ - allow storing multiple payloads per file in FileDatabase to reduce inode usage, #152
+
+## [0.10.0.6] - 02-Feb-2021
+
+### Added
+ - mongo: new config-database settings writeTimeout and maxDropBatchSize
+ - new config-node setting: maxTimeBehindPullTransactionsStart - delay transaction pulls and processing of pushes until node is close to being synced
+ - allow remote links in linker tool
+
+### Fixed
+ - local remote harvesting account should not require node link #142
+ - bypass MaxTransactionValidator for nemesis block
+ - prevent resolution statements from being created during chain undo #148
+
+### Changed
+ - breaking: split address tool into two separate tools: tool.addressgen (vanity generator) and tool.address (converter)
+
+## [0.10.0.5] - 14-Jan-2021
+
+### Fixed
+ - deep rollback
+   - insert gaps into AccountState stacks to fix deep rollback bug, #121
+   - prune newer account histories during rollback, #120
+   - write importance files to importance/wip and add commit step, #119
+ - importance block processing
+   - guarantee HighValueAccountCommitObserver is executed AFTER all other state-changing observers, #118
+   - fix calculation of VotingEligibleAccountsCount to only include currently eligible accounts
+   - fix potential deadlock when harvesting importance block, #137
+ - fix infinite loop in CompareChains when remote returns less than configured hashes, #126
+
+### Changed
+ - update boost to version 75
+ - pull finalization proofs more aggressively when unfinalizedBlocksDuration is 0
+ - UT and PT handling
+   - add MinDeadline filter to PT and UT requests
+   - only propagate valid PTs and UTs
+   - punish stateful transaction failures
+   - add configuration to ban nodes that send a lot of bad transactions
+ - memory enhancements
+   - change PT and UT limits from count to size
+   - add memory limits on dispatcher queues
+   - (mongo) cap size of transactionStatuses collection, #135
+
+## [0.10.0.4] - 04-Dec-2020
+
+### Added
+ - ipv6 support #63
+ - versions to all state primary documents in mongo #113 #115
+ - clang 11.0.1 support
+ - gcc 10.2.0 support
+
+### Fixed
+ - finalization fork resolution #102
+ - add ListenInterface #55
+ - resolve confirmed transaction addresses #82
+ - recovery finalization support (EnableRevoteOnBoot), #90
+ - check node version when adding to node container #97
+ - allow non-voting nodes to pull finalization proofs more aggressively #99
+ - fix mongo indexes
+ - non-voting node with higher importances does not get rolled back when a fork is resolved #108
+ - reduce allocations
+   - in PatriciaTree
+   - using custom memory pool with OpenSSL
+ - Trail-of-Bits: cosmetic changes
+ - minor issues: #93, #96, #98, #100, #101, #104, #105, #116
+
+### Changed
+ - change voting key tree into key list
+ - change voting key link transaction, to use shorter keys
+ - mongo namespace meta.active -> meta.latest
+ - upgrade dependencies to latest versions
+ - drop use of boost::filesystem and boost::thread_group
+ - add extended importance blocks to allow trustless verification of finalization proofs #103
+ - only serialize non-empty AccountRestrictions #114
+
+## [0.10.0.3] - 25-Sep-2020
+
+### Fixed
+ - bugfix: importance files should not be spooled to disk when delta is detached
+
+### Changed
+- removed phantom message.type from transfer transaction mongo mapping
+- apply maxTransactionsPerBlock against embedded transactions in addition to top-level transactions
+- Trail-of-Bits: set and check directory permissions
+- Trail-of-Bits: strip RPATHs from built modules by default
+
+## [0.10.0.2] - 22-Sep-2020
+
+### Fixed
+ - bugfix: validation of nemesis block containing transactions dependent on DynamicFeeMultiplier
+ - bugfix: fix rollback when importance information is spooled to disk
+ - bugfix: allow same finalization proof to be received from proof and message sync
+ - bugfix: make time based (hash cache) pruning finalization aware
+ - reduce network traffic by requesting finalization messages within range
+ - optimize compare chains logic to do binary search of remote hashes
+
+## [0.10.0.1] - 18-Sep-2020
+
+### Added
+ - deterministic finalization extension based on GRANDPA!
+
+### Changed
+ - #85, validate nemesis block on server boot
+ - tie voting keys to finalization epochs instead of finalization points
+ - spool importance information to disk when finalization is enabled in order to allow deep rollbacks
+ - make all state { lock hash, lock secret, namespace } independent of `maxRollbackBlocks` setting
+ - change chain comparision to allow syncing when finalization has stalled
+ - change "chain info" references to "chain statistics" everywhere
+ - refactor crypto code to allow different types of signature schemes for transaction processing and voting
+ - generalize one-time signatures tree into a tree that supports reusable (short-term) keys
+
+### Fixed
+ - bugfix: #84, fix block generation in `maximize-fee` mode
+
+## [0.9.6.4] - 27-Jul-2020
+
+### Changed
+ - allow nemesis block to contain balance transfers from non-nemesis account
+ - nemgen enhancements to support public network
+
+### Fixed
+ - bugfix: credit main account not remote when hash lock expires
+ - bugfix, Trail-of-Bits: UB in container access
+ - bugfix, Trail-of-Bits: missing `O_CLOEXEC` flag
+ - bugfix: high value addresses tracking
+
+## [0.9.6.3] - 10-Jul-2020
+
+### Fixed
+ - bugfix: mosaics inside Balances not correctly ordered after removing optimizedId in 0.9.6.2
+
+## [0.9.6.2] - 23-Jun-2020
+
+### Added
+ - one-time signatures tree
+
+### Changed
+ - voting key link transaction requires finalization points
+ - allow `maxVotingKeysPerAccount` voting key links
+ - track voter-eligible accounts
+ - state entries indexed by address
+ - change the way pruning works (move to BlockChainSyncConsumer)
+ - minor: add VerifiableEntity::Size to database
+ - minor: binary address format has 24-bytes
+
+### Fixed
+ - nodes cannot update identity keys in host-identity network
+ - recovery crash in reapplyBlocks caused by inconsistent BlockStatisticCache contents
+
+## [0.9.5.1] - 22-May-2020
+
+### Added
+ - major: VRF support, harvesters need to register VRF key that is used to generate VRF proof for given block
+ - harvest network fees
+
+### Changed
+ - unlock message behavior: message must specify vrf key, account must be linked to a node via NodeKeyLink
+ - renamed AccountLinkTransaction to AccountKeyLinkTransaction (consistency)
+
+### Fixed
+ - bugfix: issue #68, delay ChainedSocketReader in PacketReaders
+ - bugfix: issue #69, mosaic divisibility validation
+ - more minor fixes
+
+### Removed
+ - eventsource extension
+
+## [0.9.4.1] - 23-April-2020
+
+### Added
+ - major: TLS support, changes are large, please refer to project documentation for details
+ - bugfix: namespace extension must preserve root alias
+ - bugfix: add timeout around accept (of incoming connection)
+
+## [0.9.3.2] - 19-March-2020
+
+### Changed
+ - rocks upgraded to v6.6.4
+
+## [0.9.3.1] - 05-March-2020
+
+### Added
+ - forcibly disconnect connections to/from newly banned node identity
+ - use network fingerprint (id + generation hash) for nicer network separation
+ - missing mongo index on beneficiaryPublicKey
+
+### Changed
+ - unit221b pentesting: use ephemeral keys in unlock messages, use HKDF for key derivation
+ - unit221b pentesting: include S-part of signature in entity hash, to avoid "invalid tx announce" attack
+ - model: moved TransactionStatus.Deadline before Status
+
+### Fixed
+ - bugfix: possible race in node selector
+ - bugfix: unconfirmed transactions subscriptions
+
+### Removed
+ - unit221b pentesting: `SIGNATURE_SCHEME_*` defines, catapult now uses standard ed25519 derivation with sha512
+ - in-source implementations of ripemd160, sha256, sha3, aes, use variants provided by openssl
+
+## [0.9.2.1] - 23-January-2020
+
+### Fixed
+ - bugfix: incomplete nemesis block data inside mongo
+ - bugfix: remove spurious check in CreateCacheBlockTouchObserver
+ - bugfix: make unconditional update of activity information based on account balance
+ - minor: do not migrate node identity key (when source is worse)
+ - minor: reprocessing of aggregates with different set of cosigners
+
 ## [0.9.1.1] - 06-December-2019
 
 ### Added
@@ -66,7 +300,7 @@ The changelog format is based on [Keep a Changelog](https://keepachangelog.com/e
  - Dynamic rental fees
 
 ### Changed
- - Naming review changes:
+ - Naming review changes
    - catbuffer (models, validators, etc)
    - mongo naming review changes
    - config variable naming
@@ -180,9 +414,26 @@ The changelog format is based on [Keep a Changelog](https://keepachangelog.com/e
 - Minor crash and bug fixes detected during the Catapult Developer Preview.
 
 ## [0.1.0.1] - 14-May-2018
+
 ### Added
 - Initial code release.
 
+[0.10.0.8]: https://github.com/nemtech/catapult-server/compare/v0.10.0.7...v0.10.0.8
+[0.10.0.7]: https://github.com/nemtech/catapult-server/compare/v0.10.0.6...v0.10.0.7
+[0.10.0.6]: https://github.com/nemtech/catapult-server/compare/v0.10.0.5...v0.10.0.6
+[0.10.0.5]: https://github.com/nemtech/catapult-server/compare/v0.10.0.4...v0.10.0.5
+[0.10.0.4]: https://github.com/nemtech/catapult-server/compare/v0.10.0.3...v0.10.0.4
+[0.10.0.3]: https://github.com/nemtech/catapult-server/compare/v0.10.0.2...v0.10.0.3
+[0.10.0.2]: https://github.com/nemtech/catapult-server/compare/v0.10.0.1...v0.10.0.2
+[0.10.0.1]: https://github.com/nemtech/catapult-server/compare/v0.9.6.4...v0.10.0.1
+[0.9.6.4]: https://github.com/nemtech/catapult-server/compare/v0.9.6.3...v0.9.6.4
+[0.9.6.3]: https://github.com/nemtech/catapult-server/compare/v0.9.6.2...v0.9.6.3
+[0.9.6.2]: https://github.com/nemtech/catapult-server/compare/v0.9.5.1...v0.9.6.2
+[0.9.5.1]: https://github.com/nemtech/catapult-server/compare/v0.9.4.1...v0.9.5.1
+[0.9.4.1]: https://github.com/nemtech/catapult-server/compare/v0.9.3.2...v0.9.4.1
+[0.9.3.2]: https://github.com/nemtech/catapult-server/compare/v0.9.3.1...v0.9.3.2
+[0.9.3.1]: https://github.com/nemtech/catapult-server/compare/v0.9.2.1...v0.9.3.1
+[0.9.2.1]: https://github.com/nemtech/catapult-server/compare/v0.9.1.1...v0.9.2.1
 [0.9.1.1]: https://github.com/nemtech/catapult-server/compare/v0.9.0.1...v0.9.1.1
 [0.9.0.1]: https://github.com/nemtech/catapult-server/compare/v0.8.0.3...v0.9.0.1
 [0.8.0.3]: https://github.com/nemtech/catapult-server/compare/v0.7.0.1...v0.8.0.3

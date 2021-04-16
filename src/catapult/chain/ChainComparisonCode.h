@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -37,8 +38,8 @@ namespace catapult { namespace chain {
 	/* Remote node reported a lower chain score than the local node. */ \
 	ENUM_VALUE(Remote_Reported_Lower_Chain_Score, 2) \
 	\
-	/* Local node has a chain score of zero indicating that it is not completely initialized. */ \
-	ENUM_VALUE(Local_Chain_Score_Zero, 3) \
+	/* Local score changed during update operation. */ \
+	ENUM_VALUE(Local_Score_Updated, 3) \
 	\
 	/* Remote node is too far behind the local node. */ \
 	ENUM_VALUE(Remote_Is_Too_Far_Behind, Remote_Is_Out_Of_Sync_Flag | 1) \

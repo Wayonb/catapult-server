@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,6 +21,7 @@
 
 #include "ProcessBootstrapper.h"
 #include "PluginUtils.h"
+#include "catapult/net/PacketIoPicker.h"
 #include "catapult/plugins/PluginExceptions.h"
 #include "catapult/utils/Logging.h"
 #include <boost/exception_ptr.hpp>
@@ -29,7 +31,7 @@ namespace catapult { namespace extensions {
 #ifdef STRICT_SYMBOL_VISIBILITY
 	template<typename T>
 	void ForceSymbolInjection() {
-		CATAPULT_LOG(debug) << "forcibly injecting symbol: " << typeid(T).name () << " => " << typeid(T).hash_code();
+		CATAPULT_LOG(debug) << "forcibly injecting symbol: " << typeid(T).name() << " => " << typeid(T).hash_code();
 	}
 #endif
 
@@ -52,6 +54,7 @@ namespace catapult { namespace extensions {
 #ifdef STRICT_SYMBOL_VISIBILITY
 			// need to forcibly inject typeinfos into containing exe so that they are properly resolved across modules
 			ForceSymbolInjection<model::EmbeddedTransactionPlugin>();
+			ForceSymbolInjection<net::PacketIoPicker>();
 #endif
 	}
 
@@ -125,7 +128,9 @@ namespace catapult { namespace extensions {
 	}
 
 	void AddStaticNodesFromPath(ProcessBootstrapper& bootstrapper, const std::string& path) {
-		auto nodes = config::LoadPeersFromPath(path, bootstrapper.config().BlockChain.Network.Identifier);
+		const auto& networkInfo = bootstrapper.config().BlockChain.Network;
+		auto networkFingerprint = model::UniqueNetworkFingerprint(networkInfo.Identifier, networkInfo.GenerationHashSeed);
+		auto nodes = config::LoadPeersFromPath(path, networkFingerprint);
 		bootstrapper.addStaticNodes(nodes);
 	}
 }}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -27,23 +28,18 @@ namespace catapult { namespace test {
 	/// \note Cannot use type NamespaceId because it is defined in plugin.
 	constexpr uint64_t Default_Namespace_Id(0xB149'7F5F'BA65'1B4F);
 
-#ifdef SIGNATURE_SCHEME_KECCAK
 	/// Default (well known) currency mosaic id used in tests (`currency`).
-	constexpr MosaicId Default_Currency_Mosaic_Id(0x7C3C'F4E0'9BC8'82EF);
+	constexpr MosaicId Default_Currency_Mosaic_Id(0x4B39'06B7'32A9'04B0);
 
 	/// Default (well known) harvesting mosaic id used in tests (`harvest`).
-	constexpr MosaicId Default_Harvesting_Mosaic_Id(0x3AEC'39EE'3ECF'5CE7);
-#else
-	/// Default (well known) currency mosaic id used in tests (`currency`).
-	constexpr MosaicId Default_Currency_Mosaic_Id(0x0DC6'7FBE'1CAD'29E3);
-
-	/// Default (well known) harvesting mosaic id used in tests (`harvest`).
-	constexpr MosaicId Default_Harvesting_Mosaic_Id(0x2651'4E2A'1EF3'3824);
-#endif
+	constexpr MosaicId Default_Harvesting_Mosaic_Id(0x6648'43D5'56E6'27F1);
 
 	/// Default total chain importance used for scaling block target calculation.
 	constexpr Importance Default_Total_Chain_Importance(8'999'999'998);
 
-	/// Network generation hash string used by deterministic tests.
-	constexpr auto Deterministic_Network_Generation_Hash_String = "070D67A92D441EAAD25AB5C78F1F68628BE33EAA1DEBEDBE14D4FBE8F4DC326E";
+	/// File database batch size used in tests.
+	constexpr uint32_t File_Database_Batch_Size = 100;
+
+	/// Network generation hash seed string used by deterministic tests.
+	constexpr auto Deterministic_Network_Generation_Hash_Seed_String = "070D67A92D441EAAD25AB5C78F1F68628BE33EAA1DEBEDBE14D4FBE8F4DC326E";
 }}

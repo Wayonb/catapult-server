@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -41,7 +42,7 @@ namespace catapult { namespace model {
 		// Arrange:
 		auto expectedSize = sizeof(TrailingVariableDataLayout<CacheEntryInfo<uint64_t>, uint8_t>);
 
-#define FIELD(X) expectedSize += sizeof(CacheEntryInfo<uint64_t>::X);
+#define FIELD(X) expectedSize += SizeOf32<decltype(CacheEntryInfo<uint64_t>::X)>();
 		CACHE_ENTRY_INFO_FIELDS
 #undef FIELD
 
@@ -150,7 +151,7 @@ namespace catapult { namespace model {
 	namespace {
 		struct CacheEntryInfoTraits {
 			static auto GenerateEntityWithAttachments(uint16_t count) {
-				uint32_t entitySize = sizeof(CacheEntryInfo<uint64_t>) + count;
+				uint32_t entitySize = SizeOf32<CacheEntryInfo<uint64_t>>() + count;
 				auto pInfo = utils::MakeUniqueWithSize<CacheEntryInfo<uint64_t>>(entitySize);
 				pInfo->Size = entitySize;
 				pInfo->DataSize = count;

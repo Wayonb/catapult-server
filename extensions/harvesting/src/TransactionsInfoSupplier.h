@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,13 +20,11 @@
 **/
 
 #pragma once
+#include "catapult/cache_tx/MemoryUtCacheUtils.h"
 #include "catapult/model/BlockUtils.h"
 #include "catapult/model/TransactionSelectionStrategy.h"
 
-namespace catapult {
-	namespace cache { class ReadWriteUtCache; }
-	namespace harvesting { class HarvestingUtFacade; }
-}
+namespace catapult { namespace harvesting { class HarvestingUtFacade; } }
 
 namespace catapult { namespace harvesting {
 
@@ -47,8 +46,10 @@ namespace catapult { namespace harvesting {
 	/// Supplies a transactions info composed of a maximum number of transactions for a block given a harvesting ut facade.
 	using TransactionsInfoSupplier = std::function<TransactionsInfo (HarvestingUtFacade&, uint32_t)>;
 
-	/// Creates a default transactions info supplier around\a utCache for specified transaction \a strategy.
+	/// Creates a default transactions info supplier around \a utCache for specified transaction \a strategy
+	/// where \a countRetriever returns the total number of transactions contained within a top-level transaction.
 	TransactionsInfoSupplier CreateTransactionsInfoSupplier(
 			model::TransactionSelectionStrategy strategy,
+			const cache::EmbeddedCountRetriever& countRetriever,
 			const cache::ReadWriteUtCache& utCache);
 }}

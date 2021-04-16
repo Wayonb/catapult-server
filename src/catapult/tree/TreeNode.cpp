@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -26,22 +27,31 @@
 namespace catapult { namespace tree {
 
 	namespace {
-		std::vector<uint8_t> EncodeKey(const TreeNodePath& path, bool isLeaf) {
+		void UpdateEncodedKey(crypto::Sha3_256_Builder& builder, const TreeNodePath& path, bool isLeaf) {
+			std::array<uint8_t, sizeof(uint64_t)> buffer; // working buffer to avoid allocations
 			auto numPathNibbles = path.size();
-			std::vector<uint8_t> encodedKey(numPathNibbles / 2 + 1);
 
 			auto i = 0u;
-			encodedKey[0] = isLeaf ? 0x20 : 0; // set leaf flag
+			buffer[0] = isLeaf ? 0x20 : 0; // set leaf flag
 			if (1 == numPathNibbles % 2) {
-				encodedKey[0] |= 0x10; // set odd flag
-				encodedKey[0] |= path.nibbleAt(0); // merge in first nibble
+				// set odd flag and merge in first nibble
+				buffer[0] = static_cast<uint8_t>(buffer[0] |0x10 | path.nibbleAt(0));
 				++i;
 			}
 
-			for (; i < numPathNibbles; i += 2)
-				encodedKey[i / 2 + 1] = static_cast<uint8_t>((path.nibbleAt(i) << 4) + path.nibbleAt(i + 1));
+			auto counter = 1u;
+			for (; i < numPathNibbles; i += 2) {
+				buffer[counter] = static_cast<uint8_t>((path.nibbleAt(i) << 4) + path.nibbleAt(i + 1));
 
-			return encodedKey;
+				if (buffer.size() == ++counter) {
+					// flush working buffer
+					builder.update(buffer);
+					counter = 0;
+				}
+			}
+
+			if (0 != counter)
+				builder.update({ reinterpret_cast<const uint8_t*>(&buffer[0]), counter });
 		}
 	}
 
@@ -50,7 +60,7 @@ namespace catapult { namespace tree {
 	namespace {
 		Hash256 CalculateLeafTreeNodeHash(const TreeNodePath& path, const Hash256& value) {
 			crypto::Sha3_256_Builder builder;
-			builder.update(EncodeKey(path, true));
+			UpdateEncodedKey(builder, path, true);
 			builder.update(value);
 
 			Hash256 hash;
@@ -64,6 +74,8 @@ namespace catapult { namespace tree {
 			, m_value(value)
 			, m_hash(CalculateLeafTreeNodeHash(m_path, m_value))
 	{}
+
+	LeafTreeNode::LeafTreeNode() = default;
 
 	const TreeNodePath& LeafTreeNode::path() const {
 		return m_path;
@@ -87,6 +99,8 @@ namespace catapult { namespace tree {
 			, m_isDirty(true)
 	{}
 
+	BranchTreeNode::BranchTreeNode() = default;
+
 	const TreeNodePath& BranchTreeNode::path() const {
 		return m_path;
 	}
@@ -99,14 +113,18 @@ namespace catapult { namespace tree {
 		return m_linkSet.test(index);
 	}
 
+	bool BranchTreeNode::hasLinkedNode(size_t index) const {
+		return !!m_linkedNodes[index];
+	}
+
 	const Hash256& BranchTreeNode::link(size_t index) const {
 		const auto& pLinkedNode = m_linkedNodes[index];
 		return pLinkedNode ? pLinkedNode->hash() : m_links[index];
 	}
 
-	std::unique_ptr<const TreeNode> BranchTreeNode::linkedNode(size_t index) const {
+	TreeNode BranchTreeNode::linkedNode(size_t index) const {
 		const auto& pLinkedNode = m_linkedNodes[index];
-		return pLinkedNode ? std::make_unique<TreeNode>(pLinkedNode->copy()) : nullptr;
+		return pLinkedNode ? pLinkedNode->copy() : TreeNode();
 	}
 
 	uint8_t BranchTreeNode::highestLinkIndex() const {
@@ -116,7 +134,7 @@ namespace catapult { namespace tree {
 	const Hash256& BranchTreeNode::hash() const {
 		if (m_isDirty) {
 			crypto::Sha3_256_Builder builder;
-			builder.update(EncodeKey(m_path, false));
+			UpdateEncodedKey(builder, m_path, false);
 			for (auto i = 0u; i < Max_Links; ++i)
 				builder.update({ link(i).data(), sizeof(Hash256) });
 
@@ -169,50 +187,56 @@ namespace catapult { namespace tree {
 
 	// region TreeNode
 
-	TreeNode::TreeNode() : m_emptyHash()
+	TreeNode::TreeNode()
+			: m_treeNodeType(TreeNodeType::Empty)
+			, m_emptyHash()
 	{}
 
-	TreeNode::TreeNode(const LeafTreeNode& node) : m_pLeafNode(std::make_unique<LeafTreeNode>(node))
+	TreeNode::TreeNode(const LeafTreeNode& node)
+			: m_leafNode(node)
+			, m_treeNodeType(TreeNodeType::Leaf)
 	{}
 
-	TreeNode::TreeNode(const BranchTreeNode& node) : m_pBranchNode(std::make_unique<BranchTreeNode>(node))
+	TreeNode::TreeNode(const BranchTreeNode& node)
+			: m_branchNode(node)
+			, m_treeNodeType(TreeNodeType::Branch)
 	{}
 
 	bool TreeNode::empty() const {
-		return !isLeaf() && !isBranch();
+		return TreeNodeType::Empty == m_treeNodeType;
 	}
 
 	bool TreeNode::isBranch() const {
-		return !!m_pBranchNode;
+		return TreeNodeType::Branch == m_treeNodeType;
 	}
 
 	bool TreeNode::isLeaf() const {
-		return !!m_pLeafNode;
+		return TreeNodeType::Leaf == m_treeNodeType;
 	}
 
 	const TreeNodePath& TreeNode::path() const {
 		if (isLeaf())
-			return m_pLeafNode->path();
+			return m_leafNode.path();
 		else if (isBranch())
-			return m_pBranchNode->path();
+			return m_branchNode.path();
 		else
 			return m_emptyPath;
 	}
 
 	const Hash256& TreeNode::hash() const {
 		if (isLeaf())
-			return m_pLeafNode->hash();
+			return m_leafNode.hash();
 		else if (isBranch())
-			return m_pBranchNode->hash();
+			return m_branchNode.hash();
 		else
 			return m_emptyHash;
 	}
 
 	void TreeNode::setPath(const TreeNodePath& path) {
 		if (isLeaf())
-			m_pLeafNode = std::make_unique<LeafTreeNode>(path, m_pLeafNode->value());
+			m_leafNode = LeafTreeNode(path, m_leafNode.value());
 		else if (isBranch())
-			m_pBranchNode->setPath(path);
+			m_branchNode.setPath(path);
 		else
 			CATAPULT_THROW_RUNTIME_ERROR("cannot change path of empty node");
 	}
@@ -221,21 +245,21 @@ namespace catapult { namespace tree {
 		if (!isLeaf())
 			CATAPULT_THROW_RUNTIME_ERROR("tree node is not a leaf node");
 
-		return *m_pLeafNode;
+		return m_leafNode;
 	}
 
 	const BranchTreeNode& TreeNode::asBranchNode() const {
 		if (!isBranch())
 			CATAPULT_THROW_RUNTIME_ERROR("tree node is not a branch node");
 
-		return *m_pBranchNode;
+		return m_branchNode;
 	}
 
 	TreeNode TreeNode::copy() const {
 		if (isLeaf())
-			return TreeNode(*m_pLeafNode);
+			return TreeNode(m_leafNode);
 		else if (isBranch())
-			return TreeNode(*m_pBranchNode);
+			return TreeNode(m_branchNode);
 		else
 			return TreeNode();
 	}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,6 +22,7 @@
 #include "src/observers/Observers.h"
 #include "catapult/cache_core/BlockStatisticCache.h"
 #include "tests/test/core/BlockTestUtils.h"
+#include "tests/test/core/NotificationTestUtils.h"
 #include "tests/test/plugins/ObserverTestUtils.h"
 #include "tests/TestHarness.h"
 
@@ -53,7 +55,11 @@ namespace catapult { namespace observers {
 		}
 
 		BlockNotification CreateBlockNotification(const state::BlockStatistic& statistic) {
-			return BlockNotification(Key(), Key(), statistic.Timestamp, statistic.Difficulty, statistic.FeeMultiplier);
+			auto notification = test::CreateBlockNotification();
+			notification.Timestamp = statistic.Timestamp;
+			notification.Difficulty = statistic.Difficulty;
+			notification.FeeMultiplier = statistic.FeeMultiplier;
+			return notification;
 		}
 	}
 

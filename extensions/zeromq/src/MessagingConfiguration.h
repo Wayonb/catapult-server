@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,7 +20,7 @@
 **/
 
 #pragma once
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 
 namespace catapult { namespace utils { class ConfigurationBag; } }
 
@@ -28,6 +29,9 @@ namespace catapult { namespace zeromq {
 	/// Messaging configuration settings.
 	struct MessagingConfiguration {
 	public:
+		/// Network interface on which to listen.
+		std::string ListenInterface;
+
 		/// Subscriber port.
 		unsigned short SubscriberPort;
 
@@ -43,6 +47,6 @@ namespace catapult { namespace zeromq {
 		static MessagingConfiguration LoadFromBag(const utils::ConfigurationBag& bag);
 
 		/// Loads a messaging configuration from \a resourcesPath.
-		static MessagingConfiguration LoadFromPath(const boost::filesystem::path& resourcesPath);
+		static MessagingConfiguration LoadFromPath(const std::filesystem::path& resourcesPath);
 	};
 }}

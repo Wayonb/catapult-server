@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,19 +21,9 @@
 
 #pragma once
 #include "SecretLockInfoCacheTypes.h"
-#include "src/state/SecretLockInfoSerializer.h"
-#include "catapult/cache/CacheSerializerAdapter.h"
-#include "catapult/cache/IdentifierGroupSerializer.h"
+#include "src/state/SecretLockInfoHistorySerializer.h"
 
 namespace catapult { namespace cache {
 
-	/// Primary serializer for secret lock info cache.
-	struct SecretLockInfoPrimarySerializer
-			: public CacheSerializerAdapter<state::SecretLockInfoSerializer, SecretLockInfoCacheDescriptor>
-	{};
-
-	/// Serializer for secret lock info cache height grouped elements.
-	struct SecretLockHeightGroupingSerializer
-			: public IdentifierGroupSerializer<SecretLockInfoCacheTypes::HeightGroupingTypesDescriptor>
-	{};
+	DEFINE_LOCK_INFO_CACHE_SERIALIZERS(SecretLockInfo)
 }}

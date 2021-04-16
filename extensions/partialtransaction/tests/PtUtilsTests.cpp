@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,6 +21,7 @@
 
 #include "partialtransaction/src/PtUtils.h"
 #include "partialtransaction/tests/test/AggregateTransactionTestUtils.h"
+#include "tests/test/core/TransactionTestUtils.h"
 #include "tests/TestHarness.h"
 
 namespace catapult { namespace partialtransaction {
@@ -76,17 +78,13 @@ namespace catapult { namespace partialtransaction {
 			return capture;
 		}
 
-		model::Cosignature GenerateRandomCosignature() {
-			return { test::GenerateRandomByteArray<Key>(), test::GenerateRandomByteArray<Signature>() };
-		}
-
 		class TransactionGenerator {
 		public:
 			void addData(CosignedTransactionInfos& transactionInfos, size_t numCosignatures) {
 				model::CosignedTransactionInfo transactionInfo;
 				transactionInfo.pTransaction = test::CreateAggregateTransaction(1).pTransaction;
 				for (auto i = 0u; i < numCosignatures; ++i)
-					transactionInfo.Cosignatures.push_back(GenerateRandomCosignature());
+					transactionInfo.Cosignatures.push_back(test::CreateRandomDetachedCosignature());
 
 				transactionInfos.push_back(transactionInfo);
 				m_transactionInfos.push_back(transactionInfo);
@@ -115,7 +113,7 @@ namespace catapult { namespace partialtransaction {
 				model::CosignedTransactionInfo transactionInfo;
 				transactionInfo.EntityHash = test::GenerateRandomByteArray<Hash256>();
 				for (auto i = 0u; i < numCosignatures; ++i) {
-					auto cosignature = GenerateRandomCosignature();
+					auto cosignature = test::CreateRandomDetachedCosignature();
 					transactionInfo.Cosignatures.push_back(cosignature);
 					m_cosignatures.push_back(
 							model::DetachedCosignature(cosignature.SignerPublicKey, cosignature.Signature, transactionInfo.EntityHash));

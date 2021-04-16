@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,7 +23,6 @@
 #include "src/mappers/MosaicEntryMapper.h"
 #include "mongo/src/storages/MongoCacheStorage.h"
 #include "plugins/txes/mosaic/src/cache/MosaicCache.h"
-#include "catapult/model/Address.h"
 
 using namespace bsoncxx::builder::stream;
 
@@ -37,9 +37,8 @@ namespace catapult { namespace mongo { namespace plugins {
 				return mappers::ToInt64(key);
 			}
 
-			static auto MapToMongoDocument(const ModelType& mosaicEntry, model::NetworkIdentifier networkIdentifier) {
-				auto ownerAddress = model::PublicKeyToAddress(mosaicEntry.definition().ownerPublicKey(), networkIdentifier);
-				return plugins::ToDbModel(mosaicEntry, ownerAddress);
+			static auto MapToMongoDocument(const ModelType& mosaicEntry, model::NetworkIdentifier) {
+				return plugins::ToDbModel(mosaicEntry);
 			}
 		};
 	}

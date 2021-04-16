@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,6 +21,7 @@
 
 #include "Validators.h"
 #include "src/cache/MultisigCache.h"
+#include "catapult/model/Address.h"
 #include "catapult/validators/ValidatorContext.h"
 
 namespace catapult { namespace validators {
@@ -28,12 +30,10 @@ namespace catapult { namespace validators {
 
 	DEFINE_STATEFUL_VALIDATOR(MultisigPermittedOperation, [](const Notification& notification, const ValidatorContext& context) {
 		const auto& multisigCache = context.Cache.sub<cache::MultisigCache>();
-		if (!multisigCache.contains(notification.Signer))
-			return ValidationResult::Success;
+		auto multisigIter = multisigCache.find(notification.Sender);
 
-		auto multisigIter = multisigCache.find(notification.Signer);
-		return multisigIter.get().cosignatoryPublicKeys().empty()
+		return !multisigIter.tryGet() || multisigIter.get().cosignatoryAddresses().empty()
 				? ValidationResult::Success
 				: Failure_Multisig_Operation_Prohibited_By_Account;
-	});
+	})
 }}

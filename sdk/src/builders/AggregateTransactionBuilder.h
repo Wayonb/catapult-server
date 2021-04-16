@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,6 +22,7 @@
 #pragma once
 #include "TransactionBuilder.h"
 #include "plugins/txes/aggregate/src/model/AggregateTransaction.h"
+#include "catapult/crypto/KeyPair.h"
 #include <vector>
 
 namespace catapult { namespace builders {
@@ -52,9 +54,9 @@ namespace catapult { namespace builders {
 	class AggregateCosignatureAppender {
 	public:
 		/// Creates aggregate cosignature appender around aggregate transaction (\a pAggregateTransaction)
-		/// for the network with the specified generation hash (\a generationHash).
+		/// for the network with the specified generation hash seed (\a generationHashSeed).
 		AggregateCosignatureAppender(
-				const GenerationHash& generationHash,
+				const GenerationHashSeed& generationHashSeed,
 				std::unique_ptr<model::AggregateTransaction>&& pAggregateTransaction);
 
 	public:
@@ -65,7 +67,7 @@ namespace catapult { namespace builders {
 		std::unique_ptr<model::AggregateTransaction> build() const;
 
 	private:
-		GenerationHash m_generationHash;
+		GenerationHashSeed m_generationHashSeed;
 		std::unique_ptr<model::AggregateTransaction> m_pAggregateTransaction;
 		Hash256 m_transactionHash;
 		std::vector<model::Cosignature> m_cosignatures;

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -121,11 +122,11 @@ namespace catapult { namespace ionet {
 		transactionInfos.push_back(CreateRandomTransactionInfo());
 
 		// Act:
-		auto payload = CreateBroadcastPayload(transactionInfos, PacketType::Chain_Info);
+		auto payload = CreateBroadcastPayload(transactionInfos, PacketType::Chain_Statistics);
 
 		// Assert:
 		const auto& entity = *transactionInfos[0].pEntity;
-		test::AssertPacketHeader(payload, sizeof(PacketHeader) + entity.Size, PacketType::Chain_Info);
+		test::AssertPacketHeader(payload, sizeof(PacketHeader) + entity.Size, PacketType::Chain_Statistics);
 		ASSERT_EQ(1u, payload.buffers().size());
 
 		// - the buffer contains the correct data and points to the original entity
@@ -171,7 +172,7 @@ namespace catapult { namespace ionet {
 	TEST(TEST_CLASS, CanCreateBroadcastPayload_Cosignatures_Single) {
 		// Arrange:
 		std::vector<model::DetachedCosignature> cosignatures;
-		cosignatures.push_back(test::CreateRandomCosignature());
+		cosignatures.push_back(test::CreateRandomDetachedCosignature());
 
 		// Act:
 		auto payload = CreateBroadcastPayload(cosignatures);
@@ -184,7 +185,7 @@ namespace catapult { namespace ionet {
 		// Arrange:
 		std::vector<model::DetachedCosignature> cosignatures;
 		for (auto i = 0u; i < 5; ++i)
-			cosignatures.push_back(test::CreateRandomCosignature());
+			cosignatures.push_back(test::CreateRandomDetachedCosignature());
 
 		// Act:
 		auto payload = CreateBroadcastPayload(cosignatures);

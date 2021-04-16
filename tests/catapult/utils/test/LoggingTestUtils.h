@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,7 +22,18 @@
 #pragma once
 #include "catapult/utils/Logging.h"
 #include "tests/test/nodeps/Filesystem.h"
+
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4244) /* possible loss of data */
+#endif
+
 #include <boost/date_time.hpp>
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
 #include <map>
 #include <string>
 #include <vector>

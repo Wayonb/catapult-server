@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,12 +24,21 @@
 #include "catapult/types.h"
 
 namespace catapult {
-	namespace cache { class AccountStateCacheDelta; }
+	namespace cache {
+		class AccountStateCacheDelta;
+		class ReadOnlyAccountStateCache;
+	}
 	namespace state { struct AccountState; }
 }
 
 namespace catapult { namespace cache {
 
-	/// Forwards account state or linked account state found in \a cache associated with \a publicKey to \a action.
-	void ProcessForwardedAccountState(AccountStateCacheDelta& cache, const Key& publicKey, const consumer<state::AccountState&>& action);
+	/// Forwards account state or linked account state found in \a cache associated with \a address to \a action.
+	void ProcessForwardedAccountState(AccountStateCacheDelta& cache, const Address& address, const consumer<state::AccountState&>& action);
+
+	/// Forwards account state or linked account state found in \a cache associated with \a address to \a action.
+	void ProcessForwardedAccountState(
+			const ReadOnlyAccountStateCache& cache,
+			const Address& address,
+			const consumer<const state::AccountState&>& action);
 }}

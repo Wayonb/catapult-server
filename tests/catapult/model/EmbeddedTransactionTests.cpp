@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,6 +20,7 @@
 **/
 
 #include "catapult/model/EmbeddedTransaction.h"
+#include "catapult/model/Address.h"
 #include "catapult/preprocessor.h"
 #include "tests/test/core/mocks/MockNotificationSubscriber.h"
 #include "tests/test/core/mocks/MockTransaction.h"
@@ -37,7 +39,7 @@ namespace catapult { namespace model {
 		// Arrange:
 		auto expectedSize = sizeof(SizePrefixedEntity) + 2 * sizeof(uint32_t);
 
-#define FIELD(X) expectedSize += sizeof(EmbeddedTransaction::X);
+#define FIELD(X) expectedSize += SizeOf32<decltype(EmbeddedTransaction::X)>();
 		EMBEDDED_TRANSACTION_FIELDS
 #undef FIELD
 
@@ -76,6 +78,24 @@ namespace catapult { namespace model {
 
 	// endregion
 
+	// region GetSignerAddress
+
+	TEST(TEST_CLASS, GetSignerAddressCalculatesCorrectSignerAddress) {
+		// Arrange:
+		EmbeddedTransaction transaction;
+		test::FillWithRandomData(transaction.SignerPublicKey);
+		transaction.Network = static_cast<NetworkIdentifier>(test::RandomByte());
+
+		// Act:
+		auto signerAddress = GetSignerAddress(transaction);
+
+		// Assert:
+		auto expectedSignerAddress = PublicKeyToAddress(transaction.SignerPublicKey, transaction.Network);
+		EXPECT_EQ(expectedSignerAddress, signerAddress);
+	}
+
+	// endregion
+
 	// region IsSizeValid
 
 	namespace {
@@ -89,7 +109,7 @@ namespace catapult { namespace model {
 	TEST(TEST_CLASS, SizeIsInvalidForTransactionWithUnknownType) {
 		// Arrange:
 		EmbeddedTransaction transaction;
-		transaction.Type = static_cast<EntityType>(-1);
+		transaction.Type = static_cast<EntityType>(std::numeric_limits<uint16_t>::max());
 		transaction.Size = sizeof(EmbeddedTransaction);
 
 		// Act + Assert:
@@ -133,6 +153,26 @@ namespace catapult { namespace model {
 		auto pTransaction = CreateMockEmbeddedTransaction(1);
 
 		// Act + Assert:
+		EXPECT_FALSE(IsSizeValid(*pTransaction));
+	}
+
+	TEST(TEST_CLASS, SizeIsInvalidForTransactionWithReportedSizeLessThanHeaderSize) {
+		// Arrange:
+		std::vector<uint8_t> buffer(sizeof(SizePrefixedEntity));
+		auto* pTransaction = reinterpret_cast<EmbeddedTransaction*>(&buffer[0]);
+		pTransaction->Size = sizeof(SizePrefixedEntity);
+
+		// Act:
+		EXPECT_FALSE(IsSizeValid(*pTransaction));
+	}
+
+	TEST(TEST_CLASS, SizeIsInvalidForTransactionWithReportedSizeLessThanDerivedHeaderSize) {
+		// Arrange:
+		auto pTransaction = std::make_unique<EmbeddedTransaction>();
+		pTransaction->Type = mocks::MockTransaction::Entity_Type;
+		pTransaction->Size = sizeof(EmbeddedTransaction);
+
+		// Act:
 		EXPECT_FALSE(IsSizeValid(*pTransaction));
 	}
 

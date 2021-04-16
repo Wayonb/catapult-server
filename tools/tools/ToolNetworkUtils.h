@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,7 +20,6 @@
 **/
 
 #pragma once
-#include "catapult/crypto/KeyPair.h"
 #include "catapult/net/ConnectionSettings.h"
 #include "catapult/thread/Future.h"
 #include "catapult/types.h"
@@ -28,6 +28,7 @@ namespace catapult {
 	namespace ionet {
 		class Node;
 		class PacketIo;
+		class PacketSocketInfo;
 	}
 	namespace thread { class IoThreadPool; }
 }
@@ -37,27 +38,23 @@ namespace catapult { namespace tools {
 	/// Future that returns a packet io shared pointer.
 	using PacketIoFuture = thread::future<std::shared_ptr<ionet::PacketIo>>;
 
-	/// Connects to localhost as a client with \a clientKeyPair using \a pPool.
-	/// Localhost is expected to have identity \a serverPublicKey.
-	PacketIoFuture ConnectToLocalNode(
-			const crypto::KeyPair& clientKeyPair,
-			const Key& serverPublicKey,
-			const std::shared_ptr<thread::IoThreadPool>& pPool);
+	/// Future that returns a packet socket info.
+	using PacketSocketInfoFuture = thread::future<ionet::PacketSocketInfo>;
 
-	/// Connects to \a node as a client with \a clientKeyPair using \a pPool.
-	PacketIoFuture ConnectToNode(
-			const crypto::KeyPair& clientKeyPair,
-			const ionet::Node& node,
-			const std::shared_ptr<thread::IoThreadPool>& pPool);
+	/// Connects to \a node as a client with certificates in \a certificateDirectory using \a pool.
+	PacketIoFuture ConnectToNode(const std::string& certificateDirectory, const ionet::Node& node, thread::IoThreadPool& pool);
 
-	/// Creates tool connection settings.
-	net::ConnectionSettings CreateToolConnectionSettings();
+	/// Connects to \a node as a client with \a connectionSettings using \a pool.
+	PacketIoFuture ConnectToNode(const net::ConnectionSettings& connectionSettings, const ionet::Node& node, thread::IoThreadPool& pool);
+
+	/// Creates tool connection settings around certificates in \a certificateDirectory.
+	net::ConnectionSettings CreateToolConnectionSettings(const std::string& certificateDirectory);
 
 	/// Helper class for connecting to multiple nodes.
 	class MultiNodeConnector {
 	public:
-		/// Creates a connector around \a clientKeyPair.
-		explicit MultiNodeConnector(crypto::KeyPair&& clientKeyPair);
+		/// Creates a connector around certificates in \a certificateDirectory.
+		explicit MultiNodeConnector(const std::string& certificateDirectory);
 
 		/// Destroys the connector.
 		~MultiNodeConnector();
@@ -68,10 +65,10 @@ namespace catapult { namespace tools {
 
 	public:
 		/// Connects to \a node.
-		PacketIoFuture connect(const ionet::Node& node);
+		PacketSocketInfoFuture connect(const ionet::Node& node);
 
 	private:
-		crypto::KeyPair m_clientKeyPair;
-		std::shared_ptr<thread::IoThreadPool> m_pPool;
+		std::string m_certificateDirectory;
+		std::unique_ptr<thread::IoThreadPool> m_pPool;
 	};
 }}

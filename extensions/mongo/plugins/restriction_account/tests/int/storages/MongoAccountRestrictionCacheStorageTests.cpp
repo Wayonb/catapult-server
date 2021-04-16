@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -46,6 +47,7 @@ namespace catapult { namespace mongo { namespace plugins {
 			using ModelType = state::AccountRestrictions;
 
 			static constexpr auto Collection_Name = "accountRestrictions";
+			static constexpr auto Primary_Document_Name = "accountRestrictions";
 			static constexpr auto Network_Id = static_cast<model::NetworkIdentifier>(0x5A);
 			static constexpr auto CreateCacheStorage = CreateMongoAccountRestrictionCacheStorage;
 
@@ -88,11 +90,13 @@ namespace catapult { namespace mongo { namespace plugins {
 			}
 
 			static auto GetFindFilter(const ModelType& restrictions) {
-				return document() << "accountRestrictions.address" << mappers::ToBinary(restrictions.address()) << finalize;
+				return document()
+						<< std::string(Primary_Document_Name) + ".address" << mappers::ToBinary(restrictions.address())
+						<< finalize;
 			}
 
 			static void AssertEqual(const ModelType& restrictions, const bsoncxx::document::view& view) {
-				test::AssertEqualAccountRestrictionsData(restrictions, view["accountRestrictions"].get_document().view());
+				test::AssertEqualAccountRestrictionsData(restrictions, view[Primary_Document_Name].get_document().view());
 			}
 		};
 	}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -75,7 +76,7 @@ namespace catapult { namespace cache {
 	TEST(TEST_CLASS, CanInitializeBasicDatabase) {
 		// Arrange:
 		test::TempDirectoryGuard dbDirGuard;
-		CacheConfiguration config(dbDirGuard.name(), utils::FileSize(), PatriciaTreeStorageMode::Disabled);
+		CacheConfiguration config(dbDirGuard.name(), PatriciaTreeStorageMode::Disabled);
 
 		// Act:
 		ConcreteCacheDatabaseMixin mixin(config, { "default", "foo", "bar" });
@@ -92,7 +93,7 @@ namespace catapult { namespace cache {
 	TEST(TEST_CLASS, CanInitializeDatabaseWithPruning) {
 		// Arrange:
 		test::TempDirectoryGuard dbDirGuard;
-		CacheConfiguration config(dbDirGuard.name(), utils::FileSize(), PatriciaTreeStorageMode::Disabled);
+		CacheConfiguration config(dbDirGuard.name(), PatriciaTreeStorageMode::Disabled);
 
 		// Act:
 		ConcreteCacheDatabaseMixin mixin(config, { "default", "foo", "bar" }, FilterPruningMode::Enabled);
@@ -109,7 +110,7 @@ namespace catapult { namespace cache {
 	TEST(TEST_CLASS, CanInitializeDatabaseWithPatriciaTreeSupport) {
 		// Arrange:
 		test::TempDirectoryGuard dbDirGuard;
-		CacheConfiguration config(dbDirGuard.name(), utils::FileSize(), PatriciaTreeStorageMode::Enabled);
+		CacheConfiguration config(dbDirGuard.name(), PatriciaTreeStorageMode::Enabled);
 
 		// Act:
 		ConcreteCacheDatabaseMixin mixin(config, { "default", "foo", "bar" });
@@ -134,8 +135,11 @@ namespace catapult { namespace cache {
 
 	TEST(TEST_CLASS, CanFlushWhenCacheDatabaseIsEnabled) {
 		// Arrange: create mixin with non-zero batch-size
+		auto cacheDatabaseConfig = config::NodeConfiguration::CacheDatabaseSubConfiguration();
+		cacheDatabaseConfig.MaxWriteBatchSize = utils::FileSize::FromKilobytes(100);
+
 		test::TempDirectoryGuard dbDirGuard;
-		CacheConfiguration config(dbDirGuard.name(), utils::FileSize::FromKilobytes(100), PatriciaTreeStorageMode::Disabled);
+		CacheConfiguration config(dbDirGuard.name(), cacheDatabaseConfig, PatriciaTreeStorageMode::Disabled);
 		ConcreteCacheDatabaseMixin mixin(config, { "default", "foo", "bar" });
 
 		// Act + Assert:

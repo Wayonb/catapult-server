@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,7 +20,7 @@
 **/
 
 #pragma once
-#define CATAPULT_VERSION_MAJOR 0
-#define CATAPULT_VERSION_MINOR 9
-#define CATAPULT_VERSION_REVISION 1
-#define CATAPULT_VERSION_BUILD 1
+#define CATAPULT_VERSION_MAJOR 1
+#define CATAPULT_VERSION_MINOR 0
+#define CATAPULT_VERSION_REVISION 0
+#define CATAPULT_VERSION_BUILD 0

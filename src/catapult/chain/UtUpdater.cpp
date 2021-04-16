@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -41,6 +42,27 @@ namespace catapult { namespace chain {
 			cache::UtCacheModifierProxy& Modifier;
 			cache::CatapultCacheDelta& UnconfirmedCatapultCache;
 		};
+
+		class TransactionInfoFormatter {
+		public:
+			explicit TransactionInfoFormatter(const model::TransactionInfo& transactionInfo) : m_transactionInfo(transactionInfo)
+			{}
+
+		public:
+			friend std::ostream& operator<<(std::ostream& out, const TransactionInfoFormatter& formatter) {
+				const auto& transaction = *formatter.m_transactionInfo.pEntity;
+				out
+						<< "{ EntityHash " << formatter.m_transactionInfo.EntityHash
+						<< ", Type " << transaction.Type
+						<< ", Version " << static_cast<uint16_t>(transaction.Version)
+						<< ", SignerPublicKey " << transaction.SignerPublicKey
+						<< " }";
+				return out;
+			}
+
+		private:
+			const model::TransactionInfo& m_transactionInfo;
+		};
 	}
 
 	class UtUpdater::Impl final {
@@ -63,7 +85,7 @@ namespace catapult { namespace chain {
 		{}
 
 	public:
-		void update(const std::vector<model::TransactionInfo>& utInfos) {
+		std::vector<UtUpdateResult> update(const std::vector<model::TransactionInfo>& utInfos) {
 			// 1. lock the UT cache and lock the unconfirmed copy
 			auto modifier = m_transactionsCache.modifier();
 			auto pUnconfirmedCatapultCache = m_detachedCatapultCache.getAndTryLock();
@@ -71,11 +93,17 @@ namespace catapult { namespace chain {
 				// if there is no unconfirmed cache state, it means that a block update is forthcoming
 				// just add all to the cache and they will be validated later
 				addAll(modifier, utInfos);
-				return;
+
+				std::vector<UtUpdateResult> updateResults;
+				updateResults.reserve(utInfos.size());
+				for (auto i = 0u; i < utInfos.size(); ++i)
+					updateResults.push_back({ UtUpdateResult::UpdateType::Neutral });
+
+				return updateResults;
 			}
 
 			auto applyState = ApplyState(modifier, *pUnconfirmedCatapultCache);
-			apply(applyState, utInfos, TransactionSource::New);
+			return apply(applyState, utInfos, TransactionSource::New);
 		}
 
 		void update(const utils::HashPointerSet& confirmedTransactionHashes, const std::vector<model::TransactionInfo>& utInfos) {
@@ -104,15 +132,21 @@ namespace catapult { namespace chain {
 		}
 
 	private:
-		void apply(const ApplyState& applyState, const std::vector<model::TransactionInfo>& utInfos, TransactionSource transactionSource) {
-			apply(applyState, utInfos, transactionSource, [](const auto&) { return true; });
+		std::vector<UtUpdateResult> apply(
+				const ApplyState& applyState,
+				const std::vector<model::TransactionInfo>& utInfos,
+				TransactionSource transactionSource) {
+			return apply(applyState, utInfos, transactionSource, [](const auto&) { return true; });
 		}
 
-		void apply(
+		std::vector<UtUpdateResult> apply(
 				const ApplyState& applyState,
 				const std::vector<model::TransactionInfo>& utInfos,
 				TransactionSource transactionSource,
 				const predicate<const model::TransactionInfo&>& filter) {
+			std::vector<UtUpdateResult> updateResults;
+			updateResults.reserve(utInfos.size());
+
 			// note that the validator and observer context height is one larger than the chain height
 			// since the validation and observation has to be for the *next* block
 			auto effectiveHeight = m_detachedCatapultCache.height() + Height(1);
@@ -121,33 +155,40 @@ namespace catapult { namespace chain {
 			auto validatorContext = contextBuilder.buildValidatorContext();
 			auto observerContext = contextBuilder.buildObserverContext();
 
+			size_t numRejectedTransactions = 0;
 			for (const auto& utInfo : utInfos) {
 				const auto& entity = *utInfo.pEntity;
 				const auto& entityHash = utInfo.EntityHash;
 
-				if (!filter(utInfo))
+				if (!filter(utInfo)) {
+					updateResults.push_back({ UtUpdateResult::UpdateType::Neutral });
 					continue;
+				}
 
 				auto minTransactionFee = model::CalculateTransactionFee(m_minFeeMultiplier, entity);
 				if (entity.MaxFee < minTransactionFee) {
 					// don't log reverted transactions that could have been included by harvester with lower min fee multiplier
 					if (TransactionSource::New == transactionSource) {
 						CATAPULT_LOG(debug)
-								<< "dropping transaction " << entityHash << " with max fee " << entity.MaxFee
+								<< "dropping transaction " << TransactionInfoFormatter(utInfo) << " with max fee " << entity.MaxFee
 								<< " because min fee is " << minTransactionFee;
 					}
 
+					updateResults.push_back({ UtUpdateResult::UpdateType::Neutral });
 					continue;
 				}
 
 				if (throttle(utInfo, transactionSource, applyState, validatorContext.Cache)) {
-					CATAPULT_LOG(warning) << "dropping transaction " << entityHash << " due to throttle";
+					CATAPULT_LOG(warning) << "dropping transaction " << TransactionInfoFormatter(utInfo) << " due to throttle";
 					m_failedTransactionSink(entity, entityHash, Failure_Chain_Unconfirmed_Cache_Too_Full);
+					updateResults.push_back({ UtUpdateResult::UpdateType::Neutral });
 					continue;
 				}
 
-				if (!applyState.Modifier.add(utInfo))
+				if (!applyState.Modifier.add(utInfo)) {
+					updateResults.push_back({ UtUpdateResult::UpdateType::Neutral });
 					continue;
+				}
 
 				// notice that subscriber is created within loop because aggregate result needs to be reset each iteration
 				const auto& validator = *m_executionConfig.pValidator;
@@ -157,8 +198,8 @@ namespace catapult { namespace chain {
 				auto entityInfo = model::WeakEntityInfo(entity, entityHash);
 				m_executionConfig.pNotificationPublisher->publish(entityInfo, sub);
 				if (!IsValidationResultSuccess(sub.result())) {
-					CATAPULT_LOG_LEVEL(validators::MapToLogLevel(sub.result()))
-							<< "dropping transaction " << entityHash << ": " << sub.result();
+					CATAPULT_LOG(trace) << "dropping transaction " << TransactionInfoFormatter(utInfo) << ": " << sub.result();
+					++numRejectedTransactions;
 
 					// only forward failure (not neutral) results
 					if (IsValidationResultFailure(sub.result()))
@@ -166,9 +207,17 @@ namespace catapult { namespace chain {
 
 					sub.undo();
 					applyState.Modifier.remove(entityHash);
+					updateResults.push_back({ UtUpdateResult::UpdateType::Invalid });
 					continue;
 				}
+
+				updateResults.push_back({ UtUpdateResult::UpdateType::New });
 			}
+
+			if (numRejectedTransactions > 0)
+				CATAPULT_LOG(warning) << "apply dropped " << numRejectedTransactions << " transactions";
+
+			return updateResults;
 		}
 
 		bool throttle(
@@ -214,8 +263,8 @@ namespace catapult { namespace chain {
 
 	UtUpdater::~UtUpdater() = default;
 
-	void UtUpdater::update(const std::vector<model::TransactionInfo>& utInfos) {
-		m_pImpl->update(utInfos);
+	std::vector<UtUpdateResult> UtUpdater::update(const std::vector<model::TransactionInfo>& utInfos) {
+		return m_pImpl->update(utInfos);
 	}
 
 	void UtUpdater::update(const utils::HashPointerSet& confirmedTransactionHashes, const std::vector<model::TransactionInfo>& utInfos) {

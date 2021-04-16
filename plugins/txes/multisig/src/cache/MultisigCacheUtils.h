@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,15 +21,15 @@
 
 #pragma once
 #include "MultisigCacheTypes.h"
-#include "catapult/utils/ArraySet.h"
+#include "catapult/model/ContainerTypes.h"
 
 namespace catapult { namespace cache {
 
-	/// Finds all ancestors of \a key in \a cache, adds them to \a ancestorKeys and returns the maximum distance between
-	/// \a key and any ancestor.
-	size_t FindAncestors(const MultisigCacheTypes::CacheReadOnlyType& cache, const Key& key, utils::KeySet& ancestorKeys);
+	/// Finds all ancestors of \a address in \a cache, adds them to \a ancestors and returns the maximum distance between
+	/// \a address and any ancestor.
+	size_t FindAncestors(const MultisigCacheTypes::CacheReadOnlyType& cache, const Address& address, model::AddressSet& ancestors);
 
-	/// Finds all descendants of \a key in \a cache, adds them to \a descendantKeys and returns the maximum distance between
-	/// \a key and any descendant.
-	size_t FindDescendants(const MultisigCacheTypes::CacheReadOnlyType& cache, const Key& key, utils::KeySet& descendantKeys);
+	/// Finds all descendants of \a address in \a cache, adds them to \a descendants and returns the maximum distance between
+	/// \a address and any descendant.
+	size_t FindDescendants(const MultisigCacheTypes::CacheReadOnlyType& cache, const Address& address, model::AddressSet& descendants);
 }}

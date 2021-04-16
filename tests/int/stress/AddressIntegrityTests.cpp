@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -18,72 +19,53 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#include "catapult/crypto/KeyGenerator.h"
 #include "catapult/model/Address.h"
-#include "catapult/model/NetworkInfo.h"
+#include "catapult/model/NetworkIdentifier.h"
 #include "catapult/utils/HexFormatter.h"
 #include "tests/test/nodeps/KeyTestUtils.h"
-#include "tests/test/nodeps/MijinConstants.h"
+#include "tests/test/nodeps/TestNetworkConstants.h"
 #include "tests/TestHarness.h"
 
 namespace catapult {
 
 #define TEST_CLASS AddressIntegrityTests
 
-	TEST(TEST_CLASS, CanFindAddressStartingWithMA) {
+	TEST(TEST_CLASS, CanFindAddressStartingWithPA) {
 		// Arrange:
 		for (auto i = 0u; i < 1000; ++i) {
 			auto kp = test::GenerateKeyPair();
-			auto rawAddress = model::PublicKeyToAddress(kp.publicKey(), model::NetworkIdentifier::Mijin);
+			auto rawAddress = model::PublicKeyToAddress(kp.publicKey(), model::NetworkIdentifier::Private);
 			auto address = model::AddressToString(rawAddress);
-			if (address[0] == 'M' && address[1] == 'A')
+			if (address[0] == 'P' && address[1] == 'A')
 				return;
 		}
 
-		FAIL() << "could not generate MA* address";
+		FAIL() << "could not generate PA* address";
 	}
 
 	namespace {
-		struct MijinTestNetworkTraits {
-			static constexpr auto Network_Identifier = model::NetworkIdentifier::Mijin_Test;
-			static constexpr auto Nemesis_Private_Key = test::Mijin_Test_Nemesis_Private_Key;
-#ifdef SIGNATURE_SCHEME_KECCAK
-			static constexpr auto Expected_Nemesis_Address = "SAPO6C4QJBWWFZAZAKH55IDCIDEQX6AVRFV5M7Q3";
-#else
-			static constexpr auto Expected_Nemesis_Address = "SARNASAS2BIAB6LMFA3FPMGBPGIJGK6IJETM3ZSP";
-#endif
+		struct PrivateTestNetworkTraits {
+			static constexpr auto Network_Identifier = model::NetworkIdentifier::Private_Test;
+			static constexpr auto Nemesis_Private_Key = test::Test_Network_Nemesis_Private_Key;
+			static constexpr auto Expected_Nemesis_Address = "VARNAMOK7M4ZHNL75ZNNYC6UAM5EGH57UGHVZIA";
 
 			static std::vector<const char*> PrivateKeys() {
-				return std::vector<const char*>(&test::Mijin_Test_Private_Keys[0], &test::Mijin_Test_Private_Keys[11]);
+				return std::vector<const char*>(&test::Test_Network_Private_Keys[0], &test::Test_Network_Private_Keys[11]);
 			}
 
 			static std::vector<std::string> ExpectedAddresses() {
 				return {
-#ifdef SIGNATURE_SCHEME_KECCAK
-					"SCKPJHW4DQEQE6ALBRPUXL7CCOEYC6KRSTM27AXP",
-					"SDOFLGBMIJDJSIGSPDIXDMHUGL32RYCRSBQOHPP4",
-					"SBFLOD5YUZPAU7TVWKCHHOBGNX7C7IXJY37I3R6M",
-					"SBTSWV7IMBFZPR4ZHIKVVE7NTIJGGVZNX36J2VD2",
-					"SBDN4JD3NKFYNMJ6TLZYHSZNMQMOJI6556CIQ3QO",
-					"SD75TQ4OEKUVSJYSMH4JO3PJFIZNOZAVJHY3FFD5",
-					"SBGPI2WK76YU5IUXH6BIYGNRVQR25FYQRZ42QRUD",
-					"SDOGWQZAZH6QTPNKOU562HJRAOPJ3PBYQ65NY2BM",
-					"SDPRTL47A7Z55KIBJMLV7UK2BPA66UJTCYRCKW3J",
-					"SBKII3BJITHFOSZWZA6EKSSINLPW7SI6OF5FFZKE",
-					"SCR3NI7J3FNPY3KFUTXMDFL23DNF23BGTMTZLWCI"
-#else
-					"SAAA244WMCB2JXGNQTQHQOS45TGBFF4V2MJBVOUI",
-					"SAAA34PEDKJHKIHGVXV3BSKBSQPPQDDMO2ATWMY3",
-					"SAAA467G4ZDNOEGLNXLGWUAXZKC6VAES74J7N34D",
-					"SAAA57DREOPYKUFX4OG7IQXKITMBWKD6KXTVBBQP",
-					"SAAA66EEZKK3HGBRV57E6TOK335NK22BF2KGOEDS",
-					"SAAAIBC7AM65HOFDLYGFUT46H44TROZ7MUWCW6MZ",
-					"SAAAJ5BYWZI5J3ASQEKCUV6JSPKIVYBCIAKS4ECB",
-					"SAAAK7HILTOL6YHC3HXQTGACIWIJKD65CMGK7B5W",
-					"SAAAL4JPUQLKCWRRWMXQT3T2F3GMHIG4RUKQB24N",
-					"SAAAMZYSPE5TRAVH7I3VSF7ZD542EVDLB7JT7Z4K",
-					"SAAAZY5C3L6ONXRAPH2WYAPC3FKYFIPBBPFMLAS4"
-#endif
+					"VAAA26Z5QXYHDIVO2EYSEF7BUMC7FYQPBSWEMGQ",
+					"VAAA3ZE57CKRZY762QG4OG3RMM2EEAN6SIGNQ7Y",
+					"VAAA4RUOJ2RBEKWYOZHSMZWTDGHMCRDUCPOEXKY",
+					"VAAA6NI72BJ4FEE24JNVTSQRZHXGZCZCJ7BKOBQ",
+					"VAAA7O53WQULXNOK2GTP7QURX7RKPRDNF4SBYXQ",
+					"VAAAC7XL2E6XC2NCSXI4C6MG7HWZGE47WEVZQOA",
+					"VAAADPWJ27OZVPSPMWCX5QQWWC47IF6KUFEWPEQ",
+					"VAAAEBW5QTJAYLWOYUZDJO7BJIZCIFRP3FWJKAY",
+					"VAAAFAXT2EHGLAOXOR6I3JXR27ED7Q3LEFUDUYA",
+					"VAAAG6WJ6IHREIOJN4U5H6GV5HAQLWU7SMXJYSY",
+					"VAAAHTKTAW4NLGLXU7U2ZWP5LWQ4Y7DGYVDIIJA"
 				};
 			}
 		};
@@ -97,7 +79,7 @@ namespace catapult {
 
 #define TRAITS_BASED_TEST(TEST_NAME) \
 	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)(); \
-	TEST(TEST_CLASS, TEST_NAME##_Mijin_Test) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<MijinTestNetworkTraits>(); } \
+	TEST(TEST_CLASS, TEST_NAME##_Private_Test) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<PrivateTestNetworkTraits>(); } \
 	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)()
 
 	TRAITS_BASED_TEST(NemesisKeyProducesExpectedAddress) {

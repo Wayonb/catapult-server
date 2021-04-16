@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,16 +24,19 @@
 #include "catapult/chain/BlockDifficultyScorer.h"
 #include "catapult/chain/BlockScorer.h"
 #include "catapult/io/FileBlockStorage.h"
+#include "catapult/model/Address.h"
+#include "catapult/model/EntityHasher.h"
 #include "catapult/preprocessor.h"
 #include "tests/test/core/BlockTestUtils.h"
 #include "tests/test/local/LocalTestUtils.h"
-#include "tests/test/nodeps/MijinConstants.h"
 #include "tests/test/nodeps/Nemesis.h"
+#include "tests/test/nodeps/TestConstants.h"
+#include "tests/test/nodeps/TestNetworkConstants.h"
 
 namespace catapult { namespace test {
 
 	namespace {
-		constexpr auto Network_Identifier = model::NetworkIdentifier::Mijin_Test;
+		constexpr auto Network_Identifier = model::NetworkIdentifier::Private_Test;
 	}
 
 	BlockChainBuilder::BlockChainBuilder(const Accounts& accounts, StateHashCalculator& stateHashCalculator)
@@ -79,10 +83,11 @@ namespace catapult { namespace test {
 			m_pNemesisBlock = storage.loadBlock(Height(1));
 		} else {
 			CATAPULT_LOG(debug) << "initializing BlockChainBuilder from resources path: " << resourcesPath;
-			io::FileBlockStorage storage(resourcesPath);
+			io::FileBlockStorage storage(resourcesPath, File_Database_Batch_Size);
 			m_pParentBlockElement = storage.loadBlockElement(Height(1));
 		}
 
+		m_previousImportanceBlockHash = m_pParentBlockElement->EntityHash;
 		m_pStateHashCalculator->execute(m_pParentBlockElement->Block);
 	}
 
@@ -104,15 +109,17 @@ namespace catapult { namespace test {
 		builder.m_pTailBlockElement = m_pTailBlockElement;
 		builder.m_pParentBlockElement = m_pTailBlockElement;
 		builder.m_statistics = m_statistics;
+		builder.m_previousImportanceBlockHash = m_previousImportanceBlockHash;
 		return builder;
 	}
 
 	BlockChainBuilder BlockChainBuilder::createChainedBuilder(StateHashCalculator& stateHashCalculator, const model::Block& block) const {
 		// resources directory is not used when creating chained builder
 		auto builder = BlockChainBuilder(*m_pAccounts, stateHashCalculator, m_config, "", true);
-		builder.m_pTailBlockElement = ToSharedBlockElement(m_pTailBlockElement->GenerationHash, block);
+		builder.m_pTailBlockElement = ToSharedBlockElement(block);
 		builder.m_pParentBlockElement = builder.m_pTailBlockElement;
 		builder.m_statistics = m_statistics;
+		builder.m_previousImportanceBlockHash = m_previousImportanceBlockHash;
 		return builder;
 	}
 
@@ -126,7 +133,7 @@ namespace catapult { namespace test {
 			transactions.push_back(transactionsGenerator.generateAt(i, blockTimestamp));
 
 		auto pBlock = createBlock(context, blockTimestamp, transactions);
-		m_pTailBlockElement = ToSharedBlockElement(context.GenerationHash, *pBlock);
+		m_pTailBlockElement = ToSharedBlockElement(*pBlock);
 		m_pParentBlockElement = m_pTailBlockElement;
 		return pBlock;
 	}
@@ -139,7 +146,7 @@ namespace catapult { namespace test {
 
 			auto blockTimestamp = context.Timestamp + m_blockTimeInterval;
 			auto pBlock = createBlock(context, blockTimestamp, { transactionsGenerator.generateAt(i, blockTimestamp) });
-			m_pParentBlockElement = ToSharedBlockElement(context.GenerationHash, *pBlock);
+			m_pParentBlockElement = ToSharedBlockElement(*pBlock);
 			blocks.push_back(std::move(pBlock));
 		}
 
@@ -160,15 +167,35 @@ namespace catapult { namespace test {
 			const model::Transactions& transactions) {
 		auto difficulty = chain::CalculateDifficulty(cache::BlockStatisticRange(m_statistics.cbegin(), m_statistics.cend()), m_config);
 
-		auto signer = findBlockSigner(context, timestamp, difficulty);
-		auto pBlock = model::CreateBlock(context, Network_Identifier, signer.publicKey(), transactions);
+		auto entityType = model::CalculateBlockTypeFromHeight(context.BlockHeight + Height(1), m_config.ImportanceGrouping);
+		auto signerKeyPair = findBlockSigner(context, timestamp, difficulty);
+		auto pBlock = model::CreateBlock(entityType, context, Network_Identifier, signerKeyPair.publicKey(), transactions);
 		pBlock->Timestamp = timestamp;
 		pBlock->Difficulty = difficulty;
-		pBlock->BeneficiaryPublicKey = Key{ { 1 } }; // burn beneficiary allotment so that it doesn't cause state changes
+
+		// beneficiary must be a fixed low value account so that block rollback and reapply tests do not change AccountStateCache
+		// by changing an account's beneficiary count
+		pBlock->BeneficiaryAddress = model::PublicKeyToAddress({ { 1 } }, Network_Identifier);
 
 		pBlock->ReceiptsHash = m_blockReceiptsHashCalculator(*pBlock);
 		m_pStateHashCalculator->updateStateHash(*pBlock);
-		extensions::BlockExtensions(GetNemesisGenerationHash()).signFullBlock(signer, *pBlock);
+
+		auto vrfKeyPair = LookupVrfKeyPair(signerKeyPair.publicKey());
+		auto vrfProof = crypto::GenerateVrfProof(context.GenerationHash, vrfKeyPair);
+		pBlock->GenerationHashProof = { vrfProof.Gamma, vrfProof.VerificationHash, vrfProof.Scalar };
+
+		auto isImportanceBlock = model::Entity_Type_Block_Importance == entityType;
+		if (isImportanceBlock) {
+			auto& blockFooter = model::GetBlockFooter<model::ImportanceBlockFooter>(*pBlock);
+			blockFooter.HarvestingEligibleAccountsCount = CountOf(Test_Network_Vrf_Private_Keys);
+			blockFooter.PreviousImportanceBlockHash = m_previousImportanceBlockHash;
+		}
+
+		extensions::BlockExtensions(GetNemesisGenerationHashSeed()).signFullBlock(signerKeyPair, *pBlock);
+
+		if (isImportanceBlock)
+			m_previousImportanceBlockHash = model::CalculateHash(*pBlock);
+
 		return pBlock;
 	}
 
@@ -182,32 +209,30 @@ namespace catapult { namespace test {
 		});
 
 		auto i = 0u;
-		for (const auto* pPrivateKeyString : Mijin_Test_Private_Keys) {
+		for (const auto* pPrivateKeyString : Test_Network_Private_Keys) {
 			// skip first test account because it is used to fund other accounts
 			if (0u == i++)
 				continue;
 
-			auto keyPair = crypto::KeyPair::FromString(pPrivateKeyString);
+			auto signerKeyPair = crypto::KeyPair::FromString(pPrivateKeyString);
+			auto vrfKeyPair = LookupVrfKeyPair(signerKeyPair.publicKey());
+			auto vrfProof = crypto::GenerateVrfProof(context.GenerationHash, vrfKeyPair);
 
 			chain::BlockHitContext blockHitContext;
-			blockHitContext.GenerationHash = model::CalculateGenerationHash(context.GenerationHash, keyPair.publicKey());
+			blockHitContext.GenerationHash = model::CalculateGenerationHash(vrfProof.Gamma);
 			blockHitContext.ElapsedTime = utils::TimeSpan::FromDifference(timestamp, context.Timestamp);
-			blockHitContext.Signer = keyPair.publicKey();
+			blockHitContext.Signer = signerKeyPair.publicKey();
 			blockHitContext.Difficulty = difficulty;
 			blockHitContext.Height = context.BlockHeight + Height(1);
 
 			if (hitPredicate(blockHitContext))
-				return keyPair;
+				return signerKeyPair;
 		}
 
 		CATAPULT_THROW_RUNTIME_ERROR("no eligible harvesting accounts were found");
 	}
 
-	std::shared_ptr<const model::BlockElement> BlockChainBuilder::ToSharedBlockElement(
-			const GenerationHash& parentGenerationHash,
-			const model::Block& block) {
-		auto pBlockElement = std::make_shared<model::BlockElement>(BlockToBlockElement(block, GetNemesisGenerationHash()));
-		pBlockElement->GenerationHash = model::CalculateGenerationHash(parentGenerationHash, block.SignerPublicKey);
-		return PORTABLE_MOVE(pBlockElement);
+	std::shared_ptr<const model::BlockElement> BlockChainBuilder::ToSharedBlockElement(const model::Block& block) {
+		return std::make_shared<model::BlockElement>(BlockToBlockElement(block, GenerationHashSeed()));
 	}
 }}

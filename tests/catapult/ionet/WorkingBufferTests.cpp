@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -26,7 +27,7 @@ namespace catapult { namespace ionet {
 #define TEST_CLASS WorkingBufferTests
 
 	namespace {
-		constexpr size_t Default_Capacity = 4 * 1024;
+		constexpr uint32_t Default_Capacity = 4 * 1024;
 
 		WorkingBuffer CreateWorkingBuffer(size_t sensitivity = 10) {
 			PacketSocketOptions options;
@@ -71,6 +72,38 @@ namespace catapult { namespace ionet {
 		// Assert:
 		EXPECT_EQ(0u, buffer.size());
 		EXPECT_EQ(2345u, buffer.capacity());
+	}
+
+	// endregion
+
+	// region append
+
+	TEST(TEST_CLASS, AppendCanAppendSingleByteToWorkingBuffer) {
+		// Arrange:
+		auto buffer = CreateWorkingBuffer();
+
+		// Act:
+		buffer.append(0x4E);
+
+		// Assert:
+		EXPECT_EQ(1u, buffer.size());
+		EXPECT_EQ(Default_Capacity, buffer.capacity());
+		AssertEqual(std::vector<uint8_t>{ 0x4E }, buffer);
+	}
+
+	TEST(TEST_CLASS, AppendCanAppendMultipleBytesToWorkingBuffer) {
+		// Arrange:
+		auto buffer = CreateWorkingBuffer();
+
+		// Act:
+		buffer.append(0x4E);
+		buffer.append(0x45);
+		buffer.append(0x4D);
+
+		// Assert:
+		EXPECT_EQ(3u, buffer.size());
+		EXPECT_EQ(Default_Capacity, buffer.capacity());
+		AssertEqual(std::vector<uint8_t>{ 0x4E, 0x45, 0x4D }, buffer);
 	}
 
 	// endregion

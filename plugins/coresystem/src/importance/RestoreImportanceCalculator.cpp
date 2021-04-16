@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -26,20 +27,29 @@ namespace catapult { namespace importance {
 	namespace {
 		class RestoreImportanceCalculator final : public ImportanceCalculator {
 		public:
-			void recalculate(model::ImportanceHeight importanceHeight, cache::AccountStateCacheDelta& cache) const override {
-				auto highValueAddresses = cache.highValueAddresses().Current;
-				for (const auto& address : highValueAddresses) {
-					auto accountStateIter = cache.find(address);
-					auto& accountState = accountStateIter.get();
-					if (importanceHeight < accountState.ImportanceSnapshots.height())
-						accountState.ImportanceSnapshots.pop();
+			void recalculate(
+					ImportanceRollbackMode,
+					model::ImportanceHeight importanceHeight,
+					cache::AccountStateCacheDelta& cache) const override {
+				const auto& highValueAccounts = cache.highValueAccounts();
 
-					auto& buckets = accountState.ActivityBuckets;
-					if (buckets.end() != buckets.begin() && importanceHeight <= buckets.begin()->StartHeight)
-						buckets.pop();
-				}
+				PopAll(cache, highValueAccounts.addresses());
+				PopAll(cache, highValueAccounts.removedAddresses());
 
 				CATAPULT_LOG(debug) << "restored importances at height " << importanceHeight;
+			}
+
+		private:
+			static void PopAll(cache::AccountStateCacheDelta& cache, const model::AddressSet& addresses) {
+				for (const auto& address : addresses) {
+					auto accountStateIter = cache.find(address);
+					if (!accountStateIter.tryGet())
+						continue;
+
+					auto& accountState = accountStateIter.get();
+					accountState.ImportanceSnapshots.pop();
+					accountState.ActivityBuckets.pop();
+				}
 			}
 		};
 	}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -46,6 +47,8 @@ namespace catapult { namespace mongo {
 		// region test utils
 
 		constexpr uint64_t Multiple_Blocks_Count = 10;
+		constexpr uint64_t Default_Transactions_Per_Block = 9;
+		constexpr uint32_t Max_Drop_Batch_Size = 3;
 
 		struct BlockElementCounts {
 			size_t NumTransactions = 0;
@@ -79,7 +82,7 @@ namespace catapult { namespace mongo {
 					test::DbInitializationType::None,
 					errorPolicyMode,
 					[&receiptRegistry](auto& context, const auto& transactionRegistry) {
-						return mongo::CreateMongoBlockStorage(context, transactionRegistry, receiptRegistry);
+						return mongo::CreateMongoBlockStorage(context, Max_Drop_Batch_Size, transactionRegistry, receiptRegistry);
 					});
 
 			return decltype(pBlockStorage)(pBlockStorage.get(), [pMongoReceiptRegistry, pBlockStorage](const auto*) {});
@@ -196,7 +199,7 @@ namespace catapult { namespace mongo {
 
 		// region block element
 
-		void AssertEqual(const model::BlockElement& expectedElement) {
+		void AssertEqual(const model::BlockElement& expectedElement, uint32_t expectedTotalTransactionsCount) {
 			auto connection = test::CreateDbConnection();
 			auto database = connection[test::DatabaseName()];
 
@@ -208,13 +211,13 @@ namespace catapult { namespace mongo {
 			auto view = result.view();
 
 			// block metadata
-			auto numTransactions = static_cast<int32_t>(expectedElement.Transactions.size());
+			auto transactionsCount = static_cast<uint32_t>(expectedElement.Transactions.size());
 			auto transactionMerkleTree = model::CalculateMerkleTree(expectedElement.Transactions);
-			int32_t numStatements = 0;
+			uint32_t statementsCount = 0;
 			std::vector<Hash256> statementMerkleTree;
 			if (expectedElement.OptionalStatement) {
 				const auto& blockStatement = *expectedElement.OptionalStatement;
-				numStatements = static_cast<int32_t>(model::CountTotalStatements(blockStatement));
+				statementsCount = static_cast<uint32_t>(model::CountTotalStatements(blockStatement));
 				statementMerkleTree = model::CalculateMerkleTree(blockStatement);
 			}
 
@@ -222,8 +225,7 @@ namespace catapult { namespace mongo {
 			test::AssertEqualBlockMetadata(
 					expectedElement,
 					totalFee,
-					numTransactions,
-					numStatements,
+					{ transactionsCount, expectedTotalTransactionsCount, statementsCount },
 					transactionMerkleTree,
 					statementMerkleTree,
 					metaView);
@@ -337,7 +339,7 @@ namespace catapult { namespace mongo {
 			explicit TestContext(size_t topHeight, MongoErrorPolicy::Mode errorPolicyMode = MongoErrorPolicy::Mode::Strict)
 					: m_pStorage(CreateMongoBlockStorage(mocks::CreateMockTransactionMongoPlugin(), errorPolicyMode)) {
 				for (auto i = 1u; i <= topHeight; ++i) {
-					auto transactions = test::GenerateRandomTransactions(10);
+					auto transactions = test::GenerateRandomTransactions(Default_Transactions_Per_Block);
 					m_blocks.push_back(test::GenerateBlockWithTransactions(transactions));
 					m_blocks.back()->Height = Height(i);
 					auto blockElement = test::BlockToBlockElement(*m_blocks.back(), test::GenerateRandomByteArray<Hash256>());
@@ -453,8 +455,8 @@ namespace catapult { namespace mongo {
 	namespace {
 		void AssertCanSaveBlock(
 				const BlockElementCounts& blockElementCounts,
-				size_t numDependentDocuments,
-				size_t numExpectedTransactions) {
+				uint32_t numDependentDocuments,
+				uint32_t numExpectedTransactions) {
 			// Arrange:
 			auto pBlock = PrepareDbAndBlock(blockElementCounts);
 			auto blockElement = test::BlockToBlockElement(*pBlock, test::GenerateRandomByteArray<Hash256>());
@@ -467,7 +469,7 @@ namespace catapult { namespace mongo {
 
 			// Assert:
 			ASSERT_EQ(Height(1), pStorage->chainHeight());
-			AssertEqual(blockElement);
+			AssertEqual(blockElement, numExpectedTransactions);
 
 			// - check collection sizes
 			auto connection = test::CreateDbConnection();
@@ -519,7 +521,7 @@ namespace catapult { namespace mongo {
 		ASSERT_EQ(Height(Multiple_Blocks_Count), context.storage().chainHeight());
 		BlockElementCounts blockElementCounts;
 		for (const auto& blockElement : context.elements()) {
-			AssertEqual(blockElement);
+			AssertEqual(blockElement, Default_Transactions_Per_Block);
 			blockElementCounts.AddCounts(blockElement);
 		}
 
@@ -579,7 +581,7 @@ namespace catapult { namespace mongo {
 		// Assert:
 		ASSERT_EQ(Height(1), pStorage->chainHeight());
 
-		AssertEqual(blockElement);
+		AssertEqual(blockElement, 3);
 
 		// - check collection sizes
 		auto connection = test::CreateDbConnection();
@@ -589,9 +591,10 @@ namespace catapult { namespace mongo {
 		EXPECT_EQ(3u, static_cast<size_t>(database["transactions"].count_documents(filter.view())));
 	}
 
-	TEST(TEST_CLASS, CanRewriteBlockAtLastBlockHeightWhenErrorModeIsIdempotent) {
+	template<typename TPrepare>
+	void AssertCanRewriteBlockAtLastBlockHeightWhenErrorModeIsIdempotent(TPrepare prepare) {
 		// Arrange: create new block with same height as db
-		auto transactions = test::GenerateRandomTransactions(10);
+		auto transactions = test::GenerateRandomTransactions(7);
 		auto pBlock = test::GenerateBlockWithTransactions(transactions);
 		pBlock->Height = Height(Multiple_Blocks_Count);
 		auto newBlockElement = test::BlockToBlockElement(*pBlock, test::GenerateRandomByteArray<Hash256>());
@@ -600,9 +603,10 @@ namespace catapult { namespace mongo {
 		// - prepare db with blocks
 		TestContext context(Multiple_Blocks_Count, MongoErrorPolicy::Mode::Idempotent);
 		context.saveBlocks();
+		auto expectedBlockCount = prepare();
 
 		// Sanity:
-		ASSERT_EQ(Height(Multiple_Blocks_Count), context.storage().chainHeight());
+		ASSERT_EQ(Height(expectedBlockCount), context.storage().chainHeight());
 
 		// Act:
 		context.storage().saveBlock(newBlockElement);
@@ -613,15 +617,38 @@ namespace catapult { namespace mongo {
 		BlockElementCounts blockElementCounts;
 		for (auto i = 0u; i < context.elements().size() - 1; ++i) {
 			const auto& blockElement = context.elements()[i];
-			AssertEqual(blockElement);
+			AssertEqual(blockElement, Default_Transactions_Per_Block);
 			blockElementCounts.AddCounts(blockElement);
 		}
 
 		// - new block element
-		AssertEqual(newBlockElement);
+		AssertEqual(newBlockElement, 7);
 		blockElementCounts.AddCounts(newBlockElement);
 
 		AssertCollectionSizes(blockElementCounts);
+	}
+
+	TEST(TEST_CLASS, CanRewriteBlockAtLastBlockHeightWhenErrorModeIsIdempotent) {
+		AssertCanRewriteBlockAtLastBlockHeightWhenErrorModeIsIdempotent([]() {
+			return Multiple_Blocks_Count;
+		});
+	}
+
+	TEST(TEST_CLASS, CanRewriteBlockAtLastBlockHeightWhenErrorModeIsIdempotent_OrphanedDocuments) {
+		AssertCanRewriteBlockAtLastBlockHeightWhenErrorModeIsIdempotent([]() {
+			// Arrange: set the height one less without dropping the block or transactions
+			auto connection = test::CreateDbConnection();
+			auto database = connection[test::DatabaseName()];
+
+			auto journalHeight = document()
+					<< "$set" << open_document
+						<< "current.height" << static_cast<int64_t>(Multiple_Blocks_Count - 1)
+					<< close_document
+					<< finalize;
+
+			TrySetChainStatisticDocument(database, journalHeight.view());
+			return Multiple_Blocks_Count - 1;
+		});
 	}
 
 	namespace {
@@ -657,27 +684,45 @@ namespace catapult { namespace mongo {
 
 	// region dropBlocksAfter
 
-	TEST(TEST_CLASS, CanDropBlocks) {
-		// Arrange:
-		TestContext context(Multiple_Blocks_Count);
-		context.saveBlocks();
+	namespace {
+		void AssertCanDropBlocks(size_t topHeight, Height dropHeight) {
+			// Arrange:
+			TestContext context(topHeight);
+			context.saveBlocks();
 
-		// Act:
-		context.storage().dropBlocksAfter(Height(5));
+			// Act:
+			context.storage().dropBlocksAfter(dropHeight);
 
-		// Assert:
-		ASSERT_EQ(Height(5), context.storage().chainHeight());
-		BlockElementCounts blockElementCounts;
-		for (const auto& blockElement : context.elements()) {
-			if (blockElement.Block.Height <= Height(5)) {
-				AssertEqual(blockElement);
-				blockElementCounts.AddCounts(blockElement);
-			} else {
-				AssertNoBlockOrTransactions(blockElement.Block.Height);
+			// Assert:
+			ASSERT_EQ(dropHeight, context.storage().chainHeight());
+			BlockElementCounts blockElementCounts;
+			for (const auto& blockElement : context.elements()) {
+				if (blockElement.Block.Height <= dropHeight) {
+					AssertEqual(blockElement, Default_Transactions_Per_Block);
+					blockElementCounts.AddCounts(blockElement);
+				} else {
+					AssertNoBlockOrTransactions(blockElement.Block.Height);
+				}
 			}
-		}
 
-		AssertCollectionSizes(blockElementCounts);
+			AssertCollectionSizes(blockElementCounts);
+		}
+	}
+
+	TEST(TEST_CLASS, CanDropBlocks_OneBatchToNemesis) {
+		AssertCanDropBlocks(Max_Drop_Batch_Size - 1, Height(1));
+	}
+
+	TEST(TEST_CLASS, CanDropBlocks_OneBatch) {
+		AssertCanDropBlocks(Multiple_Blocks_Count, Height(Multiple_Blocks_Count - Max_Drop_Batch_Size));
+	}
+
+	TEST(TEST_CLASS, CanDropBlocks_MultipleBatches) {
+		AssertCanDropBlocks(Multiple_Blocks_Count, Height(Multiple_Blocks_Count - 2 * Max_Drop_Batch_Size));
+	}
+
+	TEST(TEST_CLASS, CanDropBlocks_MultipleBatchesUneven) {
+		AssertCanDropBlocks(Multiple_Blocks_Count, Height(Multiple_Blocks_Count - (2 * Max_Drop_Batch_Size + 1)));
 	}
 
 	// endregion

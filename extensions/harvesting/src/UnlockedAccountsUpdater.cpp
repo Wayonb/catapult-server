@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,32 +25,17 @@
 #include "catapult/cache/CatapultCache.h"
 #include "catapult/cache_core/ImportanceView.h"
 #include "catapult/io/RawFile.h"
+#include "catapult/model/Address.h"
+#include "catapult/utils/ThrottleLogger.h"
 
 namespace catapult { namespace harvesting {
 
 	namespace {
-		size_t PruneUnlockedAccounts(UnlockedAccounts& unlockedAccounts, const cache::CatapultCache& cache) {
-			auto cacheView = cache.createView();
-			auto height = cacheView.height() + Height(1);
-			auto readOnlyAccountStateCache = cache::ReadOnlyAccountStateCache(cacheView.sub<cache::AccountStateCache>());
-			size_t numPrunedAccounts = 0;
-			unlockedAccounts.modifier().removeIf([height, &readOnlyAccountStateCache, &numPrunedAccounts](const auto& key) {
-				cache::ImportanceView view(readOnlyAccountStateCache);
-				auto shouldPruneAccount = !view.canHarvest(key, height);
-				if (shouldPruneAccount)
-					++numPrunedAccounts;
-
-				return shouldPruneAccount;
-			});
-
-			return numPrunedAccounts;
-		}
-
-		bool AddToUnlocked(UnlockedAccounts& unlockedAccounts, crypto::KeyPair&& keyPair) {
-			auto publicKey = keyPair.publicKey();
-			auto addResult = unlockedAccounts.modifier().add(std::move(keyPair));
+		bool AddToUnlocked(UnlockedAccounts& unlockedAccounts, BlockGeneratorAccountDescriptor&& descriptor) {
+			auto signingPublicKey = descriptor.signingKeyPair().publicKey();
+			auto addResult = unlockedAccounts.modifier().add(std::move(descriptor));
 			if (UnlockedAccountsAddResult::Success_New == addResult) {
-				CATAPULT_LOG(info) << "added NEW account " << publicKey;
+				CATAPULT_LOG(important) << "added NEW account " << signingPublicKey;
 				return true;
 			}
 
@@ -64,56 +50,180 @@ namespace catapult { namespace harvesting {
 
 			return false;
 		}
+
+		// region DescriptorProcessor
+
+		class DescriptorProcessor {
+		public:
+			DescriptorProcessor(
+					const Key& signingPublicKey,
+					const Key& nodePublicKey,
+					const cache::CatapultCache& cache,
+					UnlockedAccounts& unlockedAccounts,
+					UnlockedAccountsStorage& storage)
+					: m_signingPublicKey(signingPublicKey)
+					, m_nodePublicKey(nodePublicKey)
+					, m_cache(cache)
+					, m_unlockedAccounts(unlockedAccounts)
+					, m_storage(storage)
+					, m_hasAnyRemoval(false)
+			{}
+
+		public:
+			bool hasAnyRemoval() const {
+				return m_hasAnyRemoval;
+			}
+
+		public:
+			void operator()(const HarvestRequest& harvestRequest, BlockGeneratorAccountDescriptor&& descriptor) {
+				if (HarvestRequestOperation::Add == harvestRequest.Operation)
+					add(harvestRequest, std::move(descriptor));
+				else
+					remove(GetRequestIdentifier(harvestRequest), descriptor.signingKeyPair().publicKey());
+			}
+
+			size_t pruneUnlockedAccounts() {
+				auto cacheView = m_cache.createView();
+
+				size_t numPrunedAccounts = 0;
+				auto height = cacheView.height() + Height(1);
+				m_unlockedAccounts.modifier().removeIf([this, height, &cacheView, &numPrunedAccounts](const auto& descriptor) {
+					auto readOnlyAccountStateCache = cache::ReadOnlyAccountStateCache(cacheView.sub<cache::AccountStateCache>());
+					cache::ImportanceView view(readOnlyAccountStateCache);
+
+					const auto& signingPublicKey = descriptor.signingKeyPair().publicKey();
+					auto address = model::PublicKeyToAddress(signingPublicKey, readOnlyAccountStateCache.networkIdentifier());
+					auto shouldPruneAccount = !view.canHarvest(address, height);
+
+					if (shouldPruneAccount && m_signingPublicKey == signingPublicKey) {
+						CATAPULT_LOG_THROTTLE(warning, utils::TimeSpan::FromHours(6).millis())
+								<< "primary signing public key " << m_signingPublicKey << " does not meet harvesting requirements";
+						return false;
+					}
+
+					if (!shouldPruneAccount) {
+						auto remoteAccountStateIter = readOnlyAccountStateCache.find(address);
+						if (state::AccountType::Remote == remoteAccountStateIter.get().AccountType) {
+							auto mainAccountStateIter = readOnlyAccountStateCache.find(GetLinkedPublicKey(remoteAccountStateIter.get()));
+							shouldPruneAccount = !isMainAccountEligibleForDelegation(mainAccountStateIter.get(), descriptor);
+						}
+					}
+
+					if (shouldPruneAccount)
+						++numPrunedAccounts;
+
+					return shouldPruneAccount;
+				});
+
+				return numPrunedAccounts;
+			}
+
+		private:
+			void add(const HarvestRequest& harvestRequest, BlockGeneratorAccountDescriptor&& descriptor) {
+				if (!isMainAccountEligibleForDelegation(harvestRequest.MainAccountPublicKey, descriptor))
+					return;
+
+				auto harvesterSigningPublicKey = descriptor.signingKeyPair().publicKey();
+				auto requestIdentifier = GetRequestIdentifier(harvestRequest);
+				if (!m_storage.contains(requestIdentifier) && AddToUnlocked(m_unlockedAccounts, std::move(descriptor)))
+					m_storage.add(requestIdentifier, harvestRequest.EncryptedPayload, harvesterSigningPublicKey);
+			}
+
+			void remove(HarvestRequestIdentifier requestIdentifier, const Key& harvesterSigningPublicKey) {
+				RemoveFromUnlocked(m_unlockedAccounts, harvesterSigningPublicKey);
+				m_storage.remove(requestIdentifier);
+				m_hasAnyRemoval = true;
+			}
+
+			bool isMainAccountEligibleForDelegation(const Key& mainAccountPublicKey, const BlockGeneratorAccountDescriptor& descriptor) {
+				auto cacheView = m_cache.createView();
+				auto readOnlyAccountStateCache = cache::ReadOnlyAccountStateCache(cacheView.sub<cache::AccountStateCache>());
+				auto accountStateIter = readOnlyAccountStateCache.find(mainAccountPublicKey);
+				if (!accountStateIter.tryGet()) {
+					CATAPULT_LOG(warning) << "rejecting delegation from " << mainAccountPublicKey << ": unknown main account";
+					return false;
+				}
+
+				return isMainAccountEligibleForDelegation(accountStateIter.get(), descriptor);
+			}
+
+			bool isMainAccountEligibleForDelegation(
+					const state::AccountState& accountState,
+					const BlockGeneratorAccountDescriptor& descriptor) {
+				if (GetLinkedPublicKey(accountState) != descriptor.signingKeyPair().publicKey()) {
+					CATAPULT_LOG(warning) << "rejecting delegation from " << accountState.PublicKey << ": invalid signing public key";
+					return false;
+				}
+
+				if (GetVrfPublicKey(accountState) != descriptor.vrfKeyPair().publicKey()) {
+					CATAPULT_LOG(warning) << "rejecting delegation from " << accountState.PublicKey << ": invalid vrf public key";
+					return false;
+				}
+
+				// skip node link check for remote (non-delegated) harvesters
+				if (GetLinkedPublicKey(accountState) == m_signingPublicKey)
+					return true;
+
+				if (GetNodePublicKey(accountState) != m_nodePublicKey) {
+					CATAPULT_LOG(warning) << "rejecting delegation from " << accountState.PublicKey << ": invalid node public key";
+					return false;
+				}
+
+				return true;
+			}
+
+		private:
+			Key m_signingPublicKey;
+			Key m_nodePublicKey;
+			const cache::CatapultCache& m_cache;
+			UnlockedAccounts& m_unlockedAccounts;
+			UnlockedAccountsStorage& m_storage;
+			bool m_hasAnyRemoval;
+		};
+
+		// endregion
 	}
 
 	UnlockedAccountsUpdater::UnlockedAccountsUpdater(
 			const cache::CatapultCache& cache,
 			UnlockedAccounts& unlockedAccounts,
-			const crypto::KeyPair& bootKeyPair,
+			const Key& signingPublicKey,
+			const crypto::KeyPair& encryptionKeyPair,
 			const config::CatapultDataDirectory& dataDirectory)
 			: m_cache(cache)
 			, m_unlockedAccounts(unlockedAccounts)
-			, m_bootKeyPair(bootKeyPair)
+			, m_signingPublicKey(signingPublicKey)
+			, m_encryptionKeyPair(encryptionKeyPair)
 			, m_dataDirectory(dataDirectory)
 			, m_harvestersFilename(m_dataDirectory.rootDir().file("harvesters.dat"))
 			, m_unlockedAccountsStorage(m_harvestersFilename)
 	{}
 
 	void UnlockedAccountsUpdater::load() {
-		// load entries
-		m_unlockedAccountsStorage.load(m_bootKeyPair, [&unlockedAccounts = m_unlockedAccounts](auto&& keyPair) {
-			AddToUnlocked(unlockedAccounts, std::move(keyPair));
+		// load account descriptors
+		m_unlockedAccountsStorage.load(m_encryptionKeyPair, [&unlockedAccounts = m_unlockedAccounts](auto&& descriptor) {
+			AddToUnlocked(unlockedAccounts, std::move(descriptor));
 		});
 	}
 
 	void UnlockedAccountsUpdater::update() {
 		// 1. process queued accounts
-		auto& unlockedAccounts = m_unlockedAccounts;
-		auto& storage = m_unlockedAccountsStorage;
-		bool hasAnyRemoval = false;
-		UnlockedFileQueueConsumer(m_dataDirectory.dir("transfer_message"), m_bootKeyPair, [&unlockedAccounts, &storage, &hasAnyRemoval](
-				const auto& unlockedEntryMessage,
-				auto&& keyPair) {
-			const auto& announcerPublicKey = unlockedEntryMessage.AnnouncerPublicKey;
-			const auto& harvesterPublicKey = keyPair.publicKey();
-			if (UnlockedEntryDirection::Add == unlockedEntryMessage.Direction) {
-				if (!storage.containsAnnouncer(announcerPublicKey) && AddToUnlocked(unlockedAccounts, std::move(keyPair)))
-					storage.add(announcerPublicKey, unlockedEntryMessage.EncryptedEntry, harvesterPublicKey);
-			} else {
-				RemoveFromUnlocked(unlockedAccounts, harvesterPublicKey);
-				storage.remove(announcerPublicKey);
-				hasAnyRemoval = true;
-			}
-		});
+		DescriptorProcessor processor(
+				m_signingPublicKey,
+				m_encryptionKeyPair.publicKey(),
+				m_cache,
+				m_unlockedAccounts,
+				m_unlockedAccountsStorage);
+		UnlockedFileQueueConsumer(m_dataDirectory.dir("transfer_message"), m_encryptionKeyPair, std::ref(processor));
 
 		// 2. prune accounts that are not eligible to harvest the next block
-		auto numPrunedAccounts = PruneUnlockedAccounts(m_unlockedAccounts, m_cache);
+		auto numPrunedAccounts = processor.pruneUnlockedAccounts();
 
 		// 3. save accounts
-		if (numPrunedAccounts > 0 || hasAnyRemoval) {
+		if (numPrunedAccounts > 0 || processor.hasAnyRemoval()) {
 			auto view = m_unlockedAccounts.view();
-			m_unlockedAccountsStorage.save([&view](const auto& harvesterPublicKey) {
-				return view.contains(harvesterPublicKey);
+			m_unlockedAccountsStorage.save([&view](const auto& harvesterSigningPublicKey) {
+				return view.contains(harvesterSigningPublicKey);
 			});
 		}
 	}

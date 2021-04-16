@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -32,7 +33,7 @@ namespace catapult { namespace mocks {
 #define DEFINE_MOCK_NOTIFICATION(DESCRIPTION, CODE, CHANNEL) \
 	constexpr auto Mock_##DESCRIPTION##_Notification = model::MakeNotificationType( \
 			(model::NotificationChannel::CHANNEL), \
-			(static_cast<model::FacilityCode>(-1)), \
+			(static_cast<model::FacilityCode>(std::numeric_limits<uint8_t>::max())), \
 			CODE)
 
 	/// Mock notification raised on the observer channel.
@@ -56,24 +57,45 @@ namespace catapult { namespace mocks {
 	/// Hash notification raised on no channels.
 	DEFINE_MOCK_NOTIFICATION(Hash, 0xFFFD, None);
 
+	/// Address notification raised on no channels.
+	DEFINE_MOCK_NOTIFICATION(Address, 0xFFFC, None);
+
 #undef DEFINE_MOCK_NOTIFICATION
 
 	/// Notifies the arrival of a hash.
-	struct HashNotification : public model::Notification {
+	struct MockHashNotification : public model::Notification {
 	public:
 		/// Matching notification type.
 		static constexpr auto Notification_Type = Mock_Hash_Notification;
 
 	public:
 		/// Creates a hash notification around \a hash.
-		explicit HashNotification(const Hash256& hash)
-				: model::Notification(Notification_Type, sizeof(HashNotification))
+		explicit MockHashNotification(const Hash256& hash)
+				: model::Notification(Notification_Type, sizeof(MockHashNotification))
 				, Hash(hash)
 		{}
 
 	public:
 		/// Hash.
 		const Hash256& Hash;
+	};
+
+	/// Notifies the arrival of a (resolved) address.
+	struct MockAddressNotification : public model::Notification {
+	public:
+		/// Matching notification type.
+		static constexpr auto Notification_Type = Mock_Address_Notification;
+
+	public:
+		/// Creates an address notification around \a address.
+		explicit MockAddressNotification(const Address& address)
+				: model::Notification(Notification_Type, sizeof(MockAddressNotification))
+				, Address(address)
+		{}
+
+	public:
+		/// Address.
+		catapult::Address Address;
 	};
 
 	// endregion
@@ -91,7 +113,7 @@ namespace catapult { namespace mocks {
 	public:
 		static constexpr auto Entity_Type = static_cast<model::EntityType>(0x4FFF);
 
-		static constexpr uint8_t Current_Version = 0xFF;
+		static constexpr uint8_t Current_Version = 2;
 
 	public:
 		/// Binary layout for a variable data header.
@@ -139,6 +161,12 @@ namespace catapult { namespace mocks {
 
 	// endregion
 
+	/// Gets the address of the recipient of \a transaction.
+	Address GetRecipientAddress(const MockTransaction& transaction);
+
+	/// Gets the address of the recipient of \a transaction.
+	Address GetRecipientAddress(const EmbeddedMockTransaction& transaction);
+
 	/// Creates a mock transaction with variable data composed of \a dataSize random bytes.
 	std::unique_ptr<MockTransaction> CreateMockTransaction(uint16_t dataSize);
 
@@ -153,8 +181,8 @@ namespace catapult { namespace mocks {
 	/// Creates a mock transaction with \a signer and \a recipient.
 	std::unique_ptr<MockTransaction> CreateMockTransactionWithSignerAndRecipient(const Key& signer, const Key& recipient);
 
-	/// Extracts public keys of additional accounts that must approve \a transaction.
-	utils::KeySet ExtractAdditionalRequiredCosignatories(const EmbeddedMockTransaction& transaction);
+	/// Extracts addresses of additional accounts that must approve \a transaction.
+	model::UnresolvedAddressSet ExtractAdditionalRequiredCosignatories(const EmbeddedMockTransaction& transaction);
 
 	/// Mock transaction plugin options.
 	enum class PluginOptionFlags : uint8_t {
@@ -174,7 +202,10 @@ namespace catapult { namespace mocks {
 		Publish_Custom_Notifications = 16,
 
 		/// Configures the mock transaction plugin to return a custom data buffer (equal to the mock transaction's payload sans header).
-		Custom_Buffers = 32
+		Custom_Buffers = 32,
+
+		/// Configures the mock transaction plugin to report that each transaction contains `Size % 100` embeddings.
+		Contains_Embeddings = 64
 	};
 
 	/// Returns \c true if \a options has \a flag set.

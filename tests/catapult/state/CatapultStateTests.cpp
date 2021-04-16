@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,6 +32,7 @@ namespace catapult { namespace state {
 
 		// Assert:
 		EXPECT_EQ(model::ImportanceHeight(0), state.LastRecalculationHeight);
+		EXPECT_EQ(Height(0), state.LastFinalizedHeight);
 		EXPECT_EQ(BlockFeeMultiplier(0), state.DynamicFeeMultiplier);
 		EXPECT_EQ(0u, state.NumTotalTransactions);
 	}

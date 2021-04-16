@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -34,9 +35,9 @@ namespace catapult { namespace mongo { namespace plugins {
 #define TEST_CLASS MongoMultisigCacheStorageTests
 
 	namespace {
-		void InsertRandom(utils::SortedKeySet& keys, size_t count) {
+		void InsertRandom(state::SortedAddressSet& addresses, size_t count) {
 			for (auto i = 0u; i < count; ++i)
-				keys.insert(test::GenerateRandomByteArray<Key>());
+				addresses.insert(test::GenerateRandomByteArray<Address>());
 		}
 
 		struct MultisigCacheTraits {
@@ -44,6 +45,7 @@ namespace catapult { namespace mongo { namespace plugins {
 			using ModelType = state::MultisigEntry;
 
 			static constexpr auto Collection_Name = "multisigs";
+			static constexpr auto Primary_Document_Name = "multisig";
 			static constexpr auto Network_Id = static_cast<model::NetworkIdentifier>(0x5A);
 			static constexpr auto CreateCacheStorage = CreateMongoMultisigCacheStorage;
 
@@ -52,15 +54,15 @@ namespace catapult { namespace mongo { namespace plugins {
 			}
 
 			static ModelType GenerateRandomElement(uint32_t id) {
-				auto key = Key();
-				std::memcpy(key.data(), &id, sizeof(id));
+				auto address = Address();
+				std::memcpy(address.data(), &id, sizeof(id));
 
-				state::MultisigEntry entry(key);
+				state::MultisigEntry entry(address);
 				entry.setMinApproval(12);
 				entry.setMinRemoval(23);
 
-				InsertRandom(entry.cosignatoryPublicKeys(), std::max<size_t>(1, test::RandomByte() & 0x0F));
-				InsertRandom(entry.multisigPublicKeys(), std::max<size_t>(1, test::RandomByte() & 0x0F));
+				InsertRandom(entry.cosignatoryAddresses(), std::max<size_t>(1, test::RandomByte() & 0x0F));
+				InsertRandom(entry.multisigAddresses(), std::max<size_t>(1, test::RandomByte() & 0x0F));
 				return entry;
 			}
 
@@ -71,7 +73,7 @@ namespace catapult { namespace mongo { namespace plugins {
 
 			static void Remove(cache::CatapultCacheDelta& delta, const ModelType& entry) {
 				auto& multisigCacheDelta = delta.sub<cache::MultisigCache>();
-				multisigCacheDelta.remove(entry.key());
+				multisigCacheDelta.remove(entry.address());
 			}
 
 			static void Mutate(cache::CatapultCacheDelta& delta, ModelType& entry) {
@@ -80,17 +82,18 @@ namespace catapult { namespace mongo { namespace plugins {
 
 				// update cache
 				auto& multisigCacheDelta = delta.sub<cache::MultisigCache>();
-				auto& entryFromCache = multisigCacheDelta.find(entry.key()).get();
+				auto& entryFromCache = multisigCacheDelta.find(entry.address()).get();
 				entryFromCache.setMinApproval(24);
 			}
 
 			static auto GetFindFilter(const ModelType& entry) {
-				return document() << "multisig.accountPublicKey" << mappers::ToBinary(entry.key()) << finalize;
+				return document()
+						<< std::string(Primary_Document_Name) + ".accountAddress" << mappers::ToBinary(entry.address())
+						<< finalize;
 			}
 
 			static void AssertEqual(const ModelType& entry, const bsoncxx::document::view& view) {
-				auto address = model::PublicKeyToAddress(entry.key(), Network_Id);
-				test::AssertEqualMultisigData(entry, address, view["multisig"].get_document().view());
+				test::AssertEqualMultisigData(entry, view[Primary_Document_Name].get_document().view());
 			}
 		};
 	}

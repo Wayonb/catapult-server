@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -37,7 +38,7 @@ namespace catapult { namespace mongo { namespace plugins {
 		void StreamDescriptorMetadata(bson_stream::document& builder, const NamespaceDescriptor& descriptor) {
 			builder
 					<< "meta" << bson_stream::open_document
-						<< "active" << descriptor.IsActive
+						<< "latest" << descriptor.IsLatest
 						<< "index" << static_cast<int32_t>(descriptor.Index)
 					<< bson_stream::close_document;
 		}
@@ -74,6 +75,7 @@ namespace catapult { namespace mongo { namespace plugins {
 		StreamDescriptorMetadata(builder, descriptor);
 		builder
 				<< "namespace" << bson_stream::open_document
+					<< "version" << 1
 					<< "registrationType" << (descriptor.IsRoot() ? Root_Type : Child_Type)
 					<< "depth" << static_cast<int32_t>(path.size());
 
@@ -84,7 +86,6 @@ namespace catapult { namespace mongo { namespace plugins {
 
 		builder
 					<< "parentId" << ToInt64(descriptor.IsRoot() ? Namespace_Base_Id : path[path.size() - 2])
-					<< "ownerPublicKey" << ToBinary(root.ownerPublicKey())
 					<< "ownerAddress" << ToBinary(descriptor.OwnerAddress)
 					<< "startHeight" << ToInt64(root.lifetime().Start)
 					<< "endHeight" << ToInt64(root.lifetime().End)

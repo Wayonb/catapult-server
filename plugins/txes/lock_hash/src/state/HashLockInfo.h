@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,14 +32,14 @@ namespace catapult { namespace state {
 		HashLockInfo() : LockInfo()
 		{}
 
-		/// Creates a hash lock info around \a senderPublicKey, \a mosaicId, \a amount, \a endHeight and \a hash.
+		/// Creates a hash lock info around \a ownerAddress, \a mosaicId, \a amount, \a endHeight and \a hash.
 		HashLockInfo(
-				const Key& senderPublicKey,
+				const Address& ownerAddress,
 				catapult::MosaicId mosaicId,
 				catapult::Amount amount,
 				Height endHeight,
 				const Hash256& hash)
-				: LockInfo(senderPublicKey, mosaicId, amount, endHeight)
+				: LockInfo(ownerAddress, mosaicId, amount, endHeight)
 				, Hash(hash)
 		{}
 
@@ -46,4 +47,9 @@ namespace catapult { namespace state {
 		/// Hash.
 		Hash256 Hash;
 	};
+
+	/// Gets the lock identifier for \a lockInfo.
+	inline const Hash256& GetLockIdentifier(const HashLockInfo& lockInfo) {
+		return lockInfo.Hash;
+	}
 }}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -58,10 +59,10 @@ namespace catapult { namespace subscribers {
 				io::InputStream& inputStream,
 				const CacheChangesStorages& cacheChangesStorages,
 				StateChangeSubscriber& subscriber) {
-			auto chainScore = ReadChainScore(inputStream);
+			auto chainScoreDelta = model::ChainScore::Delta(static_cast<int64_t>(io::Read64(inputStream)));
 			auto height = io::Read<Height>(inputStream);
 			auto cacheChanges = ReadCacheChanges(inputStream, cacheChangesStorages);
-			subscriber.notifyStateChange({ std::move(cacheChanges), chainScore, height });
+			subscriber.notifyStateChange({ std::move(cacheChanges), chainScoreDelta, height });
 		}
 	}
 

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -165,10 +166,10 @@ namespace catapult { namespace utils {
 	namespace {
 		void AssertStringRepresentation(const std::string& expected, uint64_t numMegabytes, uint64_t numKilobytes, uint64_t numBytes) {
 			// Arrange:
-			auto timeSpan = FileSize::FromBytes(((numMegabytes * 1024) + numKilobytes) * 1024 + numBytes);
+			auto fileSize = FileSize::FromBytes(((numMegabytes * 1024) + numKilobytes) * 1024 + numBytes);
 
 			// Act:
-			auto str = test::ToString(timeSpan);
+			auto str = test::ToString(fileSize);
 
 			// Assert:
 			EXPECT_EQ(expected, str) << numMegabytes << "MB " << numKilobytes << "KB " << numBytes << "B";

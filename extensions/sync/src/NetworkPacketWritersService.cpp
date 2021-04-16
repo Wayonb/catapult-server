@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,6 +21,7 @@
 
 #include "NetworkPacketWritersService.h"
 #include "catapult/api/RemoteChainApi.h"
+#include "catapult/config/CatapultKeys.h"
 #include "catapult/extensions/NetworkUtils.h"
 #include "catapult/extensions/ServiceLocator.h"
 #include "catapult/extensions/ServiceState.h"
@@ -49,8 +51,8 @@ namespace catapult { namespace sync {
 				for (const auto& packetIoPair : packetIoPairs) {
 					auto pPacketIo = packetIoPair.io();
 					auto pChainApi = api::CreateRemoteChainApiWithoutRegistry(*pPacketIo);
-					heightFutures.push_back(pChainApi->chainInfo().then([pPacketIo](auto&& infoFuture) {
-						return infoFuture.get().Height;
+					heightFutures.push_back(pChainApi->chainStatistics().then([pPacketIo](auto&& chainStatisticsFuture) {
+						return chainStatisticsFuture.get().Height;
 					}));
 				}
 
@@ -75,7 +77,7 @@ namespace catapult { namespace sync {
 			void registerServices(extensions::ServiceLocator& locator, extensions::ServiceState& state) override {
 				auto connectionSettings = extensions::GetConnectionSettings(state.config());
 				auto pServiceGroup = state.pool().pushServiceGroup(Service_Name);
-				auto pWriters = pServiceGroup->pushService(net::CreatePacketWriters, locator.keyPair(), connectionSettings);
+				auto pWriters = pServiceGroup->pushService(net::CreatePacketWriters, locator.keys().caPublicKey(), connectionSettings);
 
 				locator.registerService(Service_Name, pWriters);
 				state.packetIoPickers().insert(*pWriters, ionet::NodeRoles::Peer);
@@ -84,6 +86,7 @@ namespace catapult { namespace sync {
 				state.hooks().addNewBlockSink(extensions::CreatePushEntitySink<BlockSink>(locator, Service_Name));
 				state.hooks().addNewTransactionsSink(extensions::CreatePushEntitySink<TransactionsSink>(locator, Service_Name));
 				state.hooks().addPacketPayloadSink([&writers = *pWriters](const auto& payload) { writers.broadcast(payload); });
+				state.hooks().addBannedNodeIdentitySink(extensions::CreateCloseConnectionSink(*pWriters));
 
 				// add retrievers
 				state.hooks().setRemoteChainHeightsRetriever(CreateRemoteChainHeightsRetriever(*pWriters));

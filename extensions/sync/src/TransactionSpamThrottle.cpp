@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -37,10 +38,14 @@ namespace catapult { namespace sync {
 			return importance + Importance(attemptedImportanceBoost);
 		}
 
-		size_t GetMaxTransactions(size_t cacheSize, size_t maxCacheSize, Importance effectiveImportance, Importance totalImportance) {
+		size_t GetMaxTransactionsWeight(
+				size_t cacheSize,
+				size_t maxCacheSize,
+				Importance effectiveImportance,
+				Importance totalImportance) {
 			auto slotsLeft = static_cast<double>(maxCacheSize - cacheSize);
-			auto scaleFactor = std::exp(-3.0 * static_cast<double>(cacheSize) / static_cast<double>(maxCacheSize));
-			auto importancePercentage = static_cast<double>(effectiveImportance.unwrap()) / static_cast<double>(totalImportance.unwrap());
+			auto scaleFactor = std::exp(-3.0 * utils::to_ratio(cacheSize, maxCacheSize));
+			auto importancePercentage = utils::to_ratio(effectiveImportance.unwrap(), totalImportance.unwrap());
 
 			// the value 100 is empirical and thus has no special meaning
 			return static_cast<size_t>(scaleFactor * importancePercentage * 100.0 * slotsLeft);
@@ -58,14 +63,14 @@ namespace catapult { namespace sync {
 
 		public:
 			bool operator()(const model::TransactionInfo& transactionInfo, const chain::UtUpdater::ThrottleContext& context) const {
-				auto cacheSize = context.TransactionsCache.size();
-
 				// always reject if cache is completely full
-				if (cacheSize >= m_config.MaxCacheSize)
+				auto cacheMemorySize = context.TransactionsCache.memorySize();
+				if (cacheMemorySize >= m_config.MaxCacheSize)
 					return true;
 
 				// do not apply throttle unless cache contains more transactions than can fit in a single block
-				if (m_config.MaxBlockSize > cacheSize)
+				auto cacheSize = context.TransactionsCache.size();
+				if (m_config.MaxTransactionsPerBlock > cacheSize)
 					return false;
 
 				// bonded transactions and transactions originating from reverted blocks do not get rejected
@@ -77,8 +82,13 @@ namespace catapult { namespace sync {
 				cache::ImportanceView importanceView(readOnlyAccountStateCache);
 				auto importance = importanceView.getAccountImportanceOrDefault(signer, context.CacheHeight);
 				auto effectiveImportance = GetEffectiveImportance(transactionInfo.pEntity->MaxFee, importance, m_config);
-				auto maxTransactions = GetMaxTransactions(cacheSize, m_config.MaxCacheSize, effectiveImportance, m_config.TotalImportance);
-				return context.TransactionsCache.count(signer) >= maxTransactions;
+				auto maxTransactionsWeight = GetMaxTransactionsWeight(
+						cacheMemorySize.bytes(),
+						m_config.MaxCacheSize.bytes(),
+						effectiveImportance,
+						m_config.TotalImportance);
+				auto usedWeight = context.TransactionsCache.memorySizeForAccount(signer).bytes();
+				return usedWeight + transactionInfo.pEntity->Size >= maxTransactionsWeight;
 			}
 
 		private:

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,30 +20,45 @@
 **/
 
 #include "AccountLinkPlugin.h"
-#include "AccountLinkTransactionPlugin.h"
+#include "AccountKeyLinkTransactionPlugin.h"
+#include "NodeKeyLinkTransactionPlugin.h"
 #include "src/observers/Observers.h"
 #include "src/validators/Validators.h"
+#include "catapult/keylink/KeyLinkObserver.h"
+#include "catapult/keylink/KeyLinkValidator.h"
 #include "catapult/plugins/PluginManager.h"
 
 namespace catapult { namespace plugins {
 
-	void RegisterAccountLinkSubsystem(PluginManager& manager) {
-		manager.addTransactionSupport(CreateAccountLinkTransactionPlugin());
+	namespace {
+		struct NodeKeyAccessor {
+			static constexpr auto Failure_Link_Already_Exists = validators::Failure_AccountLink_Link_Already_Exists;
+			static constexpr auto Failure_Inconsistent_Unlink_Data = validators::Failure_AccountLink_Inconsistent_Unlink_Data;
 
-		manager.addStatelessValidatorHook([](auto& builder) {
-			builder.add(validators::CreateAccountLinkActionValidator());
-		});
+			template<typename TAccountState>
+			static auto& Get(TAccountState& accountState) {
+				return accountState.SupplementalPublicKeys.node();
+			}
+		};
+	}
+
+	void RegisterAccountLinkSubsystem(PluginManager& manager) {
+		manager.addTransactionSupport(CreateAccountKeyLinkTransactionPlugin());
+		manager.addTransactionSupport(CreateNodeKeyLinkTransactionPlugin());
 
 		manager.addStatefulValidatorHook([](auto& builder) {
 			builder
-				.add(validators::CreateAccountLinkAvailabilityValidator())
+				.add(validators::CreateAccountKeyLinkValidator())
 				.add(validators::CreateNewRemoteAccountAvailabilityValidator())
 				.add(validators::CreateRemoteSenderValidator())
-				.add(validators::CreateRemoteInteractionValidator());
+				.add(validators::CreateRemoteInteractionValidator())
+				.add(keylink::CreateKeyLinkValidator<model::NodeKeyLinkNotification, NodeKeyAccessor>("Node"));
 		});
 
 		manager.addObserverHook([](auto& builder) {
-			builder.add(observers::CreateAccountLinkObserver());
+			builder
+				.add(observers::CreateAccountKeyLinkObserver())
+				.add(keylink::CreateKeyLinkObserver<model::NodeKeyLinkNotification, NodeKeyAccessor>("Node"));
 		});
 	}
 }}

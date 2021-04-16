@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,6 +25,7 @@
 #include "catapult/crypto/MerkleHashBuilder.h"
 #include "catapult/utils/HexParser.h"
 #include "tests/test/core/BlockTestUtils.h"
+#include "tests/test/core/mocks/MockTransaction.h"
 #include "tests/test/nodeps/KeyTestUtils.h"
 #include "tests/TestHarness.h"
 
@@ -164,36 +166,250 @@ namespace catapult { namespace model {
 
 	TEST(TEST_CLASS, GenerationHashIsCalculatedAsExpected) {
 		// Arrange:
-		constexpr auto ParseGenerationHash = utils::ParseByteArray<GenerationHash>;
-		auto previousGenerationHash = ParseGenerationHash("57F7DA205008026C776CB6AED843393F04CD458E0AA2D9F1D5F31A402072B2D6");
-		auto publicKey = utils::ParseByteArray<Key>("6FB9C930C0AC6BEF09D6DFEBD091AE83C91B35F2C0305B05B4F6F7AF4B6FC1F0");
+		auto gamma = utils::ParseByteArray<crypto::ProofGamma>("6FB9C930C0AC6BEF09D6DFEBD091AE83C91B35F2C0305B05B4F6F7AF4B6FC1F0");
 
 		// Act:
-		auto hash = CalculateGenerationHash(previousGenerationHash, publicKey);
+		auto hash = CalculateGenerationHash(gamma);
 
 		// Assert:
-		auto expectedHash = ParseGenerationHash("575E4F520DC2C026F1C9021FD3773F236F0872A03B4AEFC22A9E0066FF204A23");
+		auto expectedHash = utils::ParseByteArray<GenerationHash>("9620004E86866D24F8881E77ED6F8464FAE1DF53F1194FF3FF1A87DC80EF22E8");
 		EXPECT_EQ(expectedHash, hash);
 	}
+
+	// endregion
+
+	// region block type
+
+	TEST(TEST_CLASS, CalculateBlockTypeFromHeight_HeightZero_MustBeImportanceBlock) {
+		EXPECT_EQ(Entity_Type_Block_Importance, CalculateBlockTypeFromHeight(Height(0), 50));
+
+		EXPECT_EQ(Entity_Type_Block_Importance, CalculateBlockTypeFromHeight(Height(0), 123));
+	}
+
+	TEST(TEST_CLASS, CalculateBlockTypeFromHeight_HeightOne_MustBeNemesisBlock) {
+		EXPECT_EQ(Entity_Type_Block_Nemesis, CalculateBlockTypeFromHeight(Height(1), 50));
+
+		EXPECT_EQ(Entity_Type_Block_Nemesis, CalculateBlockTypeFromHeight(Height(1), 123));
+	}
+
+	TEST(TEST_CLASS, CalculateBlockTypeFromHeight_HeightImportanceGrouping_MustBeImportanceBlock) {
+		EXPECT_EQ(Entity_Type_Block_Importance, CalculateBlockTypeFromHeight(Height(150), 50));
+		EXPECT_EQ(Entity_Type_Block_Importance, CalculateBlockTypeFromHeight(Height(300), 50));
+
+		EXPECT_EQ(Entity_Type_Block_Importance, CalculateBlockTypeFromHeight(Height(123), 123));
+		EXPECT_EQ(Entity_Type_Block_Importance, CalculateBlockTypeFromHeight(Height(246), 123));
+	}
+
+	TEST(TEST_CLASS, CalculateBlockTypeFromHeight_HeightNotImportanceGrouping_MustBeNormalBlock) {
+		EXPECT_EQ(Entity_Type_Block_Normal, CalculateBlockTypeFromHeight(Height(25), 50));
+		EXPECT_EQ(Entity_Type_Block_Normal, CalculateBlockTypeFromHeight(Height(49), 50));
+		EXPECT_EQ(Entity_Type_Block_Normal, CalculateBlockTypeFromHeight(Height(51), 50));
+		EXPECT_EQ(Entity_Type_Block_Normal, CalculateBlockTypeFromHeight(Height(75), 50));
+
+		EXPECT_EQ(Entity_Type_Block_Normal, CalculateBlockTypeFromHeight(Height(100), 123));
+		EXPECT_EQ(Entity_Type_Block_Normal, CalculateBlockTypeFromHeight(Height(122), 123));
+		EXPECT_EQ(Entity_Type_Block_Normal, CalculateBlockTypeFromHeight(Height(124), 123));
+		EXPECT_EQ(Entity_Type_Block_Normal, CalculateBlockTypeFromHeight(Height(200), 123));
+	}
+
+	// endregion
+
+	// region block transactions info - CalculateBlockTransactionsInfo
+
+	namespace {
+		struct BasicBlockTransactionsInfoTraits {
+			static BlockTransactionsInfo Calculate(const Block& block) {
+				return CalculateBlockTransactionsInfo(block);
+			}
+
+			static void AssertDeepCount(uint32_t, const BlockTransactionsInfo&)
+			{}
+		};
+
+		struct ExtendedBlockTransactionsInfoTraits {
+			static ExtendedBlockTransactionsInfo Calculate(const Block& block) {
+				auto transactionRegistry = mocks::CreateDefaultTransactionRegistry();
+				return CalculateBlockTransactionsInfo(block, transactionRegistry);
+			}
+
+			static void AssertDeepCount(uint32_t expected, const ExtendedBlockTransactionsInfo& blockTransactionsInfo) {
+				EXPECT_EQ(expected, blockTransactionsInfo.DeepCount);
+			}
+		};
+	}
+
+#define BLOCK_TRANSACTIONS_INFO_TEST(TEST_NAME) \
+	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)(); \
+	TEST(TEST_CLASS, TEST_NAME) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<BasicBlockTransactionsInfoTraits>(); } \
+	TEST(TEST_CLASS, TEST_NAME##_Extended) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<ExtendedBlockTransactionsInfoTraits>(); } \
+	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)()
+
+	namespace {
+		test::MutableTransactions GenerateTransactionsWithSizes(std::initializer_list<uint32_t> sizes) {
+			test::MutableTransactions transactions;
+			for (auto size : sizes) {
+				auto pTransaction = test::GenerateRandomTransactionWithSize(size);
+				pTransaction->Type = mocks::MockTransaction::Entity_Type;
+				transactions.push_back(std::move(pTransaction));
+			}
+
+			return transactions;
+		}
+	}
+
+	BLOCK_TRANSACTIONS_INFO_TEST(CanCalculateBlockTransactionsInfoForBlockWithZeroTransactions) {
+		// Arrange:
+		auto pBlock = test::GenerateEmptyRandomBlock();
+		pBlock->FeeMultiplier = BlockFeeMultiplier(3);
+
+		// Act:
+		auto blockTransactionsInfo = TTraits::Calculate(*pBlock);
+
+		// Assert:
+		EXPECT_EQ(0u, blockTransactionsInfo.Count);
+		EXPECT_EQ(Amount(), blockTransactionsInfo.TotalFee);
+		TTraits::AssertDeepCount(0, blockTransactionsInfo);
+	}
+
+	BLOCK_TRANSACTIONS_INFO_TEST(CanCalculateBlockTransactionsInfoForBlockWithSingleTransaction) {
+		// Arrange:
+		auto pBlock = test::GenerateBlockWithTransactions(GenerateTransactionsWithSizes({ 132 }));
+		pBlock->FeeMultiplier = BlockFeeMultiplier(3);
+
+		// Act:
+		auto blockTransactionsInfo = TTraits::Calculate(*pBlock);
+
+		// Assert:
+		EXPECT_EQ(1u, blockTransactionsInfo.Count);
+		EXPECT_EQ(Amount(3 * 132), blockTransactionsInfo.TotalFee);
+		TTraits::AssertDeepCount(1, blockTransactionsInfo);
+	}
+
+	BLOCK_TRANSACTIONS_INFO_TEST(CanCalculateBlockTransactionsInfoForBlockWithMultipleTransactions) {
+		// Arrange:
+		auto pBlock = test::GenerateBlockWithTransactions(GenerateTransactionsWithSizes({ 132, 222, 552 }));
+		pBlock->FeeMultiplier = BlockFeeMultiplier(3);
+
+		// Act:
+		auto blockTransactionsInfo = TTraits::Calculate(*pBlock);
+
+		// Assert:
+		EXPECT_EQ(3u, blockTransactionsInfo.Count);
+		EXPECT_EQ(Amount(3 * 906), blockTransactionsInfo.TotalFee);
+		TTraits::AssertDeepCount(3, blockTransactionsInfo);
+	}
+
+	BLOCK_TRANSACTIONS_INFO_TEST(CanCalculateBlockTransactionsInfoForBlockWithMultipleTransactions_32BitOverflow) {
+		// Arrange:
+		auto pBlock = test::GenerateBlockWithTransactions(GenerateTransactionsWithSizes({ 132, 222, 552 }));
+		pBlock->FeeMultiplier = BlockFeeMultiplier(15134406);
+
+		// Act:
+		auto blockTransactionsInfo = TTraits::Calculate(*pBlock);
+
+		// Assert:
+		EXPECT_EQ(3u, blockTransactionsInfo.Count);
+		EXPECT_EQ(Amount(15134406ull * 906), blockTransactionsInfo.TotalFee);
+		TTraits::AssertDeepCount(3, blockTransactionsInfo);
+	}
+
+	TEST(TEST_CLASS, CalculateBlockTransactionsInfoIncludesEmbeddedTransactionsInDeepCount_Extended) {
+		// Arrange:
+		auto transactions = GenerateTransactionsWithSizes({ 132, 222, 552 });
+		auto pBlock = test::GenerateBlockWithTransactions(transactions);
+
+		auto transactionRegistry = mocks::CreateDefaultTransactionRegistry(mocks::PluginOptionFlags::Contains_Embeddings);
+
+		// Act:
+		auto blockTransactionsInfo = CalculateBlockTransactionsInfo(*pBlock, transactionRegistry);
+
+		// Assert: mock embeddedCount is `Size % 100`
+		EXPECT_EQ(3u, blockTransactionsInfo.Count);
+		EXPECT_EQ(3u + 32 + 22 + 52, blockTransactionsInfo.DeepCount);
+	}
+
+	TEST(TEST_CLASS, CalculateBlockTransactionsInfoExcludesUnknownTransactionsFromDeepCount_Extended) {
+		// Arrange:
+		auto transactions = GenerateTransactionsWithSizes({ 132, 222, 552 });
+		transactions[1]->Type = static_cast<EntityType>(0);
+		auto pBlock = test::GenerateBlockWithTransactions(transactions);
+
+		auto transactionRegistry = mocks::CreateDefaultTransactionRegistry();
+
+		// Act:
+		auto blockTransactionsInfo = CalculateBlockTransactionsInfo(*pBlock, transactionRegistry);
+
+		// Assert:
+		EXPECT_EQ(3u, blockTransactionsInfo.Count);
+		EXPECT_EQ(2u, blockTransactionsInfo.DeepCount);
+	}
+
+	// endregion
+
+	// region traits
+
+	namespace {
+		struct BlockNormalTraits {
+			static constexpr uint32_t Header_Size = sizeof(BlockHeader) + sizeof(PaddedBlockFooter);
+			static constexpr auto Entity_Type = Entity_Type_Block_Normal;
+
+			static std::unique_ptr<Block> CreateBlockWithTransactions(size_t numTransactions = 3) {
+				auto transactions = test::GenerateRandomTransactions(numTransactions);
+				return test::GenerateBlockWithTransactions(transactions);
+			}
+
+			static void AssertZeroedExtendedData(const Block& block) {
+				const auto& blockFooter = GetBlockFooter<PaddedBlockFooter>(block);
+				EXPECT_EQ(0u, blockFooter.BlockHeader_Reserved1);
+			}
+		};
+
+		struct BlockImportanceTraits {
+			static constexpr uint32_t Header_Size = sizeof(BlockHeader) + sizeof(ImportanceBlockFooter);
+			static constexpr auto Entity_Type = Entity_Type_Block_Importance;
+
+			static std::unique_ptr<Block> CreateBlockWithTransactions(size_t numTransactions = 3) {
+				auto transactions = test::GenerateRandomTransactions(numTransactions);
+				return test::GenerateImportanceBlockWithTransactions(transactions);
+			}
+
+			static void AssertZeroedExtendedData(const Block& block) {
+				const auto& blockFooter = GetBlockFooter<ImportanceBlockFooter>(block);
+				EXPECT_EQ(0u, blockFooter.VotingEligibleAccountsCount);
+				EXPECT_EQ(0u, blockFooter.HarvestingEligibleAccountsCount);
+				EXPECT_EQ(Amount(), blockFooter.TotalVotingBalance);
+				EXPECT_EQ(Hash256(), blockFooter.PreviousImportanceBlockHash);
+			}
+		};
+	}
+
+#define BLOCK_TRAITS_TEST(TEST_NAME) \
+	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)(); \
+	TEST(TEST_CLASS, TEST_NAME##_Normal) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<BlockNormalTraits>(); } \
+	TEST(TEST_CLASS, TEST_NAME##_Importance) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<BlockImportanceTraits>(); } \
+	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)()
 
 	// endregion
 
 	// region sign / verify
 
 	namespace {
+		template<typename TTraits>
 		auto CreateSignedBlock(size_t numTransactions) {
 			// random generation hash is used because VerifyBlockHeaderSignature should succeed independent of generation hash
 			auto signer = test::GenerateKeyPair();
-			auto pBlock = test::GenerateBlockWithTransactions(signer, test::GenerateRandomTransactions(numTransactions));
-			extensions::BlockExtensions(test::GenerateRandomByteArray<GenerationHash>()).updateBlockTransactionsHash(*pBlock);
+			auto pBlock = TTraits::CreateBlockWithTransactions(numTransactions);
+			pBlock->SignerPublicKey = signer.publicKey();
+
+			extensions::BlockExtensions(test::GenerateRandomByteArray<GenerationHashSeed>()).updateBlockTransactionsHash(*pBlock);
 			SignBlockHeader(signer, *pBlock);
 			return pBlock;
 		}
 	}
 
-	TEST(TEST_CLASS, CanSignAndVerifyBlockWithoutTransactions) {
+	BLOCK_TRAITS_TEST(CanSignAndVerifyBlockWithoutTransactions) {
 		// Arrange:
-		auto pBlock = CreateSignedBlock(0);
+		auto pBlock = CreateSignedBlock<TTraits>(0);
 
 		// Act:
 		auto isVerified = VerifyBlockHeaderSignature(*pBlock);
@@ -202,9 +418,9 @@ namespace catapult { namespace model {
 		EXPECT_TRUE(isVerified);
 	}
 
-	TEST(TEST_CLASS, CanSignAndVerifyBlockWithTransactions) {
+	BLOCK_TRAITS_TEST(CanSignAndVerifyBlockWithTransactions) {
 		// Arrange:
-		auto pBlock = CreateSignedBlock(3);
+		auto pBlock = CreateSignedBlock<TTraits>(3);
 
 		// Act:
 		auto isVerified = VerifyBlockHeaderSignature(*pBlock);
@@ -213,9 +429,9 @@ namespace catapult { namespace model {
 		EXPECT_TRUE(isVerified);
 	}
 
-	TEST(TEST_CLASS, CanSignAndVerifyBlockHeaderWithTransactions) {
+	BLOCK_TRAITS_TEST(CanSignAndVerifyBlockHeaderWithTransactions) {
 		// Arrange:
-		auto pBlock = CreateSignedBlock(3);
+		auto pBlock = CreateSignedBlock<TTraits>(3);
 		pBlock->Size = sizeof(BlockHeader);
 
 		// Act:
@@ -225,9 +441,9 @@ namespace catapult { namespace model {
 		EXPECT_TRUE(isVerified);
 	}
 
-	TEST(TEST_CLASS, CannotVerifyBlockWithAlteredSignature) {
+	BLOCK_TRAITS_TEST(CannotVerifyBlockWithAlteredSignature) {
 		// Arrange:
-		auto pBlock = CreateSignedBlock(3);
+		auto pBlock = CreateSignedBlock<TTraits>(3);
 		pBlock->Signature[0] ^= 0xFF;
 
 		// Act:
@@ -237,9 +453,9 @@ namespace catapult { namespace model {
 		EXPECT_FALSE(isVerified);
 	}
 
-	TEST(TEST_CLASS, CannotVerifyBlockWithAlteredData) {
+	BLOCK_TRAITS_TEST(CannotVerifyBlockWithAlteredData) {
 		// Arrange:
-		auto pBlock = CreateSignedBlock(3);
+		auto pBlock = CreateSignedBlock<TTraits>(3);
 		pBlock->Timestamp = pBlock->Timestamp + Timestamp(1);
 
 		// Act:
@@ -249,9 +465,9 @@ namespace catapult { namespace model {
 		EXPECT_FALSE(isVerified);
 	}
 
-	TEST(TEST_CLASS, CannotVerifyBlockWithAlteredBlockTransactionsHash) {
+	BLOCK_TRAITS_TEST(CannotVerifyBlockWithAlteredBlockTransactionsHash) {
 		// Arrange:
-		auto pBlock = CreateSignedBlock(3);
+		auto pBlock = CreateSignedBlock<TTraits>(3);
 		pBlock->TransactionsHash[0] ^= 0xFF;
 
 		// Act:
@@ -261,9 +477,9 @@ namespace catapult { namespace model {
 		EXPECT_FALSE(isVerified);
 	}
 
-	TEST(TEST_CLASS, CanVerifyBlockWithAlteredTransaction) {
+	BLOCK_TRAITS_TEST(CanVerifyBlockWithAlteredTransaction) {
 		// Arrange:
-		auto pBlock = CreateSignedBlock(3);
+		auto pBlock = CreateSignedBlock<TTraits>(3);
 		auto transactions = pBlock->Transactions();
 		auto iter = transactions.begin();
 		++iter;
@@ -276,51 +492,28 @@ namespace catapult { namespace model {
 		EXPECT_TRUE(isVerified);
 	}
 
-	// endregion
-
-	// region fees - CalculateBlockTransactionsInfo
-
-	TEST(TEST_CLASS, CanCalculateBlockTransactionsInfoForBlockWithZeroTransactions) {
+	TEST(TEST_CLASS, CanVerifyBlockWithModifiedPaddedBlockFooter_Normal) {
 		// Arrange:
-		auto pBlock = test::GenerateEmptyRandomBlock();
-		pBlock->FeeMultiplier = BlockFeeMultiplier(3);
+		auto pBlock = CreateSignedBlock<BlockNormalTraits>(3);
+		GetBlockFooter<PaddedBlockFooter>(*pBlock).BlockHeader_Reserved1 ^= 0xFF;
 
 		// Act:
-		auto blockTransactionsInfo = CalculateBlockTransactionsInfo(*pBlock);
+		auto isVerified = VerifyBlockHeaderSignature(*pBlock);
 
 		// Assert:
-		EXPECT_EQ(0u, blockTransactionsInfo.Count);
-		EXPECT_EQ(Amount(), blockTransactionsInfo.TotalFee);
+		EXPECT_TRUE(isVerified);
 	}
 
-	TEST(TEST_CLASS, CanCalculateBlockTransactionsInfoForBlockWithSingleTransaction) {
+	TEST(TEST_CLASS, CannotVerifyBlockWithModifiedImportanceBlockFooter_Importance) {
 		// Arrange:
-		auto pBlock = test::GenerateBlockWithTransactions(test::ConstTransactions{ test::GenerateRandomTransactionWithSize(132) });
-		pBlock->FeeMultiplier = BlockFeeMultiplier(3);
+		auto pBlock = CreateSignedBlock<BlockImportanceTraits>(3);
+		GetBlockFooter<ImportanceBlockFooter>(*pBlock).PreviousImportanceBlockHash[0] ^= 0xFF;
 
 		// Act:
-		auto blockTransactionsInfo = CalculateBlockTransactionsInfo(*pBlock);
+		auto isVerified = VerifyBlockHeaderSignature(*pBlock);
 
 		// Assert:
-		EXPECT_EQ(1u, blockTransactionsInfo.Count);
-		EXPECT_EQ(Amount(3 * 132), blockTransactionsInfo.TotalFee);
-	}
-
-	TEST(TEST_CLASS, CanCalculateBlockTransactionsInfoForBlockWithMultipleTransactions) {
-		// Arrange:
-		auto pBlock = test::GenerateBlockWithTransactions(test::ConstTransactions{
-			test::GenerateRandomTransactionWithSize(132),
-			test::GenerateRandomTransactionWithSize(222),
-			test::GenerateRandomTransactionWithSize(552)
-		});
-		pBlock->FeeMultiplier = BlockFeeMultiplier(3);
-
-		// Act:
-		auto blockTransactionsInfo = CalculateBlockTransactionsInfo(*pBlock);
-
-		// Assert:
-		EXPECT_EQ(3u, blockTransactionsInfo.Count);
-		EXPECT_EQ(Amount(3 * 906), blockTransactionsInfo.TotalFee);
+		EXPECT_FALSE(isVerified);
 	}
 
 	// endregion
@@ -426,7 +619,7 @@ namespace catapult { namespace model {
 			EXPECT_EQ(std::vector<uint8_t>(transactionPaddingBytes.size(), 0), transactionPaddingBytes);
 		}
 
-		template<typename TContainerTraits>
+		template<typename TTraits, typename TContainerTraits>
 		void AssertCanCreateBlock(size_t numTransactions) {
 			// Arrange:
 			auto signer = test::GenerateKeyPair();
@@ -440,16 +633,17 @@ namespace catapult { namespace model {
 			auto transactions = TContainerTraits::MapTransactions(randomTransactions);
 
 			// Act:
-			auto pBlock = CreateBlock(context, static_cast<NetworkIdentifier>(0x17), signer.publicKey(), transactions);
+			auto networkIdentifier = static_cast<NetworkIdentifier>(0x17);
+			auto pBlock = CreateBlock(TTraits::Entity_Type, context, networkIdentifier, signer.publicKey(), transactions);
 
 			// Assert:
-			ASSERT_EQ(sizeof(BlockHeader) + SumTransactionSizes(transactions, true), pBlock->Size);
+			ASSERT_EQ(TTraits::Header_Size + SumTransactionSizes(transactions, true), pBlock->Size);
 			EXPECT_EQ(Signature(), pBlock->Signature);
 
 			EXPECT_EQ(signer.publicKey(), pBlock->SignerPublicKey);
 			EXPECT_EQ(Block::Current_Version, pBlock->Version);
 			EXPECT_EQ(static_cast<NetworkIdentifier>(0x17), pBlock->Network);
-			EXPECT_EQ(Entity_Type_Block, pBlock->Type);
+			EXPECT_EQ(TTraits::Entity_Type, pBlock->Type);
 
 			EXPECT_EQ(Height(1235), pBlock->Height);
 			EXPECT_EQ(Timestamp(), pBlock->Timestamp);
@@ -459,18 +653,19 @@ namespace catapult { namespace model {
 			EXPECT_EQ(Hash256(), pBlock->TransactionsHash);
 			EXPECT_EQ(Hash256(), pBlock->ReceiptsHash);
 			EXPECT_EQ(Hash256(), pBlock->StateHash);
-			EXPECT_EQ(signer.publicKey(), pBlock->BeneficiaryPublicKey);
+			EXPECT_EQ(GetSignerAddress(*pBlock), pBlock->BeneficiaryAddress);
 
+			TTraits::AssertZeroedExtendedData(*pBlock);
 			AssertTransactionsInBlock(*pBlock, transactions);
 		}
 	}
 
-	TEST(TEST_CLASS, CanCreateBlockWithoutTransactions) {
-		AssertCanCreateBlock<SharedPointerTraits>(0);
+	BLOCK_TRAITS_TEST(CanCreateBlockWithoutTransactions) {
+		AssertCanCreateBlock<TTraits, SharedPointerTraits>(0);
 	}
 
-	TEST(TEST_CLASS, CanCreateBlockWithTransactions) {
-		AssertCanCreateBlock<SharedPointerTraits>(5);
+	BLOCK_TRAITS_TEST(CanCreateBlockWithTransactions) {
+		AssertCanCreateBlock<TTraits, SharedPointerTraits>(5);
 	}
 
 	// endregion
@@ -478,36 +673,47 @@ namespace catapult { namespace model {
 	// region create block - StitchBlock
 
 	namespace {
-		template<typename TContainerTraits>
+		template<typename TTraits, typename TContainerTraits>
 		void AssertCanStitchBlock(size_t numTransactions) {
 			// Arrange:
-			BlockHeader blockHeader;
-			test::FillWithRandomData({ reinterpret_cast<uint8_t*>(&blockHeader), sizeof(BlockHeader) });
+			static constexpr auto Footer_Size = TTraits::Header_Size - sizeof(BlockHeader);
+
+			// - stitching only copies BlockHeader (and zeros header footer)
+			BlockHeader blockHeaderTemplate;
+			test::FillWithRandomData({ reinterpret_cast<uint8_t*>(&blockHeaderTemplate), sizeof(BlockHeader) });
+			blockHeaderTemplate.Type = TTraits::Entity_Type;
 
 			auto randomTransactions = test::GenerateRandomTransactions(numTransactions);
 			auto transactions = TContainerTraits::MapTransactions(randomTransactions);
 
 			// Act:
-			auto pBlock = StitchBlock(blockHeader, transactions);
+			auto pBlock = StitchBlock(blockHeaderTemplate, transactions);
 
 			// Assert:
-			ASSERT_EQ(sizeof(BlockHeader) + SumTransactionSizes(transactions, true), pBlock->Size);
+			ASSERT_EQ(TTraits::Header_Size + SumTransactionSizes(transactions, true), pBlock->Size);
 
+			// - check header (excluding Size field)
+			const auto* pBlockData = reinterpret_cast<const uint8_t*>(pBlock.get());
 			EXPECT_EQ_MEMORY(
-					reinterpret_cast<const uint8_t*>(&blockHeader) + sizeof(BlockHeader::Size),
-					reinterpret_cast<const uint8_t*>(pBlock.get()) + sizeof(BlockHeader::Size),
+					reinterpret_cast<const uint8_t*>(&blockHeaderTemplate) + sizeof(BlockHeader::Size),
+					pBlockData + sizeof(BlockHeader::Size),
 					sizeof(BlockHeader) - sizeof(BlockHeader::Size));
 
+			// - check header footer
+			std::array<uint8_t, Footer_Size> zeroData{};
+			EXPECT_EQ_MEMORY(zeroData.data(), pBlockData + sizeof(BlockHeader), Footer_Size);
+
+			// - check transactions
 			AssertTransactionsInBlock(*pBlock, transactions);
 		}
 	}
 
-	TEST(TEST_CLASS, CanStitchBlockWithoutTransactions) {
-		AssertCanStitchBlock<SharedPointerTraits>(0);
+	BLOCK_TRAITS_TEST(CanStitchBlockWithoutTransactions) {
+		AssertCanStitchBlock<TTraits, SharedPointerTraits>(0);
 	}
 
-	TEST(TEST_CLASS, CanStitchBlockWithTransactions) {
-		AssertCanStitchBlock<SharedPointerTraits>(5);
+	BLOCK_TRAITS_TEST(CanStitchBlockWithTransactions) {
+		AssertCanStitchBlock<TTraits, SharedPointerTraits>(5);
 	}
 
 	// endregion

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -32,11 +33,13 @@ namespace catapult { namespace harvesting {
 	/// Unlocked accounts updater.
 	class UnlockedAccountsUpdater {
 	public:
-		/// Creates unlocked accounts updater around \a cache, \a unlockedAccounts, node owner (\a bootKeyPair) and \a dataDirectory.
+		/// Creates unlocked accounts updater around \a cache, \a unlockedAccounts, node owner
+		/// (identified by \a signingPublicKey and \a encryptionKeyPair) and \a dataDirectory.
 		UnlockedAccountsUpdater(
 				const cache::CatapultCache& cache,
 				UnlockedAccounts& unlockedAccounts,
-				const crypto::KeyPair& bootKeyPair,
+				const Key& signingPublicKey,
+				const crypto::KeyPair& encryptionKeyPair,
 				const config::CatapultDataDirectory& dataDirectory);
 
 	public:
@@ -49,7 +52,8 @@ namespace catapult { namespace harvesting {
 	private:
 		const cache::CatapultCache& m_cache;
 		UnlockedAccounts& m_unlockedAccounts;
-		const crypto::KeyPair& m_bootKeyPair;
+		Key m_signingPublicKey;
+		const crypto::KeyPair& m_encryptionKeyPair;
 		config::CatapultDataDirectory m_dataDirectory;
 		std::string m_harvestersFilename;
 		UnlockedAccountsStorage m_unlockedAccountsStorage;

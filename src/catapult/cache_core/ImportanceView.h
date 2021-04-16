@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -38,8 +39,8 @@ namespace catapult { namespace cache {
 		/// Gets the importance for \a publicKey at \a height or a default importance if no importance is set.
 		Importance getAccountImportanceOrDefault(const Key& publicKey, Height height) const;
 
-		/// Returns \c true if \a publicKey can harvest at \a height.
-		bool canHarvest(const Key& publicKey, Height height) const;
+		/// Returns \c true if \a address can harvest at \a height.
+		bool canHarvest(const Address& address, Height height) const;
 
 	private:
 		const ReadOnlyAccountStateCache& m_cache;

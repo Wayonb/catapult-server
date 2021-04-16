@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -47,7 +48,7 @@ namespace catapult { namespace plugins {
 		// Arrange:
 		typename TTraits::TransactionType transaction;
 		test::FillWithRandomData(transaction);
-		transaction.AliasAction = model::AliasAction::Link;
+		transaction.AliasAction = AliasAction::Link;
 
 		// Act + Assert:
 		test::TransactionPluginTestUtils<TTraits>::AssertNotificationTypes(transaction, {
@@ -62,11 +63,13 @@ namespace catapult { namespace plugins {
 		// Arrange:
 		typename TTraits::TransactionType transaction;
 		test::FillWithRandomData(transaction);
-		transaction.AliasAction = model::AliasAction::Link;
+		transaction.AliasAction = AliasAction::Link;
 
 		typename test::TransactionPluginTestUtils<TTraits>::PublishTestBuilder builder;
 		builder.template addExpectation<NamespaceRequiredNotification>([&transaction](const auto& notification) {
-			EXPECT_EQ(transaction.SignerPublicKey, notification.Signer);
+			EXPECT_TRUE(notification.Owner.isResolved());
+
+			EXPECT_EQ(GetSignerAddress(transaction), notification.Owner.resolved());
 			EXPECT_EQ(transaction.NamespaceId, notification.NamespaceId);
 		});
 		builder.template addExpectation<AliasLinkNotification>([&transaction](const auto& notification) {
@@ -79,11 +82,12 @@ namespace catapult { namespace plugins {
 			EXPECT_EQ(transaction.MosaicId, notification.AliasedData);
 		});
 		builder.template addExpectation<MosaicRequiredNotification>([&transaction](const auto& notification) {
-			EXPECT_EQ(transaction.SignerPublicKey, notification.Signer);
-			EXPECT_EQ(transaction.MosaicId, notification.MosaicId);
-			EXPECT_EQ(UnresolvedMosaicId(), notification.UnresolvedMosaicId);
+			EXPECT_TRUE(notification.Owner.isResolved());
+			EXPECT_TRUE(notification.MosaicId.isResolved());
+
+			EXPECT_EQ(GetSignerAddress(transaction), notification.Owner.resolved());
+			EXPECT_EQ(transaction.MosaicId, notification.MosaicId.resolved());
 			EXPECT_EQ(0u, notification.PropertyFlagMask);
-			EXPECT_EQ(MosaicRequiredNotification::MosaicType::Resolved, notification.ProvidedMosaicType);
 		});
 
 		// Act + Assert:
@@ -94,7 +98,7 @@ namespace catapult { namespace plugins {
 		// Arrange:
 		typename TTraits::TransactionType transaction;
 		test::FillWithRandomData(transaction);
-		transaction.AliasAction = model::AliasAction::Unlink;
+		transaction.AliasAction = AliasAction::Unlink;
 
 		// Act + Assert:
 		test::TransactionPluginTestUtils<TTraits>::AssertNotificationTypes(transaction, {
@@ -108,11 +112,13 @@ namespace catapult { namespace plugins {
 		// Arrange:
 		typename TTraits::TransactionType transaction;
 		test::FillWithRandomData(transaction);
-		transaction.AliasAction = model::AliasAction::Unlink;
+		transaction.AliasAction = AliasAction::Unlink;
 
 		typename test::TransactionPluginTestUtils<TTraits>::PublishTestBuilder builder;
 		builder.template addExpectation<NamespaceRequiredNotification>([&transaction](const auto& notification) {
-			EXPECT_EQ(transaction.SignerPublicKey, notification.Signer);
+			EXPECT_TRUE(notification.Owner.isResolved());
+
+			EXPECT_EQ(GetSignerAddress(transaction), notification.Owner.resolved());
 			EXPECT_EQ(transaction.NamespaceId, notification.NamespaceId);
 		});
 		builder.template addExpectation<AliasLinkNotification>([&transaction](const auto& notification) {

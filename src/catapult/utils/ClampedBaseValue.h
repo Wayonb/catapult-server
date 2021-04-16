@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -56,9 +57,12 @@ namespace catapult { namespace utils {
 		using Unclamped = typename Traits::UnclampedType;
 
 	public:
+		/// Creates a clamped base value from a default value.
+		constexpr ClampedBaseValue() : ClampedBaseValue(TRange::Default_Value)
+		{}
+
 		/// Creates a clamped base value from a raw \a value.
-		constexpr explicit ClampedBaseValue(TValue value = TRange::Default_Value)
-				: Traits::ClampedBaseType(Clamp(value))
+		constexpr explicit ClampedBaseValue(TValue value) : Traits::ClampedBaseType(Clamp(value))
 		{}
 
 	private:

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -29,7 +30,7 @@
 namespace catapult { namespace test {
 
 	std::unique_ptr<model::AggregateTransaction> CreateRandomAggregateTransactionWithCosignatures(uint32_t numCosignatures) {
-		uint32_t entitySize = sizeof(model::AggregateTransaction) + 124 + numCosignatures * sizeof(model::Cosignature);
+		uint32_t entitySize = SizeOf32<model::AggregateTransaction>() + 124 + numCosignatures * SizeOf32<model::Cosignature>();
 		auto pTransaction = utils::MakeUniqueWithSize<model::AggregateTransaction>(entitySize);
 		FillWithRandomData({ reinterpret_cast<uint8_t*>(pTransaction.get()), entitySize });
 
@@ -59,13 +60,14 @@ namespace catapult { namespace test {
 		using TransactionType = model::AggregateTransaction;
 
 		uint32_t transactionSize = sizeof(mocks::EmbeddedMockTransaction);
-		uint32_t entitySize = sizeof(TransactionType) + numTransactions * (transactionSize + utils::GetPaddingSize(transactionSize, 8));
+		uint32_t payloadSize = numTransactions * (transactionSize + utils::GetPaddingSize(transactionSize, 8));
+		uint32_t entitySize = SizeOf32<TransactionType>() + payloadSize;
 
 		AggregateTransactionWrapper wrapper;
 		auto pTransaction = utils::MakeUniqueWithSize<TransactionType>(entitySize);
 		pTransaction->Size = entitySize;
 		pTransaction->Type = model::Entity_Type_Aggregate_Bonded;
-		pTransaction->PayloadSize = entitySize - sizeof(TransactionType);
+		pTransaction->PayloadSize = payloadSize;
 		FillWithRandomData(pTransaction->SignerPublicKey);
 		FillWithRandomData(pTransaction->Signature);
 
@@ -88,7 +90,7 @@ namespace catapult { namespace test {
 
 	std::unique_ptr<model::Transaction> StripCosignatures(const model::AggregateTransaction& aggregateTransaction) {
 		auto pTransactionWithoutCosignatures = CopyEntity(aggregateTransaction);
-		uint32_t cosignaturesSize = static_cast<uint32_t>(aggregateTransaction.CosignaturesCount()) * sizeof(model::Cosignature);
+		uint32_t cosignaturesSize = static_cast<uint32_t>(aggregateTransaction.CosignaturesCount()) * SizeOf32<model::Cosignature>();
 		pTransactionWithoutCosignatures->Size -= cosignaturesSize;
 		return PORTABLE_MOVE(pTransactionWithoutCosignatures);
 	}

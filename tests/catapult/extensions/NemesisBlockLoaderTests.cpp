@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,6 +22,7 @@
 #include "catapult/extensions/NemesisBlockLoader.h"
 #include "sdk/src/extensions/BlockExtensions.h"
 #include "plugins/coresystem/src/observers/Observers.h"
+#include "plugins/coresystem/src/validators/Validators.h"
 #include "catapult/cache_core/AccountStateCache.h"
 #include "catapult/model/Address.h"
 #include "catapult/model/BlockUtils.h"
@@ -43,7 +45,7 @@ namespace catapult { namespace extensions {
 #define TEST_CLASS NemesisBlockLoaderTests
 
 	namespace {
-		constexpr auto Network_Identifier = model::NetworkIdentifier::Mijin_Test;
+		constexpr auto Network_Identifier = model::NetworkIdentifier::Private_Test;
 
 		// currency and harvesting mosaic transfers need to be tested for correct behavior
 		constexpr auto Currency_Mosaic_Id = MosaicId(3456);
@@ -76,14 +78,21 @@ namespace catapult { namespace extensions {
 
 				auto pTransaction = mocks::CreateTransactionWithFeeAndTransfers(Amount(), unresolvedTransfers);
 				pTransaction->SignerPublicKey = nemesisPublicKey;
+				pTransaction->Version = mocks::MockTransaction::Current_Version;
+				pTransaction->Network = model::NetworkIdentifier::Private_Test;
 				transactions.push_back(std::move(pTransaction));
 			}
 
-			blockSignerPair.pBlock = model::CreateBlock(model::PreviousBlockContext(), Network_Identifier, nemesisPublicKey, transactions);
+			blockSignerPair.pBlock = model::CreateBlock(
+					model::Entity_Type_Block_Nemesis,
+					model::PreviousBlockContext(),
+					Network_Identifier,
+					nemesisPublicKey,
+					transactions);
 			return blockSignerPair;
 		}
 
-		enum class NemesisBlockModification { None, Public_Key, Generation_Hash, Signature };
+		enum class NemesisBlockModification { None, Public_Key, Generation_Hash_Proof, Generation_Hash, Stateless, Stateful };
 
 		void SetNemesisBlock(
 				io::BlockStorageCache& storage,
@@ -101,20 +110,32 @@ namespace catapult { namespace extensions {
 			if (NemesisBlockModification::Public_Key == modification)
 				test::FillWithRandomData(pModifiedBlock->SignerPublicKey);
 			else
-				pModifiedBlock->SignerPublicKey = network.PublicKey;
+				pModifiedBlock->SignerPublicKey = network.NemesisSignerPublicKey;
 
-			// 2. modify the generation hash if requested
+			// 2. modify the generation hash proof if requested
+			if (NemesisBlockModification::Generation_Hash_Proof == modification) {
+				test::FillWithRandomData(pModifiedBlock->GenerationHashProof);
+			} else {
+				auto vrfProof = crypto::GenerateVrfProof(network.GenerationHashSeed, *blockSignerPair.pSigner);
+				pModifiedBlock->GenerationHashProof = { vrfProof.Gamma, vrfProof.VerificationHash, vrfProof.Scalar };
+			}
+
+			// 3. modify the generation hash if requested
 			auto modifiedNemesisBlockElement = test::BlockToBlockElement(*pModifiedBlock);
-			if (NemesisBlockModification::Generation_Hash == modification)
+			if (NemesisBlockModification::Generation_Hash == modification) {
 				test::FillWithRandomData(modifiedNemesisBlockElement.GenerationHash);
-			else
-				modifiedNemesisBlockElement.GenerationHash = network.GenerationHash;
+			} else {
+				auto proofHash = crypto::GenerateVrfProofHash(pModifiedBlock->GenerationHashProof.Gamma);
+				modifiedNemesisBlockElement.GenerationHash = proofHash.copyTo<GenerationHash>();
+			}
 
-			// 3. modify the block signature if requested
-			if (NemesisBlockModification::Signature == modification)
-				test::FillWithRandomData(pModifiedBlock->Signature);
-			else
-				extensions::BlockExtensions(pNemesisBlockElement->GenerationHash).signFullBlock(*blockSignerPair.pSigner, *pModifiedBlock);
+			// 4. modify the block to fail stateless validation
+			if (NemesisBlockModification::Stateless == modification)
+				++pModifiedBlock->Version;
+
+			// 5. modify the block to fail stateful validation
+			if (NemesisBlockModification::Stateful == modification)
+				test::FillWithRandomData(pModifiedBlock->BeneficiaryAddress);
 
 			storageModifier.saveBlock(modifiedNemesisBlockElement);
 			storageModifier.commit();
@@ -139,8 +160,8 @@ namespace catapult { namespace extensions {
 		model::BlockChainConfiguration CreateDefaultConfiguration(const model::Block& nemesisBlock, const NemesisOptions& nemesisOptions) {
 			auto config = model::BlockChainConfiguration::Uninitialized();
 			config.Network.Identifier = Network_Identifier;
-			config.Network.PublicKey = nemesisBlock.SignerPublicKey;
-			test::FillWithRandomData(config.Network.GenerationHash);
+			config.Network.NemesisSignerPublicKey = nemesisBlock.SignerPublicKey;
+			test::FillWithRandomData(config.Network.GenerationHashSeed);
 			config.CurrencyMosaicId = Currency_Mosaic_Id;
 			config.HarvestingMosaicId = Harvesting_Mosaic_Id;
 			config.InitialCurrencyAtomicUnits = nemesisOptions.InitialCurrencyAtomicUnits;
@@ -153,6 +174,7 @@ namespace catapult { namespace extensions {
 			// enable Publish_Transfers (MockTransaction Publish XORs recipient address, so XOR address resolver is required
 			// for proper roundtripping or else test will fail)
 			auto config = model::BlockChainConfiguration::Uninitialized();
+			config.Network.Identifier = Network_Identifier;
 			config.HarvestingMosaicId = Harvesting_Mosaic_Id;
 			auto manager = test::CreatePluginManager(config);
 			manager.addTransactionSupport(mocks::CreateMockTransactionPlugin(mocks::PluginOptionFlags::Publish_Transfers));
@@ -168,18 +190,34 @@ namespace catapult { namespace extensions {
 				resolved = test::CreateResolverContextXor().resolve(unresolved);
 				return true;
 			});
+
+			manager.addStatelessValidatorHook([](auto& builder) {
+				builder.add(validators::CreateEntityVersionValidator());
+			});
+
+			manager.addStatefulValidatorHook([](auto& builder) {
+				builder.add(validators::CreateAddressValidator());
+			});
 			return manager;
 		}
 
-		std::unique_ptr<const observers::NotificationObserver> CreateObserver() {
+		std::unique_ptr<const observers::NotificationObserver> CreateObserverWithHarvestNetworkFees(
+				uint8_t harvestNetworkPercentage,
+				const Address& harvestNetworkFeeSinkAddress) {
 			// use real coresystem observers to create accounts, update balances and add harvest receipt
 			observers::DemuxObserverBuilder builder;
 			builder
 				.add(observers::CreateAccountAddressObserver())
 				.add(observers::CreateAccountPublicKeyObserver())
 				.add(observers::CreateBalanceTransferObserver())
-				.add(observers::CreateHarvestFeeObserver(Harvesting_Mosaic_Id, 20, model::InflationCalculator()));
+				.add(observers::CreateHarvestFeeObserver(
+						{ Harvesting_Mosaic_Id, 20, harvestNetworkPercentage, harvestNetworkFeeSinkAddress },
+						model::InflationCalculator()));
 			return builder.build();
+		}
+
+		std::unique_ptr<const observers::NotificationObserver> CreateObserver() {
+			return CreateObserverWithHarvestNetworkFees(0, Address());
 		}
 
 		const Key& GetTransactionRecipient(const model::Block& block, size_t index) {
@@ -247,7 +285,7 @@ namespace catapult { namespace extensions {
 			auto cacheConfig = cache::CacheConfiguration();
 			test::TempDirectoryGuard dbDirGuard;
 			if (enableVerifiableState)
-				cacheConfig = cache::CacheConfiguration(dbDirGuard.name(), utils::FileSize(), cache::PatriciaTreeStorageMode::Enabled);
+				cacheConfig = cache::CacheConfiguration(dbDirGuard.name(), cache::PatriciaTreeStorageMode::Enabled);
 
 			auto cache = test::CreateEmptyCatapultCache(config, cacheConfig);
 			test::LocalNodeTestState state(config, "", std::move(cache));
@@ -483,7 +521,7 @@ namespace catapult { namespace extensions {
 		test::TempDirectoryGuard dbDirGuard;
 		NemesisOptions nemesisOptions{ Importance(1234), Amount() };
 		auto config = CreateDefaultConfiguration(nemesisBlock, nemesisOptions);
-		auto cacheConfig = cache::CacheConfiguration(dbDirGuard.name(), utils::FileSize(), cache::PatriciaTreeStorageMode::Enabled);
+		auto cacheConfig = cache::CacheConfiguration(dbDirGuard.name(), cache::PatriciaTreeStorageMode::Enabled);
 		auto cache = test::CreateEmptyCatapultCache(config, cacheConfig);
 		{
 			// - calculate the expected state hash after block execution
@@ -545,12 +583,12 @@ namespace catapult { namespace extensions {
 			auto receiptMosaicId = Harvesting_Mosaic_Id;
 			blockStatementBuilder.addReceipt(model::BalanceChangeReceipt(
 					receiptType,
-					nemesisBlock.SignerPublicKey,
+					model::GetSignerAddress(nemesisBlock),
 					receiptMosaicId,
 					Amount()));
 
 			// - resolution receipts due to use of CreateResolverContextXor and interaction with MockTransaction
-			auto recipient = PublicKeyToAddress(GetTransactionRecipient(nemesisBlock, 0), model::NetworkIdentifier::Mijin_Test);
+			auto recipient = model::PublicKeyToAddress(GetTransactionRecipient(nemesisBlock, 0), model::NetworkIdentifier::Private_Test);
 			blockStatementBuilder.addResolution(test::UnresolveXor(recipient), recipient);
 			blockStatementBuilder.addResolution(test::UnresolveXor(receiptMosaicId), receiptMosaicId);
 
@@ -620,6 +658,72 @@ namespace catapult { namespace extensions {
 			EXPECT_EQ(address, accountState.Address);
 			EXPECT_EQ(Height(1), accountState.PublicKeyHeight);
 			EXPECT_EQ(publicKey, accountState.PublicKey);
+		});
+	}
+
+	namespace {
+		template<typename TTraits, typename TAssertAccountStateCache>
+		void RunNemesisBlockSpecialSinkAccountTest(
+				uint8_t harvestNetworkPercentage,
+				const Address& harvestNetworkFeeSinkAddress,
+				TAssertAccountStateCache assertAccountStateCache) {
+			// Arrange: create a valid nemesis block with a single (mosaic) transaction
+			auto nemesisBlockSignerPair = CreateNemesisBlock({ { MakeHarvestingMosaic(1234) } });
+			auto nemesisOptions = NemesisOptions{ Importance(1234), Amount() };
+
+			// - create the state
+			auto config = CreateDefaultConfiguration(*nemesisBlockSignerPair.pBlock, nemesisOptions);
+			config.HarvestNetworkPercentage = harvestNetworkPercentage;
+			config.HarvestNetworkFeeSinkAddress = harvestNetworkFeeSinkAddress;
+			test::LocalNodeTestState state(config);
+			SetNemesisBlock(state.ref().Storage, nemesisBlockSignerPair, config.Network, NemesisBlockModification::None);
+
+			// - create the publisher, observer and loader
+			auto pluginManager = CreatePluginManager();
+			{
+				auto cacheDelta = state.ref().Cache.createDelta();
+				NemesisBlockLoader loader(
+						cacheDelta,
+						pluginManager,
+						CreateObserverWithHarvestNetworkFees(harvestNetworkPercentage, harvestNetworkFeeSinkAddress));
+
+				// Act:
+				TTraits::Execute(loader, state.ref(), nemesisOptions.StateHashVerification);
+
+				// Assert:
+				TTraits::Assert(cacheDelta, assertAccountStateCache);
+			}
+
+			auto cacheView = state.ref().Cache.createView();
+			TTraits::Assert(cacheView, assertAccountStateCache);
+		}
+	}
+
+	TRAITS_BASED_TEST(CanLoadValidNemesisBlock_SpecialSinkAccountIsCreatedWhenEnabled) {
+		// Arrange:
+		auto sinkAddress = test::GenerateRandomAddress(Network_Identifier);
+
+		// Act:
+		RunNemesisBlockSpecialSinkAccountTest<TTraits>(10, sinkAddress, [&sinkAddress](const auto& accountStateCache) {
+			auto accountStateIter = accountStateCache.find(sinkAddress);
+
+			// Assert:
+			EXPECT_TRUE(!!accountStateIter.tryGet());
+			EXPECT_EQ(Height(1), accountStateIter.get().AddressHeight);
+			EXPECT_EQ(sinkAddress, accountStateIter.get().Address);
+		});
+	}
+
+	TRAITS_BASED_TEST(CanLoadValidNemesisBlock_SpecialSinkAccountIsNotCreatedWhenDisabled) {
+		// Arrange:
+		auto sinkAddress = test::GenerateRandomAddress(Network_Identifier);
+
+		// Act:
+		RunNemesisBlockSpecialSinkAccountTest<TTraits>(0, sinkAddress, [&sinkAddress](const auto& accountStateCache) {
+			auto accountStateIter = accountStateCache.find(sinkAddress);
+
+			// Assert:
+			EXPECT_FALSE(!!accountStateIter.tryGet());
 		});
 	}
 
@@ -694,6 +798,14 @@ namespace catapult { namespace extensions {
 
 		// Act: use the wrong public key
 		AssertLoadNemesisBlockFailure<TTraits>(nemesisBlockSignerPair, Importance(1234), NemesisBlockModification::Public_Key);
+	}
+
+	TRAITS_BASED_TEST(CannotLoadNemesisBlockWithWrongGenerationHashProof) {
+		// Arrange: create a valid nemesis block with a single (mosaic) transaction
+		auto nemesisBlockSignerPair = CreateNemesisBlock({ { MakeHarvestingMosaic(1234) } });
+
+		// Act: use the wrong generation hash proof
+		AssertLoadNemesisBlockFailure<TTraits>(nemesisBlockSignerPair, Importance(1234), NemesisBlockModification::Generation_Hash_Proof);
 	}
 
 	TRAITS_BASED_TEST(CannotLoadNemesisBlockWithWrongGenerationHash) {
@@ -809,14 +921,23 @@ namespace catapult { namespace extensions {
 
 	// endregion
 
-	// region failure - signature
+	// region failure - validation
 
-	TRAITS_BASED_TEST(CannotLoadNemesisBlockWithWrongSignature) {
+	TRAITS_BASED_TEST(CannotLoadNemesisBlockThatFailsStatelessValidation) {
 		// Arrange: create a valid nemesis block with a single (mosaic) transaction
 		auto nemesisBlockSignerPair = CreateNemesisBlock({ { MakeHarvestingMosaic(1234) } });
 
 		// Act:
-		auto modification = NemesisBlockModification::Signature;
+		auto modification = NemesisBlockModification::Stateless;
+		AssertLoadNemesisBlockFailure<TTraits, catapult_runtime_error>(nemesisBlockSignerPair, Importance(1234), modification);
+	}
+
+	TRAITS_BASED_TEST(CannotLoadNemesisBlockThatFailsStatefulValidation) {
+		// Arrange: create a valid nemesis block with a single (mosaic) transaction
+		auto nemesisBlockSignerPair = CreateNemesisBlock({ { MakeHarvestingMosaic(1234) } });
+
+		// Act:
+		auto modification = NemesisBlockModification::Stateful;
 		AssertLoadNemesisBlockFailure<TTraits, catapult_runtime_error>(nemesisBlockSignerPair, Importance(1234), modification);
 	}
 

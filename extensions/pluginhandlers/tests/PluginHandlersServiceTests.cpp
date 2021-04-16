@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -54,7 +55,7 @@ namespace catapult { namespace pluginhandlers {
 			// - capture params and register a handler
 			capture.pHandlers = &handlers;
 			capture.pCache = &cache;
-			handlers.registerHandler(ionet::PacketType::Chain_Info, [](const auto&, const auto&) {});
+			handlers.registerHandler(ionet::PacketType::Chain_Statistics, [](const auto&, const auto&) {});
 		});
 
 		// Act:
@@ -63,7 +64,7 @@ namespace catapult { namespace pluginhandlers {
 
 		// Assert:
 		EXPECT_EQ(1u, packetHandlers.size());
-		EXPECT_TRUE(packetHandlers.canProcess(ionet::PacketType::Chain_Info)); // the handler hook registered above
+		EXPECT_TRUE(packetHandlers.canProcess(ionet::PacketType::Chain_Statistics)); // the handler hook registered above
 
 		// - correct params were forwarded to callback
 		EXPECT_EQ(&packetHandlers, capture.pHandlers);

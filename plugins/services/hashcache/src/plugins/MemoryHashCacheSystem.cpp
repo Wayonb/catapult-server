@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -51,10 +52,8 @@ namespace catapult { namespace plugins {
 			builder.add(validators::CreateUniqueTransactionHashValidator());
 		});
 
-		manager.addTransientObserverHook([&config](auto& builder) {
-			builder
-				.add(observers::CreateTransactionHashObserver())
-				.add(observers::CreateCacheTimePruningObserver<cache::HashCache>("TransactionHash", config.BlockPruneInterval));
+		manager.addTransientObserverHook([](auto& builder) {
+			builder.add(observers::CreateTransactionHashObserver());
 		});
 	}
 }}

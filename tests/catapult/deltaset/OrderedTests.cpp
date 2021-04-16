@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -32,16 +33,16 @@ namespace catapult { namespace deltaset {
 	}
 
 // base (mutable)
-DEFINE_MUTABLE_BASE_SET_TESTS_FOR(OrderedMutable);
+DEFINE_MUTABLE_BASE_SET_TESTS_FOR(OrderedMutable)
 
 // base (immutable)
-DEFINE_IMMUTABLE_BASE_SET_TESTS_FOR(OrderedImmutable);
+DEFINE_IMMUTABLE_BASE_SET_TESTS_FOR(OrderedImmutable)
 
 // delta (mutable)
-DEFINE_MUTABLE_BASE_SET_DELTA_TESTS_FOR(OrderedMutable);
+DEFINE_MUTABLE_BASE_SET_DELTA_TESTS_FOR(OrderedMutable)
 
 // delta (immutable)
-DEFINE_IMMUTABLE_BASE_SET_DELTA_TESTS_FOR(OrderedImmutable);
+DEFINE_IMMUTABLE_BASE_SET_DELTA_TESTS_FOR(OrderedImmutable)
 
 /* forward tests only use ordered base variants */
 #define TEST_CLASS OrderedTests

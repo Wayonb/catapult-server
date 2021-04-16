@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -38,14 +39,22 @@ namespace catapult { namespace plugins {
 
 	/// Additional storage configuration.
 	struct StorageConfiguration {
+	public:
+		/// Creates default configuration.
+		StorageConfiguration()
+				: PreferCacheDatabase(false)
+				, CacheDatabaseConfig() // default initialize
+		{}
+
+	public:
 		/// Prefer using a database for cache storage.
-		bool PreferCacheDatabase = false;
+		bool PreferCacheDatabase;
 
 		/// Base directory to use for storing cache database.
 		std::string CacheDatabaseDirectory;
 
-		/// Maximum cache database write batch size.
-		utils::FileSize MaxCacheDatabaseWriteBatchSize;
+		/// Cache database configuration.
+		config::NodeConfiguration::CacheDatabaseSubConfiguration CacheDatabaseConfig;
 	};
 
 	/// Manager for registering plugins.
@@ -71,7 +80,7 @@ namespace catapult { namespace plugins {
 		using AggregateMosaicResolver = AggregateResolver<UnresolvedMosaicId, MosaicId>;
 		using AggregateAddressResolver = AggregateResolver<UnresolvedAddress, Address>;
 
-		using PublisherPointer = std::unique_ptr<model::NotificationPublisher>;
+		using PublisherPointer = std::unique_ptr<const model::NotificationPublisher>;
 
 	public:
 		/// Creates a new plugin manager around \a config, \a storageConfig \a userConfig and \a inflationConfig.

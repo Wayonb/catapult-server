@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -25,7 +26,7 @@
 #include "src/PtSyncSourceService.h"
 #include "catapult/config/ConfigurationFileLoader.h"
 #include "catapult/extensions/ProcessBootstrapper.h"
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 
 namespace catapult { namespace partialtransaction {
 
@@ -33,8 +34,8 @@ namespace catapult { namespace partialtransaction {
 		void RegisterExtension(extensions::ProcessBootstrapper& bootstrapper) {
 			const auto& resourcesPath = bootstrapper.resourcesPath();
 			auto config = PtConfiguration::LoadFromPath(resourcesPath);
-			auto ptCacheOptions = cache::MemoryCacheOptions(config.CacheMaxResponseSize.bytes(), config.CacheMaxSize);
-			AddStaticNodesFromPath(bootstrapper, (boost::filesystem::path(resourcesPath) / "peers-api.json").generic_string());
+			auto ptCacheOptions = cache::MemoryCacheOptions(config.CacheMaxResponseSize, config.CacheMaxSize);
+			AddStaticNodesFromPath(bootstrapper, (std::filesystem::path(resourcesPath) / "peers-api.json").generic_string());
 
 			// create and register the pt cache (it is optional, so not in server state)
 			auto& extensionManager = bootstrapper.extensionManager();

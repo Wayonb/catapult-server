@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -30,6 +31,12 @@ namespace catapult { namespace utils {
 	template<typename T>
 	constexpr const T& as_const(T& ref) {
 		return ref;
+	}
+
+	/// Creates a ratio from \a numerator and \a denominator.
+	template<typename T>
+	double to_ratio(T numerator, T denominator) {
+		return static_cast<double>(numerator) / static_cast<double>(denominator);
 	}
 
 	/// Converts a strongly typed enumeration \a value to its underlying integral value.

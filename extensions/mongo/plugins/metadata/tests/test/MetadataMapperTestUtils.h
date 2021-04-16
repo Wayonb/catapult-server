@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -90,7 +91,7 @@ namespace catapult { namespace test {
 		// Assert:
 		auto expectedFieldCount = TTransactionTraits::Expected_Field_Count;
 		EXPECT_EQ(0 == valueSize ? expectedFieldCount : expectedFieldCount + 1, GetFieldCount(view));
-		EXPECT_EQ(pTransaction->TargetPublicKey, GetKeyValue(view, "targetPublicKey"));
+		EXPECT_EQ(pTransaction->TargetAddress, GetUnresolvedAddressValue(view, "targetAddress"));
 		EXPECT_EQ(pTransaction->ScopedMetadataKey, GetUint64(view, "scopedMetadataKey"));
 		EXPECT_EQ(pTransaction->ValueSizeDelta, GetInt32(view, "valueSizeDelta"));
 		EXPECT_EQ(pTransaction->ValueSize, GetUint32(view, "valueSize"));

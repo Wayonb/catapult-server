@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,6 +23,7 @@
 #include "AccountActivityBuckets.h"
 #include "AccountBalances.h"
 #include "AccountImportanceSnapshots.h"
+#include "AccountPublicKeys.h"
 #include "catapult/model/Mosaic.h"
 
 namespace catapult { namespace state {
@@ -38,6 +40,7 @@ namespace catapult { namespace state {
 		Remote,
 
 		/// Account is a remote harvester eligible account that is unlinked.
+		/// \note This allows an account that has previously been used as remote to be reused as a remote.
 		Remote_Unlinked
 	};
 
@@ -45,14 +48,7 @@ namespace catapult { namespace state {
 	struct PLUGIN_API_DEPENDENCY AccountState {
 	public:
 		/// Creates an account state from \a address and \a addressHeight.
-		AccountState(const catapult::Address& address, Height addressHeight)
-				: Address(address)
-				, AddressHeight(addressHeight)
-				, PublicKey()
-				, PublicKeyHeight(0)
-				, AccountType(AccountType::Unlinked)
-				, LinkedAccountKey()
-		{}
+		AccountState(const catapult::Address& address, Height addressHeight);
 
 	public:
 		/// Address of an account.
@@ -70,8 +66,8 @@ namespace catapult { namespace state {
 		/// Type of account.
 		state::AccountType AccountType;
 
-		/// Public key of linked account.
-		Key LinkedAccountKey;
+		/// Supplemental public keys.
+		AccountPublicKeys SupplementalPublicKeys;
 
 		/// Importance snapshots of the account.
 		AccountImportanceSnapshots ImportanceSnapshots;
@@ -86,9 +82,21 @@ namespace catapult { namespace state {
 	/// Returns \c true if \a accountType corresponds to a remote account.
 	bool IsRemote(AccountType accountType);
 
+	/// Returns \c true if \a accountState contains any historical information.
+	bool HasHistoricalInformation(const AccountState& accountState);
+
 	/// Requires that \a remoteAccountState and \a mainAccountState state are linked.
 	void RequireLinkedRemoteAndMainAccounts(const AccountState& remoteAccountState, const AccountState& mainAccountState);
 
 	/// Applys \a fee surplus at \a importanceHeight to \a accountState.
 	void ApplyFeeSurplus(AccountState& accountState, const model::Mosaic& fee, model::ImportanceHeight importanceHeight);
+
+	/// Gets the linked public key associated with \a accountState or a zero key.
+	Key GetLinkedPublicKey(const AccountState& accountState);
+
+	/// Gets the node public key associated with \a accountState or a zero key.
+	Key GetNodePublicKey(const AccountState& accountState);
+
+	/// Gets the vrf public key associated with \a accountState or a zero key.
+	Key GetVrfPublicKey(const AccountState& accountState);
 }}

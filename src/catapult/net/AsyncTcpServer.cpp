@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -49,6 +50,9 @@ namespace catapult { namespace net {
 				EnableAddressReuse(acceptor);
 			}
 
+			if (boost::asio::ip::tcp::v6() == endpoint.protocol())
+				acceptor.set_option(boost::asio::ip::v6_only(false));
+
 			acceptor.bind(endpoint);
 		}
 
@@ -57,12 +61,12 @@ namespace catapult { namespace net {
 				, public std::enable_shared_from_this<DefaultAsyncTcpServer> {
 		public:
 			DefaultAsyncTcpServer(
-					const std::shared_ptr<thread::IoThreadPool>& pPool,
+					thread::IoThreadPool& pool,
 					const boost::asio::ip::tcp::endpoint& endpoint,
 					const AsyncTcpServerSettings& settings)
-					: m_pPool(pPool)
-					, m_acceptorStrand(pPool->ioContext())
-					, m_acceptor(pPool->ioContext())
+					: m_ioContext(pool.ioContext())
+					, m_acceptorStrand(m_ioContext)
+					, m_acceptor(m_ioContext)
 					, m_settings(settings)
 					, m_isStopped(false)
 					, m_hasPendingAccept(false)
@@ -116,13 +120,16 @@ namespace catapult { namespace net {
 
 		private:
 			void closeAcceptor() {
-				boost::system::error_code ignored_ec;
-				m_acceptor.close(ignored_ec);
+				boost::system::error_code ignoredEc;
+				m_acceptor.close(ignoredEc);
 			}
 
 			void handleAccept(const ionet::PacketSocketInfo& socketInfo) {
 				// add a destruction hook to the socket and post additional handling to the strand
-				ionet::PacketSocketInfo decoratedSocketInfo(socketInfo.host(), addDestructionHook(socketInfo.socket()));
+				ionet::PacketSocketInfo decoratedSocketInfo(
+						socketInfo.host(),
+						socketInfo.publicKey(),
+						addDestructionHook(socketInfo.socket()));
 				boost::asio::post(m_acceptorStrand, [pThis = shared_from_this(), decoratedSocketInfo]() {
 					pThis->handleAcceptOnStrand(decoratedSocketInfo);
 				});
@@ -143,7 +150,7 @@ namespace catapult { namespace net {
 				tryStartAccept();
 
 				// post the user callback on the thread pool (outside of the strand)
-				boost::asio::post(m_pPool->ioContext(), [userCallback = m_settings.Accept, socketInfo] {
+				boost::asio::post(m_ioContext, [userCallback = m_settings.Accept, socketInfo] {
 					userCallback(socketInfo);
 				});
 			}
@@ -192,11 +199,11 @@ namespace catapult { namespace net {
 				auto acceptHandler = [pThis = shared_from_this()](const auto& socketInfo) {
 					pThis->handleAccept(socketInfo);
 				};
-				ionet::Accept(m_pPool->ioContext(), m_acceptor, m_settings.PacketSocketOptions, m_settings.ConfigureSocket, acceptHandler);
+				ionet::Accept(m_ioContext, m_acceptor, m_settings.PacketSocketOptions, acceptHandler);
 			}
 
 		private:
-			std::shared_ptr<thread::IoThreadPool> m_pPool;
+			boost::asio::io_context& m_ioContext;
 			boost::asio::io_context::strand m_acceptorStrand;
 			boost::asio::ip::tcp::acceptor m_acceptor;
 
@@ -208,17 +215,16 @@ namespace catapult { namespace net {
 		};
 	}
 
-	AsyncTcpServerSettings::AsyncTcpServerSettings(const AcceptHandler& accept) :
-			Accept(accept),
-			ConfigureSocket([](const auto&) {}),
-			PacketSocketOptions(ConnectionSettings().toSocketOptions())
+	AsyncTcpServerSettings::AsyncTcpServerSettings(const AcceptHandler& accept)
+			: Accept(accept)
+			, PacketSocketOptions(ConnectionSettings().toSocketOptions())
 	{}
 
 	std::shared_ptr<AsyncTcpServer> CreateAsyncTcpServer(
-			const std::shared_ptr<thread::IoThreadPool>& pPool,
+			thread::IoThreadPool& pool,
 			const boost::asio::ip::tcp::endpoint& endpoint,
 			const AsyncTcpServerSettings& settings) {
-		auto pServer = std::make_shared<DefaultAsyncTcpServer>(pPool, endpoint, settings);
+		auto pServer = std::make_shared<DefaultAsyncTcpServer>(pool, endpoint, settings);
 		pServer->start();
 		return PORTABLE_MOVE(pServer);
 	}

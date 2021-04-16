@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -53,11 +54,12 @@ namespace catapult { namespace plugins {
 				EXPECT_EQ(transaction.NewRestrictionType, notification.RestrictionType);
 			});
 			builder.template addExpectation<MosaicRequiredNotification>([&transaction](const auto& notification) {
-				EXPECT_EQ(transaction.SignerPublicKey, notification.Signer);
-				EXPECT_EQ(MosaicId(), notification.MosaicId);
-				EXPECT_EQ(transaction.MosaicId, notification.UnresolvedMosaicId);
+				EXPECT_TRUE(notification.Owner.isResolved());
+				EXPECT_FALSE(notification.MosaicId.isResolved());
+
+				EXPECT_EQ(GetSignerAddress(transaction), notification.Owner.resolved());
+				EXPECT_EQ(transaction.MosaicId, notification.MosaicId.unresolved());
 				EXPECT_EQ(0x04u, notification.PropertyFlagMask);
-				EXPECT_EQ(MosaicRequiredNotification::MosaicType::Unresolved, notification.ProvidedMosaicType);
 			});
 			builder.template addExpectation<MosaicGlobalRestrictionModificationPreviousValueNotification>([&transaction](
 					const auto& notification) {

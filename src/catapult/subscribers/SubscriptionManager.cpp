@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,6 +21,7 @@
 
 #include "SubscriptionManager.h"
 #include "AggregateBlockChangeSubscriber.h"
+#include "AggregateFinalizationSubscriber.h"
 #include "AggregateNodeSubscriber.h"
 #include "AggregatePtChangeSubscriber.h"
 #include "AggregateStateChangeSubscriber.h"
@@ -34,7 +36,7 @@ namespace catapult { namespace subscribers {
 
 	SubscriptionManager::SubscriptionManager(const config::CatapultConfiguration& config)
 			: m_config(config)
-			, m_pStorage(std::make_unique<io::FileBlockStorage>(m_config.User.DataDirectory)) {
+			, m_pStorage(std::make_unique<io::FileBlockStorage>(m_config.User.DataDirectory, m_config.Node.FileDatabaseBatchSize)) {
 		m_subscriberUsedFlags.fill(false);
 	}
 
@@ -45,28 +47,23 @@ namespace catapult { namespace subscribers {
 	// region add - subscriber
 
 	void SubscriptionManager::addBlockChangeSubscriber(std::unique_ptr<io::BlockChangeSubscriber>&& pSubscriber) {
-		requireUnused(SubscriberType::BlockChange);
+		requireUnused(SubscriberType::Block_Change);
 		m_blockChangeSubscribers.push_back(std::move(pSubscriber));
 	}
 
-	void SubscriptionManager::addUtChangeSubscriber(std::unique_ptr<cache::UtChangeSubscriber>&& pSubscriber) {
-		requireUnused(SubscriberType::UtChange);
-		m_utChangeSubscribers.push_back(std::move(pSubscriber));
-	}
-
 	void SubscriptionManager::addPtChangeSubscriber(std::unique_ptr<cache::PtChangeSubscriber>&& pSubscriber) {
-		requireUnused(SubscriberType::PtChange);
+		requireUnused(SubscriberType::Pt_Change);
 		m_ptChangeSubscribers.push_back(std::move(pSubscriber));
 	}
 
-	void SubscriptionManager::addTransactionStatusSubscriber(std::unique_ptr<TransactionStatusSubscriber>&& pSubscriber) {
-		requireUnused(SubscriberType::TransactionStatus);
-		m_transactionStatusSubscribers.push_back(std::move(pSubscriber));
+	void SubscriptionManager::addUtChangeSubscriber(std::unique_ptr<cache::UtChangeSubscriber>&& pSubscriber) {
+		requireUnused(SubscriberType::Ut_Change);
+		m_utChangeSubscribers.push_back(std::move(pSubscriber));
 	}
 
-	void SubscriptionManager::addStateChangeSubscriber(std::unique_ptr<StateChangeSubscriber>&& pSubscriber) {
-		requireUnused(SubscriberType::StateChange);
-		m_stateChangeSubscribers.push_back(std::move(pSubscriber));
+	void SubscriptionManager::addFinalizationSubscriber(std::unique_ptr<FinalizationSubscriber>&& pSubscriber) {
+		requireUnused(SubscriberType::Finalization);
+		m_finalizationSubscribers.push_back(std::move(pSubscriber));
 	}
 
 	void SubscriptionManager::addNodeSubscriber(std::unique_ptr<NodeSubscriber>&& pSubscriber) {
@@ -74,23 +71,48 @@ namespace catapult { namespace subscribers {
 		m_nodeSubscribers.push_back(std::move(pSubscriber));
 	}
 
+	void SubscriptionManager::addStateChangeSubscriber(std::unique_ptr<StateChangeSubscriber>&& pSubscriber) {
+		requireUnused(SubscriberType::State_Change);
+		m_stateChangeSubscribers.push_back(std::move(pSubscriber));
+	}
+
+	void SubscriptionManager::addTransactionStatusSubscriber(std::unique_ptr<TransactionStatusSubscriber>&& pSubscriber) {
+		requireUnused(SubscriberType::Transaction_Status);
+		m_transactionStatusSubscribers.push_back(std::move(pSubscriber));
+	}
+
 	// endregion
 
 	// region create - subscriber
 
 	std::unique_ptr<io::BlockChangeSubscriber> SubscriptionManager::createBlockChangeSubscriber() {
-		markUsed(SubscriberType::BlockChange);
+		markUsed(SubscriberType::Block_Change);
 		return std::make_unique<AggregateBlockChangeSubscriber<>>(std::move(m_blockChangeSubscribers));
 	}
 
+	std::unique_ptr<cache::PtChangeSubscriber> SubscriptionManager::createPtChangeSubscriber() {
+		markUsed(SubscriberType::Pt_Change);
+		return std::make_unique<AggregatePtChangeSubscriber<>>(std::move(m_ptChangeSubscribers));
+	}
+
 	std::unique_ptr<cache::UtChangeSubscriber> SubscriptionManager::createUtChangeSubscriber() {
-		markUsed(SubscriberType::UtChange);
+		markUsed(SubscriberType::Ut_Change);
 		return std::make_unique<AggregateUtChangeSubscriber<>>(std::move(m_utChangeSubscribers));
 	}
 
-	std::unique_ptr<cache::PtChangeSubscriber> SubscriptionManager::createPtChangeSubscriber() {
-		markUsed(SubscriberType::PtChange);
-		return std::make_unique<AggregatePtChangeSubscriber<>>(std::move(m_ptChangeSubscribers));
+	std::unique_ptr<FinalizationSubscriber> SubscriptionManager::createFinalizationSubscriber() {
+		markUsed(SubscriberType::Finalization);
+		return std::make_unique<AggregateFinalizationSubscriber<>>(std::move(m_finalizationSubscribers));
+	}
+
+	std::unique_ptr<NodeSubscriber> SubscriptionManager::createNodeSubscriber() {
+		markUsed(SubscriberType::Node);
+		return std::make_unique<AggregateNodeSubscriber<>>(std::move(m_nodeSubscribers));
+	}
+
+	std::unique_ptr<StateChangeSubscriber> SubscriptionManager::createStateChangeSubscriber() {
+		markUsed(SubscriberType::State_Change);
+		return std::make_unique<AggregateStateChangeSubscriber<>>(std::move(m_stateChangeSubscribers));
 	}
 
 	std::unique_ptr<TransactionStatusSubscriber> SubscriptionManager::createTransactionStatusSubscriber() {
@@ -98,7 +120,7 @@ namespace catapult { namespace subscribers {
 		public:
 			void notifyStatus(const model::Transaction& transaction, const Hash256& hash, uint32_t status) override {
 				auto result = validators::ValidationResult(status);
-				CATAPULT_LOG_LEVEL(validators::MapToLogLevel(result))
+				CATAPULT_LOG(trace)
 						<< "rejected tx " << hash << " due to result " << result
 						<< " (deadline " << transaction.Deadline << ")";
 			}
@@ -107,19 +129,9 @@ namespace catapult { namespace subscribers {
 			{}
 		};
 
-		markUsed(SubscriberType::TransactionStatus);
+		markUsed(SubscriberType::Transaction_Status);
 		m_transactionStatusSubscribers.push_back(std::make_unique<LoggingTransactionStatusSubscriber>());
 		return std::make_unique<AggregateTransactionStatusSubscriber<>>(std::move(m_transactionStatusSubscribers));
-	}
-
-	std::unique_ptr<StateChangeSubscriber> SubscriptionManager::createStateChangeSubscriber() {
-		markUsed(SubscriberType::StateChange);
-		return std::make_unique<AggregateStateChangeSubscriber<>>(std::move(m_stateChangeSubscribers));
-	}
-
-	std::unique_ptr<NodeSubscriber> SubscriptionManager::createNodeSubscriber() {
-		markUsed(SubscriberType::Node);
-		return std::make_unique<AggregateNodeSubscriber<>>(std::move(m_nodeSubscribers));
 	}
 
 	// endregion
@@ -133,25 +145,25 @@ namespace catapult { namespace subscribers {
 			return io::CreateAggregateBlockStorage(std::move(m_pStorage), std::move(pBlockChangeSubscriber));
 		}
 
-		markUsed(SubscriberType::BlockChange);
+		markUsed(SubscriberType::Block_Change);
 		pSubscriber = nullptr;
 		return std::move(m_pStorage);
-	}
-
-	std::unique_ptr<cache::MemoryUtCacheProxy> SubscriptionManager::createUtCache(const cache::MemoryCacheOptions& options) {
-		if (!m_utChangeSubscribers.empty())
-			return std::make_unique<cache::MemoryUtCacheProxy>(options, cache::CreateAggregateUtCache, createUtChangeSubscriber());
-
-		markUsed(SubscriberType::UtChange);
-		return std::make_unique<cache::MemoryUtCacheProxy>(options);
 	}
 
 	std::unique_ptr<cache::MemoryPtCacheProxy> SubscriptionManager::createPtCache(const cache::MemoryCacheOptions& options) {
 		if (!m_ptChangeSubscribers.empty())
 			return std::make_unique<cache::MemoryPtCacheProxy>(options, cache::CreateAggregatePtCache, createPtChangeSubscriber());
 
-		markUsed(SubscriberType::PtChange);
+		markUsed(SubscriberType::Pt_Change);
 		return std::make_unique<cache::MemoryPtCacheProxy>(options);
+	}
+
+	std::unique_ptr<cache::MemoryUtCacheProxy> SubscriptionManager::createUtCache(const cache::MemoryCacheOptions& options) {
+		if (!m_utChangeSubscribers.empty())
+			return std::make_unique<cache::MemoryUtCacheProxy>(options, cache::CreateAggregateUtCache, createUtChangeSubscriber());
+
+		markUsed(SubscriberType::Ut_Change);
+		return std::make_unique<cache::MemoryUtCacheProxy>(options);
 	}
 
 	// endregion

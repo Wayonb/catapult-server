@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,9 +29,9 @@ namespace catapult { namespace validators {
 
 	DEFINE_STATEFUL_VALIDATOR(NewRemoteAccountAvailability, [](const Notification& notification, const ValidatorContext& context) {
 		const auto& cache = context.Cache.sub<cache::AccountStateCache>();
-		auto remoteAccountStateIter = cache.find(notification.RemoteAccountKey);
+		auto remoteAccountStateIter = cache.find(notification.LinkedPublicKey);
 		return !remoteAccountStateIter.tryGet() || state::AccountType::Remote_Unlinked == remoteAccountStateIter.get().AccountType
 				? ValidationResult::Success
 				: Failure_AccountLink_Remote_Account_Ineligible;
-	});
+	})
 }}

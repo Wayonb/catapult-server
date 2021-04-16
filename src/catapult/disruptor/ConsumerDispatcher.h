@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,8 +24,8 @@
 #include "Disruptor.h"
 #include "DisruptorConsumer.h"
 #include "DisruptorInspector.h"
+#include "catapult/thread/ThreadGroup.h"
 #include "catapult/utils/NamedObject.h"
-#include <boost/thread.hpp>
 #include <atomic>
 
 namespace catapult { namespace disruptor { class ConsumerEntry; } }
@@ -70,6 +71,9 @@ namespace catapult { namespace disruptor {
 		/// Gets the number of elements currently in the disruptor.
 		size_t numActiveElements() const;
 
+		/// Gets the cumulative size of all elements currently in the disruptor.
+		utils::FileSize memorySize() const;
+
 	private:
 		DisruptorElement* tryNext(ConsumerEntry& consumerEntry);
 
@@ -77,17 +81,17 @@ namespace catapult { namespace disruptor {
 
 		bool canProcessNextElement() const;
 
-		ProcessingCompleteFunc wrap(const ProcessingCompleteFunc& processingComplete);
+		ProcessingCompleteFunc wrap(const ProcessingCompleteFunc& processingComplete, utils::FileSize inputMemorySize);
 
 	private:
-		size_t m_elementTraceInterval;
-		bool m_shouldThrowIfFull;
+		ConsumerDispatcherOptions m_options;
 		std::atomic_bool m_keepRunning;
 		DisruptorBarriers m_barriers;
 		Disruptor m_disruptor;
 		DisruptorInspector m_inspector;
-		boost::thread_group m_threads;
+		thread::ThreadGroup m_threads;
 		std::atomic<size_t> m_numActiveElements;
+		std::atomic<uint64_t> m_memorySize;
 
 		utils::SpinLock m_addSpinLock; // lock to serialize access to Disruptor::add
 	};

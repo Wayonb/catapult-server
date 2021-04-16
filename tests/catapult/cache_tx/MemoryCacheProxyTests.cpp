@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -35,13 +36,13 @@ namespace catapult { namespace cache {
 		void AssertSize(size_t expectedSize, const CacheProxy& cache) {
 			EXPECT_EQ(expectedSize, cache.view().size());
 			EXPECT_EQ(expectedSize, cache.get().view().size());
-			EXPECT_EQ(expectedSize, const_cast<CacheProxy&>(cache).get().view().size());
+			EXPECT_EQ(expectedSize, const_cast<CacheProxy&>(cache).get().modifier().size());
 		}
 	}
 
 	TEST(TEST_CLASS, CanCreateProxyAroundMemoryCache) {
 		// Arrange:
-		CacheProxy cache(MemoryCacheOptions(1'000'000, 1'000));
+		CacheProxy cache(MemoryCacheOptions(utils::FileSize(), utils::FileSize::FromKilobytes(1)));
 
 		// Act: add some infos
 		for (const auto& info : test::CreateTransactionInfos(5))
@@ -78,16 +79,19 @@ namespace catapult { namespace cache {
 	TEST(TEST_CLASS, CanCreateProxyAroundMemoryCacheAggregate) {
 		// Arrange:
 		size_t numModifierCalls = 0;
-		CacheProxy cache(MemoryCacheOptions(1'000'000, 1'000), CreateMockMutableCache, numModifierCalls);
+		CacheProxy cache(
+				MemoryCacheOptions(utils::FileSize(), utils::FileSize::FromKilobytes(1)),
+				CreateMockMutableCache,
+				numModifierCalls);
 
 		// Act: add some infos
 		for (const auto& info : test::CreateTransactionInfos(5))
 			cache.modifier().add(info);
 
-		// Assert: check view sizes
+		// Assert: check view sizes, this makes an additonal call to modifier
 		AssertSize(5, cache);
 
 		// - importantly notice that modifier() was called on the wrapper, which delegated to the memory cache modifier()
-		EXPECT_EQ(5u, numModifierCalls);
+		EXPECT_EQ(6u, numModifierCalls);
 	}
 }}

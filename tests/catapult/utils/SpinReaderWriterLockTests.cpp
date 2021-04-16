@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -256,7 +257,7 @@ namespace catapult { namespace utils {
 		test::LockTestGuard testGuard(state);
 
 		for (auto i = 0u; i < test::Num_Default_Lock_Threads; ++i) {
-			testGuard.Threads.create_thread([&, i] {
+			testGuard.Threads.spawn([&, i] {
 				// Act: acquire a reader and increment the counter
 				auto readLock = lock.acquireReader();
 				state.incrementCounterAndBlock(counter, i);
@@ -314,13 +315,14 @@ namespace catapult { namespace utils {
 		SpinReaderWriterLock lock;
 		char value = '\0';
 		test::LockTestState state;
+		thread::ThreadGroup levelTwoThreads;
 		test::LockTestGuard testGuard(state);
 
 		// Act: spawn the reader thread
-		testGuard.Threads.create_thread([&] {
+		testGuard.Threads.spawn([&] {
 			// - acquire a reader and then spawn thread that takes a write lock
 			auto readLock = lock.acquireReader();
-			testGuard.Threads.create_thread([&] {
+			levelTwoThreads.spawn([&] {
 				// - the writer should be blocked because the outer thread is holding a read lock
 				auto writeLock2 = typename TTraits::LockGuard(lock);
 				state.setValueAndBlock(value, 'w');
@@ -345,13 +347,14 @@ namespace catapult { namespace utils {
 		SpinReaderWriterLock lock;
 		char value = '\0';
 		test::LockTestState state;
+		thread::ThreadGroup levelTwoThreads;
 		test::LockTestGuard testGuard(state);
 
 		// Act: spawn the writer thread
-		testGuard.Threads.create_thread([&] {
+		levelTwoThreads.spawn([&] {
 			// - acquire a writer and then spawn thread that takes a read lock
 			auto writeLock = typename TTraits::LockGuard(lock);
-			testGuard.Threads.create_thread([&] {
+			testGuard.Threads.spawn([&] {
 				// - the reader should be blocked because the outer thread is holding a write lock
 				auto readLock2 = lock.acquireReader();
 				state.setValueAndBlock(value, 'r');
@@ -437,20 +440,21 @@ namespace catapult { namespace utils {
 		//  W:   |WriteLock**  |    # when M ReadLock is released, pending writer is unblocked
 		//  R:     |ReadLock***  |  # when W WriteLock is released, pending reader2 is unblocked
 		ReaderWriterRaceState<TTraits> state;
+		thread::ThreadGroup levelTwoThreads;
 		test::LockTestGuard testGuard(state);
 
 		// Act: spawn a reader thread
-		testGuard.Threads.create_thread([&] {
+		testGuard.Threads.spawn([&] {
 			// - acquire a reader lock
 			auto readLock = state.Lock.acquireReader();
 
 			// - spawn a thread that will acquire a writer lock
-			testGuard.Threads.create_thread([&] {
+			levelTwoThreads.spawn([&] {
 				state.doWriterWork();
 			});
 
 			// - spawn a thread that will acquire a reader lock after a writer is pending
-			testGuard.Threads.create_thread([&] {
+			levelTwoThreads.spawn([&] {
 				WAIT_FOR_EXPR(state.Lock.isWriterPending());
 				state.doReaderWork();
 			});
@@ -477,22 +481,23 @@ namespace catapult { namespace utils {
 		//  W:       [WriteLock****  |  # when R ReadLock is released, pending writer is unblocked
 		//                              # (note that promotion is blocked by R ReadLock)
 		ReaderWriterRaceState<WriterPromotionTraits> state;
+		thread::ThreadGroup levelTwoThreads;
 		test::LockTestGuard testGuard(state);
 
 		// Act: spawn a reader thread
-		testGuard.Threads.create_thread([&] {
+		testGuard.Threads.spawn([&] {
 			// Act: acquire a reader lock
 			auto readLock = state.Lock.acquireReader();
 
 			// - spawn a thread that will acquire a writer lock after multiple readers (including itself) are active
-			testGuard.Threads.create_thread([&] {
+			levelTwoThreads.spawn([&] {
 				auto writerThreadReadLock = state.acquireReader();
 				WAIT_FOR_VALUE(2u, state.NumReaderThreads);
 				state.doWriterWork(std::move(writerThreadReadLock));
 			});
 
 			// - spawn a thread that will acquire a reader lock after the writer thread
-			testGuard.Threads.create_thread([&] {
+			levelTwoThreads.spawn([&] {
 				WAIT_FOR_ONE(state.NumReaderThreads);
 				state.doReaderWork();
 			});
@@ -518,15 +523,16 @@ namespace catapult { namespace utils {
 		//  R:     |ReadLock      |     # when M ReadLock is released, pending reader2 is unblocked
 		//  W:       [WriteLock****  |  # when W and R ReadLock are released, pending writer is unblocked
 		ReaderWriterRaceState<WriterAcquireTraits> state;
+		thread::ThreadGroup levelTwoThreads;
 		test::LockTestGuard testGuard(state);
 
 		// Act: spawn a reader thread
-		testGuard.Threads.create_thread([&] {
+		testGuard.Threads.spawn([&] {
 			// Act: acquire a reader lock
 			auto readLock = state.Lock.acquireReader();
 
 			// - spawn a thread that will acquire a writer lock after multiple readers (including itself) are active
-			testGuard.Threads.create_thread([&] {
+			levelTwoThreads.spawn([&] {
 				{
 					auto writerThreadReadLock = state.acquireReader();
 					WAIT_FOR_VALUE(2u, state.NumReaderThreads);
@@ -536,7 +542,7 @@ namespace catapult { namespace utils {
 			});
 
 			// - spawn a thread that will acquire a reader lock after the writer thread
-			testGuard.Threads.create_thread([&] {
+			levelTwoThreads.spawn([&] {
 				WAIT_FOR_ONE(state.NumReaderThreads);
 				state.doReaderWork();
 			});

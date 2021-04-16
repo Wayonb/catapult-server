@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,44 +21,55 @@
 
 #include "ConfigurationTestUtils.h"
 #include "catapult/utils/Logging.h"
-#include <boost/filesystem/path.hpp>
-#include <boost/filesystem.hpp>
+#include "tests/test/net/CertificateLocator.h"
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
+#include <filesystem>
 
 namespace pt = boost::property_tree;
 
 namespace catapult { namespace test {
 
 	namespace {
-		std::string CopyFile(const boost::filesystem::path& destinationPath, const std::string& filename) {
-			auto sourceFilePath = boost::filesystem::path("..") / "resources" / filename;
+		std::string CopyFile(const std::filesystem::path& destinationPath, const std::string& filename) {
+			auto sourceFilePath = std::filesystem::path("..") / "resources" / filename;
 			auto destinationFilePath = destinationPath / filename;
-			boost::filesystem::copy_file(sourceFilePath, destinationFilePath);
+			std::filesystem::copy_file(sourceFilePath, destinationFilePath);
 			return destinationFilePath.generic_string();
 		}
 
-		void SetAutoHarvesting(const std::string& configFilePath) {
+		void DisableVoting(const std::string& configFilePath) {
 			pt::ptree properties;
 			pt::read_ini(configFilePath, properties);
-			properties.put("harvesting.enableAutoHarvesting", true);
-			properties.put("harvesting.harvesterPrivateKey", "3485D98EFD7EB07ADAFCFD1A157D89DE2796A95E780813C0258AF3F5F84ED8CB");
+			properties.put("finalization.enableVoting", false);
+			pt::write_ini(configFilePath, properties);
+		}
+
+		void ClearAutoHarvesting(const std::string& configFilePath) {
+			pt::ptree properties;
+			pt::read_ini(configFilePath, properties);
+			properties.put("harvesting.enableAutoHarvesting", false);
 			pt::write_ini(configFilePath, properties);
 		}
 	}
 
 	void PrepareConfiguration(const std::string& destination, NodeFlag nodeFlag) {
-		auto destinationResourcesPath = boost::filesystem::path(destination) / "resources";
-		boost::filesystem::create_directories(destinationResourcesPath);
-		CopyFile(destinationResourcesPath, "config-networkheight.properties");
+		auto destinationResourcesPath = std::filesystem::path(destination) / "resources";
+		std::filesystem::create_directories(destinationResourcesPath);
+
+		auto finalizationConfigFilePath = CopyFile(destinationResourcesPath, "config-finalization.properties");
+		DisableVoting(finalizationConfigFilePath);
+
 		CopyFile(destinationResourcesPath, "config-task.properties");
+
+		GenerateCertificateDirectory((std::filesystem::path(destination) / "cert").generic_string());
 
 		// don't copy the harvesting configuration if an api node is being simulated
 		if (HasFlag(NodeFlag::Simulated_Api, nodeFlag))
 			return;
 
 		auto harvestingConfigFilePath = CopyFile(destinationResourcesPath, "config-harvesting.properties");
-		if (HasFlag(NodeFlag::Auto_Harvest, nodeFlag))
-			SetAutoHarvesting(harvestingConfigFilePath);
+		if (!HasFlag(NodeFlag::Auto_Harvest, nodeFlag))
+			ClearAutoHarvesting(harvestingConfigFilePath);
 	}
 }}

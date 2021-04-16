@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,7 +21,7 @@
 
 #include "NemesisCompatibleConfiguration.h"
 #include "tests/test/local/LocalTestUtils.h"
-#include "tests/test/nodeps/MijinConstants.h"
+#include "tests/test/nodeps/TestNetworkConstants.h"
 
 namespace catapult { namespace test {
 
@@ -41,7 +42,7 @@ namespace catapult { namespace test {
 				{ "maxMosaicDuration", "456d" },
 				{ "maxMosaicDivisibility", "6" },
 
-				{ "mosaicRentalFeeSinkPublicKey", Mosaic_Rental_Fee_Sink_Public_Key },
+				{ "mosaicRentalFeeSinkAddress", Mosaic_Rental_Fee_Sink_Address },
 				{ "mosaicRentalFee", "500" }
 			}
 		}}));
@@ -57,7 +58,7 @@ namespace catapult { namespace test {
 				{ "namespaceGracePeriodDuration", "1h" },
 				{ "reservedRootNamespaceNames", "cat" },
 
-				{ "namespaceRentalFeeSinkPublicKey", Namespace_Rental_Fee_Sink_Public_Key },
+				{ "namespaceRentalFeeSinkAddress", Namespace_Rental_Fee_Sink_Address },
 				{ "rootNamespaceRentalFeePerBlock", "10" },
 				{ "childNamespaceRentalFee", "10000" }
 			}
@@ -71,7 +72,8 @@ namespace catapult { namespace test {
 		}
 
 		void AddCommonPluginExtensions(config::ExtensionsConfiguration& config) {
-			AddPluginExtensions(config, { "diagnostics", "networkheight", "packetserver", "sync", "transactionsink" });
+			// finalization is needed because int tests are run with 0 == MaxRollbackBlocks
+			AddPluginExtensions(config, { "diagnostics", "finalization", "packetserver", "sync", "transactionsink" });
 		}
 	}
 
@@ -81,11 +83,11 @@ namespace catapult { namespace test {
 
 	void AddPeerPluginExtensions(config::ExtensionsConfiguration& config) {
 		AddCommonPluginExtensions(config);
-		AddPluginExtensions(config, { "eventsource", "harvesting", "syncsource" });
+		AddPluginExtensions(config, { "harvesting", "syncsource" });
 	}
 
 	void AddSimplePartnerPluginExtensions(config::ExtensionsConfiguration& config) {
-		AddPluginExtensions(config, { "packetserver", "sync", "syncsource" });
+		AddPluginExtensions(config, { "finalization", "packetserver", "sync", "syncsource" });
 	}
 
 	void AddRecoveryPluginExtensions(config::ExtensionsConfiguration& config) {

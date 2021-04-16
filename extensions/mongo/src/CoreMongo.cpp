@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,6 +21,7 @@
 
 #include "CoreMongo.h"
 #include "MongoPluginManager.h"
+#include "mappers/KeyLinkTransactionMapper.h"
 #include "storages/MongoAccountStateCacheStorage.h"
 #include "mongo/src/MongoReceiptPluginFactory.h"
 #include "catapult/model/BlockChainConfiguration.h"
@@ -27,6 +29,10 @@
 namespace catapult { namespace mongo {
 
 	void RegisterCoreMongoSystem(MongoPluginManager& manager) {
+		// transaction support
+		manager.addTransactionSupport(mappers::CreateVotingKeyLinkTransactionMongoPlugin());
+		manager.addTransactionSupport(mappers::CreateVrfKeyLinkTransactionMongoPlugin());
+
 		// cache storage support
 		manager.addStorageSupport(storages::CreateMongoAccountStateCacheStorage(manager.mongoContext(), manager.networkIdentifier()));
 

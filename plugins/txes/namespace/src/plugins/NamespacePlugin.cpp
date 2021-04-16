@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,7 +32,6 @@
 #include "src/observers/Observers.h"
 #include "src/validators/Validators.h"
 #include "catapult/cache/ReadOnlyCatapultCache.h"
-#include "catapult/model/Address.h"
 #include "catapult/observers/ObserverUtils.h"
 #include "catapult/observers/RentalFeeObserver.h"
 #include "catapult/plugins/CacheHandlers.h"
@@ -74,15 +74,13 @@ namespace catapult { namespace plugins {
 				UnresolvedMosaicId currencyMosaicId,
 				const config::NamespaceConfiguration& config) {
 			NamespaceRentalFeeConfiguration rentalFeeConfig;
-			rentalFeeConfig.SinkPublicKey = config.NamespaceRentalFeeSinkPublicKey;
 			rentalFeeConfig.CurrencyMosaicId = currencyMosaicId;
 			rentalFeeConfig.RootFeePerBlock = config.RootNamespaceRentalFeePerBlock;
 			rentalFeeConfig.ChildFee = config.ChildNamespaceRentalFee;
-			rentalFeeConfig.NemesisPublicKey = network.PublicKey;
+			rentalFeeConfig.NemesisSignerPublicKey = network.NemesisSignerPublicKey;
 
 			// sink address is already resolved but needs to be passed as unresolved into notification
-			auto sinkAddress = PublicKeyToAddress(rentalFeeConfig.SinkPublicKey, network.Identifier);
-			std::memcpy(rentalFeeConfig.SinkAddress.data(), sinkAddress.data(), sinkAddress.size());
+			rentalFeeConfig.SinkAddress = config.NamespaceRentalFeeSinkAddress.copyTo<UnresolvedAddress>();
 			return rentalFeeConfig;
 		}
 
@@ -172,15 +170,15 @@ namespace catapult { namespace plugins {
 			});
 
 			manager.addStatelessValidatorHook([config, minDuration, maxDuration](auto& builder) {
-				const auto& reservedNames = config.ReservedRootNamespaceNames;
 				builder
 					.add(validators::CreateNamespaceRegistrationTypeValidator())
-					.add(validators::CreateNamespaceNameValidator(config.MaxNameSize, reservedNames))
+					.add(validators::CreateNamespaceNameValidator(config.MaxNameSize))
 					.add(validators::CreateRootNamespaceValidator(minDuration, maxDuration));
 			});
 
 			manager.addStatefulValidatorHook([constraints, config](auto& builder) {
 				builder
+					.add(validators::CreateNamespaceReservedNameValidator(config.ReservedRootNamespaceNames))
 					.add(validators::CreateRootNamespaceAvailabilityValidator())
 					.add(validators::CreateNamespaceDurationOverflowValidator(constraints.MaxNamespaceDuration))
 					// note that the following validator needs to run before the RootNamespaceMaxChildrenValidator
@@ -201,8 +199,7 @@ namespace catapult { namespace plugins {
 							"NamespaceGracePeriod",
 							model::Receipt_Type_Namespace_Expired,
 							gracePeriodDuration))
-					.add(observers::CreateCacheBlockTouchObserver<cache::NamespaceCache>("Namespace", expiryReceiptType))
-					.add(observers::CreateCacheBlockPruningObserver<cache::NamespaceCache>("Namespace", 1, maxRollbackBlocks));
+					.add(observers::CreateCacheBlockTouchObserver<cache::NamespaceCache>("Namespace", expiryReceiptType));
 			});
 		}
 

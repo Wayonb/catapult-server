@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,7 +29,7 @@ namespace catapult { namespace test {
 	/// Creates \a count lock infos with increasing heights.
 	template<typename TLockInfoTraits>
 	auto CreateLockInfos(size_t count) {
-		std::vector<typename TLockInfoTraits::ValueType> lockInfos;
+		std::vector<typename TLockInfoTraits::LockInfoType> lockInfos;
 		for (auto i = 0u; i < count; ++i) {
 			lockInfos.emplace_back(TLockInfoTraits::CreateLockInfo(Height((i + 1) * 10)));
 			if (0 == i % 2)
@@ -40,7 +41,7 @@ namespace catapult { namespace test {
 
 	/// Asserts that \a lhs and \a rhs are equal.
 	inline void AssertEqualLockInfo(const state::LockInfo& lhs, const state::LockInfo& rhs) {
-		EXPECT_EQ(lhs.SenderPublicKey, rhs.SenderPublicKey);
+		EXPECT_EQ(lhs.OwnerAddress, rhs.OwnerAddress);
 		EXPECT_EQ(lhs.MosaicId, rhs.MosaicId);
 		EXPECT_EQ(lhs.Amount, rhs.Amount);
 		EXPECT_EQ(lhs.EndHeight, rhs.EndHeight);

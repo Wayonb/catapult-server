@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,111 +20,80 @@
 **/
 
 #include "tools/ToolMain.h"
-#include "catapult/crypto/KeyPair.h"
-#include "catapult/crypto/KeyUtils.h"
+#include "tools/AccountTool.h"
 #include "catapult/model/Address.h"
-#include "catapult/utils/Logging.h"
-#include "catapult/utils/RandomGenerator.h"
-#include "catapult/exceptions.h"
-#include <iostream>
-#include <string>
+#include "catapult/utils/ConfigurationValueParsers.h"
 
 namespace catapult { namespace tools { namespace address {
 
 	namespace {
-		class AddressTool : public Tool {
+		// region Mode
+
+		enum class Mode { Encoded_Address, Decoded_Address, Public_Key, Secret_Key };
+
+		Mode ParseMode(const std::string& str) {
+			static const std::array<std::pair<const char*, Mode>, 4> String_To_Mode_Pairs{{
+				{ "encoded", Mode::Encoded_Address },
+				{ "decoded", Mode::Decoded_Address },
+				{ "public", Mode::Public_Key },
+				{ "secret", Mode::Secret_Key }
+			}};
+
+			Mode mode;
+			if (!utils::TryParseEnumValue(String_To_Mode_Pairs, str, mode)) {
+				std::ostringstream out;
+				out << "'" << str << "' is not a valid mode";
+				CATAPULT_THROW_INVALID_ARGUMENT(out.str().c_str());
+			}
+
+			return mode;
+		}
+
+		// endregion
+
+		// region AddressInspectorTool
+
+		class AddressInspectorTool : public AccountTool {
 		public:
-			std::string name() const override {
-				return "Address Tool";
-			}
-
-			void prepareOptions(OptionsBuilder& optionsBuilder, OptionsPositional&) override {
-				optionsBuilder("generate,g",
-						OptionsValue<uint32_t>(m_numRandomKeys)->default_value(3),
-						"number of random keys to generate");
-				optionsBuilder("public,p",
-						OptionsValue<std::string>(m_publicKey),
-						"show address associated with public key");
-				optionsBuilder("secret,s",
-						OptionsValue<std::string>(m_secretKey),
-						"show address and public key associated with private key");
-#ifdef SIGNATURE_SCHEME_KECCAK
-				optionsBuilder("network,n",
-						OptionsValue<std::string>(m_networkName)->default_value("public"),
-						"network, possible values: public (default), public-test");
-#else
-				optionsBuilder("network,n",
-						OptionsValue<std::string>(m_networkName)->default_value("mijin"),
-						"network, possible values: mijin (default), mijin-test");
-#endif
-
-				optionsBuilder("useLowEntropySource,w",
-						OptionsSwitch(),
-						"true if a low entropy source should be used for randomness (unsafe)");
-			}
-
-			int run(const Options& options) override {
-				model::NetworkIdentifier networkId;
-				if (!model::TryParseValue(m_networkName, networkId))
-					CATAPULT_THROW_INVALID_ARGUMENT_1("unknown network", m_networkName);
-
-				if (!m_publicKey.empty()) {
-					output(networkId, crypto::ParseKey(m_publicKey));
-					return 0;
-				}
-
-				if (!m_secretKey.empty()) {
-					output(networkId, crypto::KeyPair::FromString(m_secretKey));
-					return 0;
-				}
-
-				if (options["useLowEntropySource"].as<bool>())
-					generateKeys(networkId, utils::LowEntropyRandomGenerator());
-				else
-					generateKeys(networkId, utils::HighEntropyRandomGenerator());
-
-				return 0;
-			}
+			AddressInspectorTool() : AccountTool("Address Inspector Tool", AccountTool::InputDisposition::Required)
+			{}
 
 		private:
-			void output(model::NetworkIdentifier networkId, const crypto::KeyPair& keyPair) {
-				std::cout << std::setw(Label_Width) << "private key: " << crypto::FormatKey(keyPair.privateKey()) << std::endl;
-				output(networkId, keyPair.publicKey());
+			void prepareAdditionalOptions(OptionsBuilder& optionsBuilder) override {
+				optionsBuilder("mode,m",
+						OptionsValue<std::string>()->required(),
+						"mode, possible values: encoded, decoded, public, secret");
 			}
 
-			void output(model::NetworkIdentifier networkId, const Key& publicKey) {
-				std::cout
-						<< std::setw(Label_Width) << "public key: " << crypto::FormatKey(publicKey) << std::endl
-						<< std::setw(Label_Width - static_cast<int>(m_networkName.size()) - 3)
-								<< "address (" << m_networkName << "): "
-								<< model::AddressToString(model::PublicKeyToAddress(publicKey, networkId)) << std::endl;
-			}
+			void process(const Options& options, const std::vector<std::string>& values, AccountPrinter& printer) override {
+				auto mode = ParseMode(options["mode"].as<std::string>());
+				for (const auto& value : values) {
+					switch (mode) {
+					case Mode::Encoded_Address:
+						printer.print(model::StringToAddress(value));
+						break;
 
-			template<typename TGenerator>
-			void generateKeys(model::NetworkIdentifier networkId, TGenerator&& generator) {
-				std::cout << "--- generating " << m_numRandomKeys << " keys ---" << std::endl;
+					case Mode::Decoded_Address:
+						printer.print(utils::ParseByteArray<Address>(value));
+						break;
 
-				for (auto i = 0u; i < m_numRandomKeys; ++i) {
-					output(networkId, crypto::KeyPair::FromPrivate(crypto::PrivateKey::Generate([&generator]() {
-						return static_cast<uint8_t>(generator());
-					})));
-					std::cout << std::endl;
+					case Mode::Public_Key:
+						printer.print(utils::ParseByteArray<Key>(value));
+						break;
+
+					case Mode::Secret_Key:
+						printer.print(crypto::KeyPair::FromString(value));
+						break;
+					}
 				}
 			}
-
-		private:
-			uint32_t m_numRandomKeys;
-			std::string m_publicKey;
-			std::string m_secretKey;
-			std::string m_networkName;
-
-		private:
-			static constexpr int Label_Width = 24;
 		};
+
+		// endregion
 	}
 }}}
 
 int main(int argc, const char** argv) {
-	catapult::tools::address::AddressTool tool;
+	catapult::tools::address::AddressInspectorTool tool;
 	return catapult::tools::ToolMain(argc, argv, tool);
 }

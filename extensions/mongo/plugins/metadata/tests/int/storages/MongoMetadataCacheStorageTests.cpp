@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -40,6 +41,7 @@ namespace catapult { namespace mongo { namespace plugins {
 			using ModelType = state::MetadataEntry;
 
 			static constexpr auto Collection_Name = "metadata";
+			static constexpr auto Primary_Document_Name = "metadataEntry";
 			static constexpr auto Network_Id = static_cast<model::NetworkIdentifier>(0x5A);
 			static constexpr auto CreateCacheStorage = CreateMongoMetadataCacheStorage;
 
@@ -70,11 +72,13 @@ namespace catapult { namespace mongo { namespace plugins {
 			}
 
 			static auto GetFindFilter(const ModelType& metadataEntry) {
-				return document() << "metadataEntry.compositeHash" << mappers::ToBinary(metadataEntry.key().uniqueKey()) << finalize;
+				return document()
+						<< std::string(Primary_Document_Name) + ".compositeHash" << mappers::ToBinary(metadataEntry.key().uniqueKey())
+						<< finalize;
 			}
 
 			static void AssertEqual(const ModelType& metadataEntry, const bsoncxx::document::view& view) {
-				test::AssertEqualMetadataEntry(metadataEntry, view["metadataEntry"].get_document().view());
+				test::AssertEqualMetadataEntry(metadataEntry, view[Primary_Document_Name].get_document().view());
 			}
 		};
 	}

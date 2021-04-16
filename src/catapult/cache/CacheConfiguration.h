@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,6 +20,7 @@
 **/
 
 #pragma once
+#include "catapult/config/NodeConfiguration.h"
 #include "catapult/utils/FileSize.h"
 #include <string>
 
@@ -42,15 +44,19 @@ namespace catapult { namespace cache {
 				, ShouldStorePatriciaTrees(false)
 		{}
 
-		/// Creates a cache configuration around \a databaseDirectory, \a maxCacheDatabaseWriteBatchSize
-		/// and specified patricia tree storage \a mode.
+		/// Creates a cache configuration around \a databaseDirectory and specified patricia tree storage \a mode.
+		CacheConfiguration(const std::string& databaseDirectory, PatriciaTreeStorageMode mode)
+				: CacheConfiguration(databaseDirectory, config::NodeConfiguration::CacheDatabaseSubConfiguration(), mode)
+		{}
+
+		/// Creates a cache configuration around \a databaseDirectory, \a databaseConfig and specified patricia tree storage \a mode.
 		CacheConfiguration(
 				const std::string& databaseDirectory,
-				utils::FileSize maxCacheDatabaseWriteBatchSize,
+				const config::NodeConfiguration::CacheDatabaseSubConfiguration& databaseConfig,
 				PatriciaTreeStorageMode mode)
 				: ShouldUseCacheDatabase(true)
 				, CacheDatabaseDirectory(databaseDirectory)
-				, MaxCacheDatabaseWriteBatchSize(maxCacheDatabaseWriteBatchSize)
+				, CacheDatabaseConfig(databaseConfig)
 				, ShouldStorePatriciaTrees(PatriciaTreeStorageMode::Enabled == mode)
 		{}
 
@@ -61,8 +67,8 @@ namespace catapult { namespace cache {
 		/// Base directory to use for storing cache database.
 		std::string CacheDatabaseDirectory;
 
-		/// Maximum size of database write batch.
-		utils::FileSize MaxCacheDatabaseWriteBatchSize;
+		/// Cache database configuration.
+		config::NodeConfiguration::CacheDatabaseSubConfiguration CacheDatabaseConfig;
 
 		/// \c true if patricia trees should be stored, \c false otherwise.
 		bool ShouldStorePatriciaTrees;

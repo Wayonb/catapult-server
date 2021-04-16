@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,7 +29,7 @@ namespace catapult { namespace net {
 
 	namespace {
 		constexpr utils::LogLevel MapToLogLevel(ionet::SocketOperationCode code) {
-			return ionet::SocketOperationCode::Closed == code ? utils::LogLevel::Debug : utils::LogLevel::Warning;
+			return ionet::SocketOperationCode::Closed == code ? utils::LogLevel::debug : utils::LogLevel::warning;
 		}
 
 		class DefaultChainedSocketReader

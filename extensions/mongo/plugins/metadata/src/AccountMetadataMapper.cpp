@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,7 +32,7 @@ namespace catapult { namespace mongo { namespace plugins {
 		template<typename TTransaction>
 		void Stream(bson_stream::document& builder, const TTransaction& transaction) {
 			builder
-					<< "targetPublicKey" << ToBinary(transaction.TargetPublicKey)
+					<< "targetAddress" << ToBinary(transaction.TargetAddress)
 					<< "scopedMetadataKey" << static_cast<int64_t>(transaction.ScopedMetadataKey)
 					<< "valueSizeDelta" << transaction.ValueSizeDelta
 					<< "valueSize" << transaction.ValueSize;

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -27,21 +28,31 @@ namespace catapult { namespace test {
 
 	// region create (single)
 
+	namespace {
+		void Prepare(model::TransactionInfo& transactionInfo) {
+			FillWithRandomData(transactionInfo.EntityHash);
+			FillWithRandomData(transactionInfo.MerkleComponentHash);
+			transactionInfo.OptionalExtractedAddresses = std::make_shared<model::UnresolvedAddressSet>();
+		}
+	}
+
 	model::TransactionInfo CreateRandomTransactionInfo() {
 		auto transactionInfo = model::TransactionInfo(GenerateRandomTransaction());
-		FillWithRandomData(transactionInfo.EntityHash);
-		FillWithRandomData(transactionInfo.MerkleComponentHash);
-		transactionInfo.OptionalExtractedAddresses = std::make_shared<model::UnresolvedAddressSet>();
+		Prepare(transactionInfo);
 		return transactionInfo;
 	}
 
-	model::TransactionInfo CreateTransactionInfoWithDeadline(size_t deadline) {
+	model::TransactionInfo CreateRandomTransactionInfoWithSize(uint32_t entitySize) {
+		auto transactionInfo = model::TransactionInfo(GenerateRandomTransactionWithSize(entitySize));
+		Prepare(transactionInfo);
+		return transactionInfo;
+	}
+
+	model::TransactionInfo CreateTransactionInfoWithDeadline(uint64_t deadline) {
 		auto pTransaction = GenerateRandomTransaction();
 		pTransaction->Deadline = Timestamp(deadline);
 		auto transactionInfo = model::TransactionInfo(std::move(pTransaction));
-		FillWithRandomData(transactionInfo.EntityHash);
-		FillWithRandomData(transactionInfo.MerkleComponentHash);
-		transactionInfo.OptionalExtractedAddresses = std::make_shared<model::UnresolvedAddressSet>();
+		Prepare(transactionInfo);
 		return transactionInfo;
 	}
 

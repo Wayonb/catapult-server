@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -33,7 +34,16 @@ namespace catapult { namespace ionet {
 		Peer = 0x01,
 
 		/// Api node.
-		Api = 0x02
+		Api = 0x02,
+
+		/// Voting node.
+		Voting = 0x04,
+
+		/// IPv4 compatible node.
+		IPv4 = 0x40,
+
+		/// IPv6 compatible node.
+		IPv6 = 0x80
 	};
 
 	MAKE_BITWISE_ENUM(NodeRoles)

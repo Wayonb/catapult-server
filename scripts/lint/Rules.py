@@ -9,10 +9,10 @@ from exclusions import \
 
 
 class Rules(Enum):
-    Default = 1
-    Plugin = 2
-    Extension = 3
-    Tools = 4
+    DEFAULT = 1
+    PLUGIN = 2
+    EXTENSION = 3
+    TOOLS = 4
 
 
 def getMajorComponentName(component):
@@ -249,7 +249,7 @@ class ExtensionRules:
         elif 'plugins' in pathElements:
             expectedUnified = 'catapult:mongo:plugins:'
         else:
-            for subcomponent in ['api', 'chain', 'handlers']:
+            for subcomponent in ['api', 'chain', 'handlers', 'io', 'ionet', 'model']:
                 if subcomponent in pathElements:
                     expectedUnified = 'catapult:' + subcomponent + ':'
                     break
@@ -383,8 +383,8 @@ class ToolsRules:
 
 
 RULE_ID_TO_CLASS_MAP = {
-    Rules.Default: DefaultRules,
-    Rules.Plugin: PluginRules,
-    Rules.Extension: ExtensionRules,
-    Rules.Tools: ToolsRules
+    Rules.DEFAULT: DefaultRules,
+    Rules.PLUGIN: PluginRules,
+    Rules.EXTENSION: ExtensionRules,
+    Rules.TOOLS: ToolsRules
 }

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -78,9 +79,10 @@ namespace catapult { namespace builders {
 
 		// 2. set fixed transaction fields
 		pTransaction->RecipientAddress = m_recipientAddress;
-		pTransaction->MosaicsCount = utils::checked_cast<size_t, uint8_t>(m_mosaics.size());
 		pTransaction->MessageSize = utils::checked_cast<size_t, uint16_t>(m_message.size());
+		pTransaction->MosaicsCount = utils::checked_cast<size_t, uint8_t>(m_mosaics.size());
 		pTransaction->TransferTransactionBody_Reserved1 = 0;
+		pTransaction->TransferTransactionBody_Reserved2 = 0;
 
 		// 3. set transaction attachments
 		std::copy(m_mosaics.cbegin(), m_mosaics.cend(), pTransaction->MosaicsPtr());

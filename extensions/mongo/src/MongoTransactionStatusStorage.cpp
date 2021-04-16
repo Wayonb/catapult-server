@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,8 +37,7 @@ namespace catapult { namespace mongo {
 		auto CreateFilter(const std::string& fieldName) {
 			return [fieldName](const auto& status) {
 				auto filter = document()
-						<< fieldName
-						<< open_document
+						<< fieldName << open_document
 							<< "$eq" << mongo::mappers::ToBinary(status.Hash)
 						<< close_document
 						<< finalize;
@@ -56,7 +56,7 @@ namespace catapult { namespace mongo {
 		public:
 			void notifyStatus(const model::Transaction& transaction, const Hash256& hash, uint32_t status) override {
 				utils::SpinLockGuard guard(m_lock);
-				m_transactionStatuses.emplace_back(hash, status, transaction.Deadline);
+				m_transactionStatuses.emplace_back(hash, transaction.Deadline, status);
 			}
 
 			void flush() override {

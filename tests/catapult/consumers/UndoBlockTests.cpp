@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -41,7 +42,7 @@ namespace catapult { namespace consumers {
 			versions.push_back(seed); // block should be processed after all transactions, so it should be undone first
 
 			for (uint8_t i = 0u; i < numTransactions; ++i)
-				versions.push_back(seed + numTransactions - i);
+				versions.push_back(static_cast<uint8_t>(seed + numTransactions - i));
 
 			return versions;
 		}
@@ -128,7 +129,7 @@ namespace catapult { namespace consumers {
 			// Arrange:
 			test::TempDirectoryGuard dbDirGuard;
 			auto config = model::BlockChainConfiguration::Uninitialized();
-			auto cacheConfig = cache::CacheConfiguration(dbDirGuard.name(), utils::FileSize(), cache::PatriciaTreeStorageMode::Enabled);
+			auto cacheConfig = cache::CacheConfiguration(dbDirGuard.name(), cache::PatriciaTreeStorageMode::Enabled);
 			auto cache = test::CreateEmptyCatapultCache(config, cacheConfig);
 
 			auto delta = cache.createDelta();

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -71,7 +72,7 @@ namespace catapult { namespace api {
 					return false;
 
 				auto pResponse = static_cast<const GenericResponse*>(&packet);
-				result = pResponse->Foo * m_multiplier;
+				result = static_cast<ResultType>(pResponse->Foo * m_multiplier);
 				return 0 == result % 2; // indicate only even results are valid
 			}
 

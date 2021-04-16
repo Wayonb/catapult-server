@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -50,7 +51,7 @@ namespace catapult { namespace chain {
 				}
 
 				const auto& singleRequest() const {
-					return m_pTransactionApi->transactionInfosRequests()[0];
+					return m_pTransactionApi->transactionInfosRequests()[0].ShortHashPairs;
 				}
 
 				void setError(bool setError = true) {
@@ -61,7 +62,7 @@ namespace catapult { namespace chain {
 				}
 
 				void checkAdditionalRequestParameters() {
-					// no additional request parameters
+					EXPECT_EQ(Timestamp(84), m_pTransactionApi->transactionInfosRequests()[0].Deadline);
 				}
 
 			private:
@@ -92,8 +93,13 @@ namespace catapult { namespace chain {
 
 			static auto CreateSynchronizer(
 					const partialtransaction::ShortHashPairsSupplier& shortHashPairsSupplier,
-					const partialtransaction::CosignedTransactionInfosConsumer& transactionInfosConsumer) {
-				return CreatePtSynchronizer(shortHashPairsSupplier, transactionInfosConsumer);
+					const partialtransaction::CosignedTransactionInfosConsumer& transactionInfosConsumer,
+					bool shouldExecute = true) {
+				return CreatePtSynchronizer(
+						[]() { return Timestamp(84); },
+						shortHashPairsSupplier,
+						transactionInfosConsumer,
+						[shouldExecute]() { return shouldExecute; });
 			}
 
 			static void AssertCustomResponse(const ResponseContainerType& expectedResponse, const ResponseContainerType& actualResponse) {
@@ -105,5 +111,5 @@ namespace catapult { namespace chain {
 		};
 	}
 
-	DEFINE_ENTITIES_SYNCHRONIZER_TESTS(PtSynchronizer)
+	DEFINE_CONDITIONAL_ENTITIES_SYNCHRONIZER_TESTS(PtSynchronizer)
 }}

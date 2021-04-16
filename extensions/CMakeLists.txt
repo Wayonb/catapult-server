@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.14)
 
 include_directories(.)
 include_directories(${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/src)
@@ -33,8 +33,8 @@ endfunction()
 
 add_subdirectory(addressextraction)
 add_subdirectory(diagnostics)
-add_subdirectory(eventsource)
 add_subdirectory(filespooling)
+add_subdirectory(finalization)
 add_subdirectory(harvesting)
 add_subdirectory(hashcache)
 add_subdirectory(mongo)

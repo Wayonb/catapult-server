@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,14 +29,20 @@ namespace catapult { namespace config {
 	/// User configuration settings.
 	struct UserConfiguration {
 	public:
-		/// Boot private key.
-		std::string BootPrivateKey;
-
 		/// \c true if potential delegated harvesters should be automatically detected.
 		bool EnableDelegatedHarvestersAutoDetection;
 
+		/// Seed directory containing nemesis.
+		std::string SeedDirectory;
+
 		/// Data directory.
 		std::string DataDirectory;
+
+		/// Certificate directory.
+		std::string CertificateDirectory;
+
+		/// Voting keys directory.
+		std::string VotingKeysDirectory;
 
 		/// Plugins directory.
 		std::string PluginsDirectory;

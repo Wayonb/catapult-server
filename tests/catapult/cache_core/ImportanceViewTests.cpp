@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,9 +22,10 @@
 #include "catapult/cache_core/ImportanceView.h"
 #include "catapult/cache_core/AccountStateCache.h"
 #include "catapult/model/Address.h"
-#include "catapult/model/NetworkInfo.h"
+#include "catapult/model/NetworkIdentifier.h"
 #include "tests/test/cache/AccountStateCacheTestUtils.h"
 #include "tests/test/cache/ImportanceViewTestUtils.h"
+#include "tests/test/core/AccountStateTestUtils.h"
 #include "tests/TestHarness.h"
 
 using catapult::model::ImportanceHeight;
@@ -59,7 +61,7 @@ namespace catapult { namespace cache {
 				// explicitly mark the account as a main account (local harvesting when remote harvesting is enabled)
 				auto accountStateIter = PublicKeyTraits::AddAccount(delta, publicKey, height);
 				accountStateIter.get().AccountType = state::AccountType::Main;
-				accountStateIter.get().LinkedAccountKey = test::GenerateRandomByteArray<Key>();
+				test::ForceSetLinkedPublicKey(accountStateIter.get(), test::GenerateRandomByteArray<Key>());
 				return accountStateIter;
 			}
 		};
@@ -70,12 +72,12 @@ namespace catapult { namespace cache {
 				auto mainAccountPublicKey = test::GenerateRandomByteArray<Key>();
 				auto mainAccountStateIter = PublicKeyTraits::AddAccount(delta, mainAccountPublicKey, height);
 				mainAccountStateIter.get().AccountType = state::AccountType::Main;
-				mainAccountStateIter.get().LinkedAccountKey = publicKey;
+				test::ForceSetLinkedPublicKey(mainAccountStateIter.get(), publicKey);
 
 				// 2. add the remote account with specified key
 				auto accountStateIter = PublicKeyTraits::AddAccount(delta, publicKey, height);
 				accountStateIter.get().AccountType = state::AccountType::Remote;
-				accountStateIter.get().LinkedAccountKey = mainAccountPublicKey;
+				test::ForceSetLinkedPublicKey(accountStateIter.get(), mainAccountPublicKey);
 				return mainAccountStateIter;
 			}
 		};
@@ -197,7 +199,7 @@ namespace catapult { namespace cache {
 		struct CanHarvestViaMemberTraits {
 			static bool CanHarvest(const AccountStateCache& cache, const Key& publicKey, Height height) {
 				auto pView = test::CreateImportanceView(cache);
-				return pView->canHarvest(publicKey, height);
+				return pView->canHarvest(model::PublicKeyToAddress(publicKey, Default_Cache_Options.NetworkIdentifier), height);
 			}
 		};
 
@@ -291,7 +293,7 @@ namespace catapult { namespace cache {
 
 		struct CanHarvestTraits {
 			static void Act(const ImportanceView& view, const Key& publicKey) {
-				view.canHarvest(publicKey, Height(111));
+				view.canHarvest(model::PublicKeyToAddress(publicKey, Default_Cache_Options.NetworkIdentifier), Height(111));
 			}
 		};
 	}
@@ -334,7 +336,7 @@ namespace catapult { namespace cache {
 	IMPROPER_LINKS_TRAITS_BASED_TEST(FailureWhenLinkedAccountDoesNotReferenceRemoteAccount) {
 		AssertImproperLink<TTraits>([](auto& accountState) {
 			// Arrange: change the main account to point to a different account
-			test::FillWithRandomData(accountState.LinkedAccountKey);
+			test::ForceSetLinkedPublicKey(accountState, test::GenerateRandomByteArray<Key>());
 		});
 	}
 

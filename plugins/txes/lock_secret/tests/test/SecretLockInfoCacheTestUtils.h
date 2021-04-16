@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -30,7 +31,9 @@ namespace catapult { namespace test {
 
 	/// Basic traits for a secret lock info.
 	struct BasicSecretLockInfoTestTraits : public cache::SecretLockInfoCacheDescriptor {
-		using cache::SecretLockInfoCacheDescriptor::ValueType;
+		using HistoryType = cache::SecretLockInfoCacheDescriptor::ValueType;
+		using LockInfoType = HistoryType::ValueType;
+		using ValueType = LockInfoType;
 
 		static constexpr auto ToKey = cache::SecretLockInfoCacheDescriptor::GetKeyFromValue;
 

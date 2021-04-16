@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -63,7 +64,7 @@ namespace catapult { namespace model {
 
 	// region size + alignment + properties
 
-#define TRANSACTION_FIELDS FIELD(TargetPublicKey) FIELD(ScopedMetadataKey) FIELD(ValueSizeDelta) FIELD(ValueSize)
+#define TRANSACTION_FIELDS FIELD(TargetAddress) FIELD(ScopedMetadataKey) FIELD(ValueSizeDelta) FIELD(ValueSize)
 
 	namespace {
 		template<typename T>
@@ -71,13 +72,13 @@ namespace catapult { namespace model {
 			// Arrange:
 			auto expectedSize = baseSize + expectedTargetIdSize;
 
-#define FIELD(X) expectedSize += sizeof(T::X);
+#define FIELD(X) expectedSize += SizeOf32<decltype(T::X)>();
 			TRANSACTION_FIELDS
 #undef FIELD
 
 			// Assert:
 			EXPECT_EQ(expectedSize, sizeof(T));
-			EXPECT_EQ(baseSize + expectedTargetIdSize + 44u, sizeof(T));
+			EXPECT_EQ(baseSize + expectedTargetIdSize + 36u, sizeof(T));
 		}
 
 		using AccountMetadataFlag = std::integral_constant<MetadataType, MetadataType::Account>;
@@ -136,7 +137,7 @@ namespace catapult { namespace model {
 		template<typename TTraits>
 		struct MetadataTransactionTraits {
 			static auto GenerateEntityWithAttachments(uint8_t count) {
-				uint32_t entitySize = sizeof(typename TTraits::TransactionType) + count;
+				uint32_t entitySize = SizeOf32<typename TTraits::TransactionType>() + count;
 				auto pTransaction = utils::MakeUniqueWithSize<typename TTraits::TransactionType>(entitySize);
 				pTransaction->Size = entitySize;
 				pTransaction->ValueSize = count;
@@ -190,20 +191,20 @@ namespace catapult { namespace model {
 
 	// region ExtractAdditionalRequiredCosignatories
 
-	METADATA_TYPE_BASED_TEST(ExtractAdditionalRequiredCosignatories_ExtractsNothingWhenTargetPublicKeyIsEqualToSigner) {
+	METADATA_TYPE_BASED_TEST(ExtractAdditionalRequiredCosignatories_ExtractsTargetAddressWhenEqualToSigner) {
 		// Arrange:
 		typename TTraits::EmbeddedTransactionType transaction;
 		test::FillWithRandomData(transaction);
-		transaction.TargetPublicKey = transaction.SignerPublicKey;
+		transaction.TargetAddress = GetSignerAddress(transaction).template copyTo<UnresolvedAddress>();
 
 		// Act:
 		auto additionalCosignatories = ExtractAdditionalRequiredCosignatories(transaction);
 
 		// Assert:
-		EXPECT_EQ(utils::KeySet(), additionalCosignatories);
+		EXPECT_EQ(UnresolvedAddressSet{ transaction.TargetAddress }, additionalCosignatories);
 	}
 
-	METADATA_TYPE_BASED_TEST(ExtractAdditionalRequiredCosignatories_ExtractsTargetPublicKeyWhenNotEqualToSigner) {
+	METADATA_TYPE_BASED_TEST(ExtractAdditionalRequiredCosignatories_ExtractsTargetAddressWhenNotEqualToSigner) {
 		// Arrange:
 		typename TTraits::EmbeddedTransactionType transaction;
 		test::FillWithRandomData(transaction);
@@ -212,7 +213,7 @@ namespace catapult { namespace model {
 		auto additionalCosignatories = ExtractAdditionalRequiredCosignatories(transaction);
 
 		// Assert:
-		EXPECT_EQ(utils::KeySet{ transaction.TargetPublicKey }, additionalCosignatories);
+		EXPECT_EQ(UnresolvedAddressSet{ transaction.TargetAddress }, additionalCosignatories);
 	}
 
 	// endregion

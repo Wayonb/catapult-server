@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,6 +22,7 @@
 #pragma once
 #include "HexFormatter.h"
 #include <array>
+#include <cstring>
 
 namespace catapult { namespace utils {
 
@@ -142,6 +144,15 @@ namespace catapult { namespace utils {
 		friend std::ostream& operator<<(std::ostream& out, const ByteArray& byteArray) {
 			out << HexFormat(byteArray.m_array);
 			return out;
+		}
+
+	public:
+		/// Copies this byte array to a different byte array.
+		template<typename TDestination>
+		TDestination copyTo() const {
+			TDestination dest;
+			std::memcpy(dest.data(), m_array.data(), std::min(dest.size(), m_array.size()));
+			return dest;
 		}
 
 	private:

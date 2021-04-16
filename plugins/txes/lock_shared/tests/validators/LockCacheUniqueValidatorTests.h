@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -34,22 +35,19 @@ namespace catapult { namespace validators {
 	public:
 		static void AssertSuccessWhenHashIsNotInCache() {
 			// Arrange:
-			typename TTraits::NotificationBuilder builder;
 			auto cache = CreateDefaultCache(test::CreateLockInfos<BasicTraits>(3));
+			typename TTraits::NotificationBuilder builder;
 
 			// Assert:
-			RunTest(ValidationResult::Success, builder.notification(), cache);
+			RunTest(ValidationResult::Success, builder.notification(), cache, Height(100));
 		}
 
-		static void AssertFailureWhenHashIsInCache() {
-			// Arrange:
-			typename TTraits::NotificationBuilder builder;
-			auto lockInfos = test::CreateLockInfos<BasicTraits>(3);
-			auto cache = CreateDefaultCache(lockInfos);
-			builder.prepare(lockInfos[1]);
+		static void AssertSuccessWhenHashIsInCacheAndInactive() {
+			RunNotEmptyCacheTest(ValidationResult::Success, Height(11), Height(11));
+		}
 
-			// Assert:
-			RunTest(TTraits::Failure, builder.notification(), cache);
+		static void AssertFailureWhenHashIsInCacheAndActive() {
+			RunNotEmptyCacheTest(TTraits::Failure, Height(11), Height(10));
 		}
 
 	private:
@@ -68,13 +66,31 @@ namespace catapult { namespace validators {
 			return cache;
 		}
 
+		static void RunNotEmptyCacheTest(ValidationResult expectedResult, Height endHeight, Height notificationHeight) {
+			// Arrange:
+			auto lockInfos = test::CreateLockInfos<BasicTraits>(3);
+			lockInfos[1].Status = state::LockStatus::Unused;
+			lockInfos[1].EndHeight = endHeight;
+			auto cache = CreateDefaultCache(lockInfos);
+
+			typename TTraits::NotificationBuilder builder;
+			builder.prepare(lockInfos[1]);
+
+			// Assert:
+			RunTest(expectedResult, builder.notification(), cache, notificationHeight);
+		}
+
 		template<typename TCache>
-		static void RunTest(ValidationResult expectedResult, const typename TTraits::NotificationType& notification, const TCache& cache) {
+		static void RunTest(
+				ValidationResult expectedResult,
+				const typename TTraits::NotificationType& notification,
+				const TCache& cache,
+				Height height) {
 			// Arrange:
 			auto pValidator = TTraits::CreateValidator();
 
 			// Act:
-			auto result = test::ValidateNotification(*pValidator, notification, cache);
+			auto result = test::ValidateNotification(*pValidator, notification, cache, height);
 
 			// Assert:
 			EXPECT_EQ(expectedResult, result);
@@ -87,4 +103,5 @@ namespace catapult { namespace validators {
 
 #define DEFINE_CACHE_UNIQUE_TESTS(TRAITS_NAME) \
 	MAKE_CACHE_UNIQUE_TEST(TRAITS_NAME, SuccessWhenHashIsNotInCache) \
-	MAKE_CACHE_UNIQUE_TEST(TRAITS_NAME, FailureWhenHashIsInCache)
+	MAKE_CACHE_UNIQUE_TEST(TRAITS_NAME, SuccessWhenHashIsInCacheAndInactive) \
+	MAKE_CACHE_UNIQUE_TEST(TRAITS_NAME, FailureWhenHashIsInCacheAndActive)

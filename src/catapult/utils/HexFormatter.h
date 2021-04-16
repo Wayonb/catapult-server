@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -56,7 +57,7 @@ namespace catapult { namespace utils {
 			if constexpr (std::is_integral_v<T>) {
 				OutputValue(out, value, N);
 			} else {
-				auto pData = reinterpret_cast<const uint8_t*>(&value);
+				const auto* pData = reinterpret_cast<const uint8_t*>(&value);
 				for (auto i = 0u; i < sizeof(T); ++i)
 					OutputValue(out, pData[sizeof(T) - 1 - i], 1);
 			}
@@ -132,7 +133,7 @@ namespace catapult { namespace utils {
 		if constexpr (traits::is_scalar_v<T>) {
 			return IntegralHexFormatter<T>(data);
 		} else {
-			auto pData = reinterpret_cast<const uint8_t*>(&data);
+			const auto* pData = reinterpret_cast<const uint8_t*>(&data);
 			return HexFormat(pData, pData + sizeof(T), 0);
 		}
 	}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,12 +21,49 @@
 
 #pragma once
 #include "catapult/io/BlockChangeSubscriber.h"
+#include "catapult/subscribers/FinalizationSubscriber.h"
 #include "catapult/subscribers/NodeSubscriber.h"
 #include "catapult/subscribers/StateChangeSubscriber.h"
 #include "catapult/subscribers/TransactionStatusSubscriber.h"
 #include "tests/test/cache/UnsupportedTransactionsChangeSubscribers.h"
 
 namespace catapult { namespace test {
+
+	/// Unsupported block change subscriber.
+	class UnsupportedBlockChangeSubscriber : public io::BlockChangeSubscriber {
+	public:
+		void notifyBlock(const model::BlockElement&) override {
+			CATAPULT_THROW_RUNTIME_ERROR("notifyBlock - not supported in mock");
+		}
+
+		void notifyDropBlocksAfter(Height) override {
+			CATAPULT_THROW_RUNTIME_ERROR("notifyDropBlocksAfter - not supported in mock");
+		}
+	};
+
+	/// Unsupported finalization subscriber.
+	class UnsupportedFinalizationSubscriber : public subscribers::FinalizationSubscriber {
+	public:
+		void notifyFinalizedBlock(const model::FinalizationRound&, Height, const Hash256&) override {
+			CATAPULT_THROW_RUNTIME_ERROR("notifyFinalizedBlock - not supported in mock");
+		}
+	};
+
+	/// Unsupported node subscriber.
+	class UnsupportedNodeSubscriber : public subscribers::NodeSubscriber {
+	public:
+		void notifyNode(const ionet::Node&) override {
+			CATAPULT_THROW_RUNTIME_ERROR("notifyNode - not supported in mock");
+		}
+
+		bool notifyIncomingNode(const model::NodeIdentity&, ionet::ServiceIdentifier) override {
+			CATAPULT_THROW_RUNTIME_ERROR("notifyIncomingNode - not supported in mock");
+		}
+
+		void notifyBan(const model::NodeIdentity&, uint32_t) override {
+			CATAPULT_THROW_RUNTIME_ERROR("notifyBan - not supported in mock");
+		}
+	};
 
 	/// Unsupported state change subscriber.
 	class UnsupportedStateChangeSubscriber : public subscribers::StateChangeSubscriber {
@@ -49,34 +87,6 @@ namespace catapult { namespace test {
 
 		void flush() override {
 			FlushInvoker<FlushBehavior>::Flush();
-		}
-	};
-
-	/// Unsupported block change subscriber.
-	class UnsupportedBlockChangeSubscriber : public io::BlockChangeSubscriber {
-	public:
-		void notifyBlock(const model::BlockElement&) override {
-			CATAPULT_THROW_RUNTIME_ERROR("notifyBlock - not supported in mock");
-		}
-
-		void notifyDropBlocksAfter(Height) override {
-			CATAPULT_THROW_RUNTIME_ERROR("notifyDropBlocksAfter - not supported in mock");
-		}
-	};
-
-	/// Unsupported node subscriber.
-	class UnsupportedNodeSubscriber : public subscribers::NodeSubscriber {
-	public:
-		void notifyNode(const ionet::Node&) override {
-			CATAPULT_THROW_RUNTIME_ERROR("notifyNode - not supported in mock");
-		}
-
-		bool notifyIncomingNode(const model::NodeIdentity&, ionet::ServiceIdentifier) override {
-			CATAPULT_THROW_RUNTIME_ERROR("notifyIncomingNode - not supported in mock");
-		}
-
-		void notifyBan(const model::NodeIdentity&, validators::ValidationResult) override {
-			CATAPULT_THROW_RUNTIME_ERROR("notifyBan - not supported in mock");
 		}
 	};
 }}

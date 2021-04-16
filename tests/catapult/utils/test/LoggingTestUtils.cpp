@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -29,7 +30,7 @@ namespace catapult { namespace test {
 	}
 
 	utils::FileLoggerOptions CreateTestFileLoggerOptions(const std::string& prefix) {
-		auto logDirectory = boost::filesystem::path(TempDirectoryGuard::DefaultName()) / "testlogs";
+		auto logDirectory = std::filesystem::path(TempDirectoryGuard::DefaultName()) / "testlogs";
 		auto options = utils::FileLoggerOptions(logDirectory.generic_string(), prefix + "%4N.txt");
 		options.SinkType = utils::LogSinkType::Sync;
 		return options;
@@ -46,7 +47,7 @@ namespace catapult { namespace test {
 	std::string TempLogsDirectoryGuard::name(size_t id) {
 		std::ostringstream logFilename;
 		logFilename << m_prefix << std::setfill('0') << std::setw(4) << id << ".txt";
-		return (boost::filesystem::path(m_directoryGuard.name()) / logFilename.str()).generic_string();
+		return (std::filesystem::path(m_directoryGuard.name()) / logFilename.str()).generic_string();
 	}
 
 	namespace {
@@ -82,8 +83,13 @@ namespace catapult { namespace test {
 		std::string logLine;
 		std::vector<SimpleLogRecord> records;
 		auto logFile = std::fstream(logFilename);
-		while (std::getline(logFile, logLine))
-			records.push_back(ParseRecord(logLine));
+		while (std::getline(logFile, logLine)) {
+			// interpret leading space as line continuation
+			if (!logLine.empty() && ' ' == logLine[0])
+				records.back().Message += "\n" + logLine;
+			else
+				records.push_back(ParseRecord(logLine));
+		}
 
 		return records;
 	}

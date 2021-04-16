@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,7 +37,7 @@ namespace catapult { namespace test {
 	constexpr NamespaceId::ValueType Default_Root_Id(246);
 
 	/// Creates a random namespace owner.
-	Key CreateRandomOwner();
+	Address CreateRandomOwner();
 
 	/// Generates valid namespace name of length \a size.
 	std::string GenerateValidName(size_t size);

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,6 +21,7 @@
 
 #include "AccountStateTestUtils.h"
 #include "AddressTestUtils.h"
+#include "catapult/utils/Casting.h"
 #include "tests/TestHarness.h"
 
 namespace catapult { namespace test {
@@ -45,6 +47,17 @@ namespace catapult { namespace test {
 	}
 
 	namespace {
+		void AssertEqual(const state::AccountPublicKeys& expected, const state::AccountPublicKeys& actual, const std::string& message) {
+			EXPECT_EQ(expected.mask(), actual.mask()) << message;
+			EXPECT_EQ(expected.linked().get(), actual.linked().get()) << message;
+			EXPECT_EQ(expected.node().get(), actual.node().get()) << message;
+			EXPECT_EQ(expected.vrf().get(), actual.vrf().get()) << message;
+
+			ASSERT_EQ(expected.voting().size(), actual.voting().size()) << message;
+			for (auto i = 0u; i < expected.voting().size(); ++i)
+				EXPECT_EQ(expected.voting().get(i), actual.voting().get(i)) << message << " at " << i;
+		}
+
 		void AssertEqual(
 				const state::AccountImportanceSnapshots& expected,
 				const state::AccountImportanceSnapshots& actual,
@@ -86,8 +99,8 @@ namespace catapult { namespace test {
 		EXPECT_EQ(expected.PublicKeyHeight, actual.PublicKeyHeight) << message;
 
 		EXPECT_EQ(expected.AccountType, actual.AccountType) << message;
-		EXPECT_EQ(expected.LinkedAccountKey, actual.LinkedAccountKey) << message;
 
+		AssertEqual(expected.SupplementalPublicKeys, actual.SupplementalPublicKeys, message + ": supplemental public keys");
 		AssertEqual(expected.ImportanceSnapshots, actual.ImportanceSnapshots, message + ": importance snapshot");
 		AssertEqual(expected.ActivityBuckets, actual.ActivityBuckets, message + ": activity bucket");
 
@@ -113,5 +126,48 @@ namespace catapult { namespace test {
 		}
 
 		return accountStates;
+	}
+
+	void SetRandomSupplementalPublicKeys(
+			state::AccountState& accountState,
+			state::AccountPublicKeys::KeyType mask,
+			uint8_t numVotingKeys) {
+		if (HasFlag(state::AccountPublicKeys::KeyType::Linked, mask))
+			accountState.SupplementalPublicKeys.linked().set(test::GenerateRandomByteArray<Key>());
+
+		if (HasFlag(state::AccountPublicKeys::KeyType::Node, mask))
+			accountState.SupplementalPublicKeys.node().set(test::GenerateRandomByteArray<Key>());
+
+		if (HasFlag(state::AccountPublicKeys::KeyType::VRF, mask))
+			accountState.SupplementalPublicKeys.vrf().set(test::GenerateRandomByteArray<Key>());
+
+		for (auto i = 0u; i < numVotingKeys; ++i) {
+			accountState.SupplementalPublicKeys.voting().add({
+				test::GenerateRandomByteArray<VotingKey>(),
+				FinalizationEpoch((i + 1) * 100),
+				FinalizationEpoch((i + 1) * 100 + 49)
+			});
+		}
+	}
+
+	void ForceSetLinkedPublicKey(state::AccountState& accountState, const Key& linkedPublicKey) {
+		accountState.SupplementalPublicKeys.linked().unset();
+		accountState.SupplementalPublicKeys.linked().set(linkedPublicKey);
+	}
+
+	std::vector<Height::ValueType> GetSnapshotHeights(const state::AccountImportanceSnapshots& snapshots) {
+		std::vector<Height::ValueType> heights;
+		for (const auto& snapshot : snapshots)
+			heights.push_back(snapshot.Height.unwrap());
+
+		return heights;
+	}
+
+	std::vector<Height::ValueType> GetBucketHeights(const state::AccountActivityBuckets& buckets) {
+		std::vector<Height::ValueType> heights;
+			for (const auto& bucket : buckets)
+				heights.push_back(bucket.StartHeight.unwrap());
+
+			return heights;
 	}
 }}

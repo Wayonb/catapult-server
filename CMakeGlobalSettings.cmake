@@ -13,24 +13,34 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
+### set up conan
+if(USE_CONAN)
+	set(CONAN_SYSTEM_INCLUDES ON)
+	include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+
+	if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+		conan_basic_setup(KEEP_RPATHS)
+	else()
+		conan_basic_setup()
+	endif()
+endif()
+
 ### set boost settings
 add_definitions(-DBOOST_ALL_DYN_LINK)
+add_definitions(-DBOOST_ASIO_USE_TS_EXECUTOR_AS_DEFAULT)
 set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 
+# log requires { atomic chrono filesystem log_setup regex thread }
+set(CATAPULT_BOOST_COMPONENTS atomic chrono date_time filesystem log log_setup program_options regex thread)
+
+### set openssl definitions
+add_definitions(-DOPENSSL_API_COMPAT=0x10100000L)
+
 ### set custom diagnostics
 if(ENABLE_CATAPULT_DIAGNOSTICS)
 	add_definitions(-DENABLE_CATAPULT_DIAGNOSTICS)
-endif()
-
-### detect signature scheme
-if(USE_KECCAK)
-	add_definitions(-DSIGNATURE_SCHEME_KECCAK)
-	set(HASH_VARIANT_NAME "keccak")
-else()
-	add_definitions(-DSIGNATURE_SCHEME_SHA3)
-	set(HASH_VARIANT_NAME "sha3")
 endif()
 
 ### forward docker build settings
@@ -71,7 +81,7 @@ if(USE_SANITIZER)
 
 	if(USE_SANITIZER MATCHES "undefined")
 		set(SANITIZATION_FLAGS "${SANITIZATION_FLAGS} -fsanitize=implicit-conversion,nullability")
-		if (ENABLE_FUZZ_BUILD)
+		if(ENABLE_FUZZ_BUILD)
 			set(SANITIZATION_FLAGS "${SANITIZATION_FLAGS} -fsanitize=address -fno-sanitize-recover=all")
 		endif()
 	endif()
@@ -106,10 +116,7 @@ if(MSVC)
 	add_definitions(-D_SILENCE_CXX17_ALLOCATOR_VOID_DEPRECATION_WARNING)
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
 	# -Wstrict-aliasing=1 perform most paranoid strict aliasing checks
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wstrict-aliasing=1")
-
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wformat-security -Werror -Wstrict-aliasing=1")
 
 	# - Wno-maybe-uninitialized: false positives where gcc isn't sure if an uninitialized variable is used or not
 	set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -Wno-maybe-uninitialized -g1 -fno-omit-frame-pointer")
@@ -135,38 +142,83 @@ elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
 		-Wno-switch-enum \
 		-Wno-weak-vtables")
 
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
-
 	set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -g1")
 endif()
 
-# set runpath for built binaries on linux
-if(("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" AND "${CMAKE_SYSTEM_NAME}" MATCHES "Linux"))
-	file(MAKE_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/boost")
-	set(CMAKE_SKIP_BUILD_RPATH FALSE)
+if(NOT MSVC)
+	# set visibility flags
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
+endif()
 
-	# $origin - to load plugins when running the server
-	# $origin/boost - same, use our boost libs
-	set(CMAKE_INSTALL_RPATH "$ORIGIN:$ORIGIN/../deps:$ORIGIN/../lib${CMAKE_INSTALL_RPATH}")
-	set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-	set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+if(CATAPULT_BUILD_RELEASE)
+	set(ENABLE_HARDENING ON)
+endif()
 
-	# use rpath for executables
-	# (executable rpath will be used for loading indirect libs, this is needed because boost libs do not set runpath)
-	# use newer runpath for shared libs
-	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--enable-new-dtags")
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--disable-new-dtags")
+if("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
+	# set hardening flags
+	if(ENABLE_HARDENING)
+		set(HARDENING_FLAGS "-fstack-protector-all -D_FORTIFY_SOURCE=2")
+		if("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
+			set(HARDENING_FLAGS "${HARDENING_FLAGS} -fstack-clash-protection")
+		else()
+			set(HARDENING_FLAGS "${HARDENING_FLAGS} -fsanitize=safe-stack")
+		endif()
+
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${HARDENING_FLAGS}")
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${HARDENING_FLAGS}")
+
+		set(LINKER_HARDENING_FLAGS "-Wl,-z,noexecstack,-z,relro,-z,now")
+		set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${LINKER_HARDENING_FLAGS}")
+		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${LINKER_HARDENING_FLAGS}")
+	endif()
+endif()
+
+if(USE_CONAN)
+	# only set rpath when running conan, which copies dependencies to `@executable_path/../deps`
+	# when not using conan, rpath is set to link paths by default
+	if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+		set(ENABLE_RPATHS ON)
+		set(USE_EXPLICIT_RPATHS ON)
+	endif()
+endif()
+
+if(ENABLE_RPATHS)
+	if(USE_EXPLICIT_RPATHS)
+		if("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
+			# $origin - to load plugins when running the server
+			set(CMAKE_INSTALL_RPATH "$ORIGIN/../deps:$ORIGIN/../lib")
+			set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+			set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
+
+			# use rpath for executables
+			# (executable rpath will be used for loading indirect libs, this is needed because boost libs do not set runpath)
+			# use newer runpath for shared libs
+			set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--enable-new-dtags")
+			set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--disable-new-dtags")
+		endif()
+		if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+			set(CMAKE_INSTALL_RPATH "@executable_path/../deps;@executable_path/../lib")
+			set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+			set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
+		endif()
+	endif()
+else()
+	set(CMAKE_SKIP_BUILD_RPATH TRUE)
 endif()
 
 ### define gtest helper functions
 
+if(ENABLE_TESTS)
+	find_package(GTest 1.10.0 EXACT REQUIRED)
+endif()
+
 # find and set gtest includes
 function(catapult_add_gtest_dependencies)
-	find_package(GTest REQUIRED)
 	include_directories(SYSTEM ${GTEST_INCLUDE_DIR})
 endfunction()
 
+# add tests subdirectory
 function(catapult_add_tests_subdirectory DIRECTORY_NAME)
 	if(ENABLE_TESTS)
 		add_subdirectory(${DIRECTORY_NAME})
@@ -208,9 +260,9 @@ if(NOT CATAPULT_BUILD_DEVELOPMENT)
 		OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 	if(CATAPULT_BUILD_RELEASE)
-		set(CATAPULT_VERSION_DESCRIPTION "(public, ${HASH_VARIANT_NAME})")
+		set(CATAPULT_VERSION_DESCRIPTION "(public)")
 	else()
-		set(CATAPULT_VERSION_DESCRIPTION "${GIT_COMMIT_HASH} [${GIT_BRANCH}] (${HASH_VARIANT_NAME})")
+		set(CATAPULT_VERSION_DESCRIPTION "${GIT_COMMIT_HASH} [${GIT_BRANCH}]")
 	endif()
 endif()
 
@@ -240,25 +292,6 @@ function(catapult_target TARGET_NAME)
 
 	# indicate boost as a dependency
 	target_link_libraries(${TARGET_NAME} ${Boost_LIBRARIES})
-
-	# copy boost shared libraries
-	foreach(BOOST_COMPONENT ATOMIC SYSTEM DATE_TIME REGEX TIMER CHRONO LOG THREAD FILESYSTEM PROGRAM_OPTIONS)
-		if(MSVC)
-			# copy into ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$(Configuration)
-			string(REPLACE ".lib" ".dll" BOOSTDLLNAME ${Boost_${BOOST_COMPONENT}_LIBRARY_RELEASE})
-			add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-				COMMAND ${CMAKE_COMMAND} -E copy_if_different
-				"${BOOSTDLLNAME}" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$(Configuration)")
-		elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
-			# copy into ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/boost
-			set(BOOSTDLLNAME ${Boost_${BOOST_COMPONENT}_LIBRARY_RELEASE})
-			set(BOOSTVERSION "${Boost_VERSION_MAJOR}.${Boost_VERSION_MINOR}.${Boost_VERSION_PATCH}")
-			get_filename_component(BOOSTFILENAME ${BOOSTDLLNAME} NAME)
-			add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-				COMMAND ${CMAKE_COMMAND} -E copy_if_different
-				"${BOOSTDLLNAME}" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/boost")
-		endif()
-	endforeach()
 
 	# put both plugins and plugins tests in same 'folder'
 	if(TARGET_NAME MATCHES "\.plugins")
@@ -376,7 +409,6 @@ endfunction()
 
 # used to define a catapult test executable
 function(catapult_test_executable TARGET_NAME)
-	find_package(GTest REQUIRED)
 	include_directories(SYSTEM ${GTEST_INCLUDE_DIR})
 
 	catapult_executable(${TARGET_NAME} ${ARGN})
@@ -391,7 +423,6 @@ function(catapult_test_executable_target TARGET_NAME TEST_DEPENDENCY_NAME)
 	catapult_test_executable(${TARGET_NAME} ${ARGN})
 
 	# inline instead of calling catapult_add_gtest_dependencies in order to apply gtest dependencies to correct scope
-	find_package(GTest REQUIRED)
 	include_directories(SYSTEM ${GTEST_INCLUDE_DIR})
 
 	# customize and export compiler options for gtest

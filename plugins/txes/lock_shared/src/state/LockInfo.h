@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -34,17 +35,14 @@ namespace catapult { namespace state {
 
 	/// Lock info.
 	struct LockInfo {
-	public:
-		static constexpr auto Is_Deactivation_Destructive = true;
-
 	protected:
 		/// Creates a default lock info.
 		LockInfo()
 		{}
 
-		/// Creates a lock info around \a senderPublicKey, \a mosaicId, \a amount and \a endHeight.
-		LockInfo(const Key& senderPublicKey, catapult::MosaicId mosaicId, catapult::Amount amount, Height endHeight)
-				: SenderPublicKey(senderPublicKey)
+		/// Creates a lock info around \a ownerAddress, \a mosaicId, \a amount and \a endHeight.
+		LockInfo(const Address& ownerAddress, catapult::MosaicId mosaicId, catapult::Amount amount, Height endHeight)
+				: OwnerAddress(ownerAddress)
 				, MosaicId(mosaicId)
 				, Amount(amount)
 				, EndHeight(endHeight)
@@ -52,8 +50,8 @@ namespace catapult { namespace state {
 		{}
 
 	public:
-		/// Sender public key.
-		Key SenderPublicKey;
+		/// Owner address.
+		Address OwnerAddress;
 
 		/// Mosaic id.
 		catapult::MosaicId MosaicId;

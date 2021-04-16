@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -43,19 +44,20 @@ namespace catapult { namespace mongo { namespace storages {
 			using ModelType = state::AccountState;
 
 			static constexpr auto Collection_Name = "accounts";
+			static constexpr auto Primary_Document_Name = "account";
 			static constexpr auto Network_Id = static_cast<model::NetworkIdentifier>(0x5A);
 			static constexpr auto CreateCacheStorage = CreateMongoAccountStateCacheStorage;
 
 			static cache::CatapultCache CreateCache() {
 				auto chainConfig = model::BlockChainConfiguration::Uninitialized();
-				chainConfig.Network.Identifier = model::NetworkIdentifier::Mijin_Test;
+				chainConfig.Network.Identifier = model::NetworkIdentifier::Private_Test;
 				return test::CreateEmptyCatapultCache(chainConfig);
 			}
 
 			static ModelType GenerateRandomElement(uint32_t id) {
 				auto height = Height(id);
 				auto publicKey = test::GenerateRandomByteArray<Key>();
-				auto address = model::PublicKeyToAddress(publicKey, model::NetworkIdentifier::Mijin_Test);
+				auto address = model::PublicKeyToAddress(publicKey, model::NetworkIdentifier::Private_Test);
 				auto accountState = state::AccountState(address, Height(1234567) + height);
 				accountState.PublicKey = publicKey;
 				accountState.PublicKeyHeight = Height(1234567) + height;
@@ -94,11 +96,13 @@ namespace catapult { namespace mongo { namespace storages {
 			}
 
 			static auto GetFindFilter(const ModelType& accountState) {
-				return document() << "account.address" << mappers::ToBinary(accountState.Address) << finalize;
+				return document()
+						<< std::string(Primary_Document_Name) + ".address" << mappers::ToBinary(accountState.Address)
+						<< finalize;
 			}
 
 			static void AssertEqual(const ModelType& accountState, const bsoncxx::document::view& view) {
-				test::AssertEqualAccountState(accountState, view["account"].get_document().view());
+				test::AssertEqualAccountState(accountState, view[Primary_Document_Name].get_document().view());
 			}
 		};
 	}

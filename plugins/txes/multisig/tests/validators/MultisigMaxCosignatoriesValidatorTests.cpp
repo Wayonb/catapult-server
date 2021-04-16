@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -39,25 +40,25 @@ namespace catapult { namespace validators {
 				uint8_t numDeletions,
 				uint8_t maxCosignatoriesPerAccount) {
 			// Arrange:
-			auto signer = test::GenerateRandomByteArray<Key>();
+			auto multisig = test::GenerateRandomByteArray<Address>();
 
 			// - setup cache
 			auto cache = test::MultisigCacheFactory::Create();
 			if (numInitialCosignatories > 0) {
 				auto cacheDelta = cache.createDelta();
-				auto entry = state::MultisigEntry(signer);
+				auto entry = state::MultisigEntry(multisig);
 
 				// - add cosignatories
 				for (auto i = 0; i < numInitialCosignatories; ++i)
-					entry.cosignatoryPublicKeys().insert(test::GenerateRandomByteArray<Key>());
+					entry.cosignatoryAddresses().insert(test::GenerateRandomByteArray<Address>());
 
 				cacheDelta.sub<cache::MultisigCache>().insert(entry);
 				cache.commit(Height());
 			}
 
-			auto publicKeyAdditions = test::GenerateRandomDataVector<Key>(numAdditions);
-			auto publicKeyDeletions = test::GenerateRandomDataVector<Key>(numDeletions);
-			auto notification = test::CreateMultisigCosignatoriesNotification(signer, publicKeyAdditions, publicKeyDeletions);
+			auto addressAdditions = test::GenerateRandomDataVector<UnresolvedAddress>(numAdditions);
+			auto addressDeletions = test::GenerateRandomDataVector<UnresolvedAddress>(numDeletions);
+			auto notification = test::CreateMultisigCosignatoriesNotification(multisig, addressAdditions, addressDeletions);
 			auto pValidator = CreateMultisigMaxCosignatoriesValidator(maxCosignatoriesPerAccount);
 
 			// Act:

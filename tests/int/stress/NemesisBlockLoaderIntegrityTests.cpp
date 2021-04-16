@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -18,6 +19,8 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
+#include "catapult/cache_core/AccountStateCache.h"
+#include "catapult/config/CatapultDataDirectory.h"
 #include "catapult/extensions/LocalNodeChainScore.h"
 #include "catapult/extensions/NemesisBlockLoader.h"
 #include "tests/test/local/LocalNodeTestState.h"
@@ -25,7 +28,7 @@
 #include "tests/test/nemesis/NemesisCompatibleConfiguration.h"
 #include "tests/test/nemesis/NemesisTestUtils.h"
 #include "tests/test/nodeps/Filesystem.h"
-#include "tests/test/nodeps/MijinConstants.h"
+#include "tests/test/nodeps/TestNetworkConstants.h"
 #include "tests/TestHarness.h"
 
 namespace catapult { namespace extensions {
@@ -39,21 +42,28 @@ namespace catapult { namespace extensions {
 		// 1) Num_Nemesis_Namespaces namespace registration transactions
 		// 2) for each mosaic - (a) mosaic definition transaction, (b) mosaic supply change transaction, (c) mosaic alias transaction
 		// 3) Num_Nemesis_Accounts transfer transactions
+		// 4) Num_Nemesis_Harvesting_Accounts vrf key link transactions
 
-		constexpr auto Num_Nemesis_Accounts = CountOf(test::Mijin_Test_Private_Keys);
+		constexpr auto Num_Nemesis_Accounts = CountOf(test::Test_Network_Private_Keys);
+		constexpr auto Num_Nemesis_Harvesting_Accounts = CountOf(test::Test_Network_Vrf_Private_Keys);
 		constexpr auto Num_Nemesis_Namespaces = 3;
 		constexpr auto Num_Nemesis_Mosaics = 2;
-		constexpr auto Num_Nemesis_Transactions = Num_Nemesis_Namespaces + 3 * Num_Nemesis_Mosaics + Num_Nemesis_Accounts;
+		constexpr auto Num_Nemesis_Transactions = 0
+				+ Num_Nemesis_Namespaces
+				+ 3 * Num_Nemesis_Mosaics
+				+ Num_Nemesis_Accounts
+				+ Num_Nemesis_Harvesting_Accounts;
 
 		template<typename TAction>
 		void RunNemesisBlockTest(TAction action) {
 			// Arrange:
 			test::TempDirectoryGuard tempDir;
+			config::CatapultDataDirectoryPreparer::Prepare(tempDir.name());
 
-			auto blockChainConfig = test::CreatePrototypicalBlockChainConfiguration();
-			test::AddNemesisPluginExtensions(blockChainConfig);
+			auto config = test::CreatePrototypicalCatapultConfiguration(tempDir.name());
+			test::AddNemesisPluginExtensions(const_cast<model::BlockChainConfiguration&>(config.BlockChain));
 
-			auto pPluginManager = test::CreatePluginManagerWithRealPlugins(blockChainConfig);
+			auto pPluginManager = test::CreatePluginManagerWithRealPlugins(config);
 			test::LocalNodeTestState localNodeState(pPluginManager->config(), tempDir.name(), pPluginManager->createCache());
 
 			{
@@ -109,11 +119,33 @@ namespace catapult { namespace extensions {
 		});
 	}
 
+	TEST(TEST_CLASS, ProperFinalizedHeightAfterLoadingNemesisBlock) {
+		// Act:
+		RunNemesisBlockTest([](const auto& stateRef) {
+			// Assert:
+			EXPECT_EQ(Height(1), stateRef.Cache.createView().dependentState().LastFinalizedHeight);
+		});
+	}
+
 	TEST(TEST_CLASS, ProperNumTransactionsAfterLoadingNemesisBlock) {
 		// Act:
 		RunNemesisBlockTest([](const auto& stateRef) {
 			// Assert:
 			EXPECT_EQ(Num_Nemesis_Transactions, stateRef.Cache.createView().dependentState().NumTotalTransactions);
+		});
+	}
+
+	TEST(TEST_CLASS, ProperHighValueAccountStatisticsAfterLoadingNemesisBlock) {
+		// Act:
+		RunNemesisBlockTest([](const auto& stateRef) {
+			auto cacheView = stateRef.Cache.createView();
+			auto readOnlyCache = cacheView.toReadOnly();
+			auto highValueAccountStatistics = readOnlyCache.template sub<cache::AccountStateCache>().highValueAccountStatistics();
+
+			// Assert:
+			EXPECT_EQ(0u, highValueAccountStatistics.VotingEligibleAccountsCount);
+			EXPECT_EQ(Num_Nemesis_Harvesting_Accounts, highValueAccountStatistics.HarvestingEligibleAccountsCount);
+			EXPECT_EQ(Amount(), highValueAccountStatistics.TotalVotingBalance);
 		});
 	}
 

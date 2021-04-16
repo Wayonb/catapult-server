@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -229,7 +230,7 @@ namespace catapult { namespace ionet {
 	TEST(TEST_CLASS, CannotBanNodeWithLocalNetworkHost) {
 		// Arrange:
 		auto identity = CreateRandomIdentity();
-		identity.Host = "127.0.0.1";
+		identity.Host = "_local_";
 		BannedNodes bannedNodes(CreateBanSettings(), CreateTimeSupplier({ 1, 1, 1, 4, 5, 6 }), Default_Strategy);
 
 		// Act:

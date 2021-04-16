@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -54,7 +55,7 @@ namespace catapult { namespace model {
 		template<typename TTransaction, typename TDerivedTransaction, typename TPlugin>
 		class BasicTransactionPluginT : public TPlugin {
 		private:
-			using PublishFunc = consumer<const TDerivedTransaction&, NotificationSubscriber&>;
+			using PublishFunc = consumer<const TDerivedTransaction&, const PublishContext&, NotificationSubscriber&>;
 
 		public:
 			explicit BasicTransactionPluginT(const PublishFunc& publishFunc) : m_publishFunc(publishFunc)
@@ -70,13 +71,13 @@ namespace catapult { namespace model {
 				return { version, version, utils::TimeSpan() };
 			}
 
-			uint64_t calculateRealSize(const TTransaction& transaction) const override {
-				return TDerivedTransaction::CalculateRealSize(static_cast<const TDerivedTransaction&>(transaction));
+			bool isSizeValid(const TTransaction& transaction) const override {
+				return IsSizeValidT<TDerivedTransaction>(static_cast<const TDerivedTransaction&>(transaction));
 			}
 
 		protected:
-			void publishImpl(const TTransaction& transaction, NotificationSubscriber& sub) const {
-				m_publishFunc(static_cast<const TDerivedTransaction&>(transaction), sub);
+			void publishImpl(const TTransaction& transaction, const PublishContext& context, NotificationSubscriber& sub) const {
+				m_publishFunc(static_cast<const TDerivedTransaction&>(transaction), context, sub);
 			}
 
 		private:
@@ -95,20 +96,23 @@ namespace catapult { namespace model {
 			{}
 
 		public:
-			utils::KeySet additionalRequiredCosignatories(const EmbeddedTransaction& transaction) const override {
+			void publish(
+					const EmbeddedTransaction& transaction,
+					const PublishContext& context,
+					NotificationSubscriber& sub) const override {
+				BaseType::publishImpl(transaction, context, sub);
+			}
+
+			UnresolvedAddressSet additionalRequiredCosignatories(const EmbeddedTransaction& transaction) const override {
 				if constexpr (TransactionPluginFactoryOptions::Default == Options) {
 #ifdef _MSC_VER
 					// suppress warning that transaction is unreferenced formal parameter
 					(transaction);
 #endif
-					return utils::KeySet();
+					return UnresolvedAddressSet();
 				} else {
 					return ExtractAdditionalRequiredCosignatories(static_cast<const TEmbeddedTransaction&>(transaction));
 				}
-			}
-
-			void publish(const EmbeddedTransaction& transaction, NotificationSubscriber& sub) const override {
-				BaseType::publishImpl(transaction, sub);
 			}
 		};
 
@@ -125,8 +129,15 @@ namespace catapult { namespace model {
 			{}
 
 		public:
-			void publish(const WeakEntityInfoT<Transaction>& transactionInfo, NotificationSubscriber& sub) const override {
-				BaseType::publishImpl(transactionInfo.entity(), sub);
+			void publish(
+					const WeakEntityInfoT<Transaction>& transactionInfo,
+					const PublishContext& context,
+					NotificationSubscriber& sub) const override {
+				BaseType::publishImpl(transactionInfo.entity(), context, sub);
+			}
+
+			uint32_t embeddedCount(const Transaction&) const override {
+				return 0;
 			}
 
 			RawBuffer dataBuffer(const Transaction& transaction) const override {

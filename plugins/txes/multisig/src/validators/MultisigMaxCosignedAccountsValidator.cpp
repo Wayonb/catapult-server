@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,12 +32,13 @@ namespace catapult { namespace validators {
 				const Notification& notification,
 				const ValidatorContext& context) {
 			const auto& multisigCache = context.Cache.sub<cache::MultisigCache>();
-			if (!multisigCache.contains(notification.CosignatoryKey))
+			auto multisigIter = multisigCache.find(context.Resolvers.resolve(notification.Cosignatory));
+
+			if (!multisigIter.tryGet())
 				return ValidationResult::Success;
 
-			auto multisigIter = multisigCache.find(notification.CosignatoryKey);
 			const auto& cosignatoryEntry = multisigIter.get();
-			return cosignatoryEntry.multisigPublicKeys().size() >= maxCosignedAccountsPerAccount
+			return cosignatoryEntry.multisigAddresses().size() >= maxCosignedAccountsPerAccount
 					? Failure_Multisig_Max_Cosigned_Accounts
 					: ValidationResult::Success;
 		});

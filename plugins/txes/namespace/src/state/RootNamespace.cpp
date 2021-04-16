@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,17 +24,17 @@
 
 namespace catapult { namespace state {
 
-	RootNamespace::RootNamespace(NamespaceId id, const Key& ownerPublicKey, const NamespaceLifetime& lifetime)
-			: RootNamespace(id, ownerPublicKey, lifetime, std::make_shared<Children>())
+	RootNamespace::RootNamespace(NamespaceId id, const Address& ownerAddress, const NamespaceLifetime& lifetime)
+			: RootNamespace(id, ownerAddress, lifetime, std::make_shared<Children>())
 	{}
 
 	RootNamespace::RootNamespace(
 			NamespaceId id,
-			const Key& ownerPublicKey,
+			const Address& ownerAddress,
 			const NamespaceLifetime& lifetime,
 			const std::shared_ptr<Children>& pChildren)
 			: m_id(id)
-			, m_ownerPublicKey(ownerPublicKey)
+			, m_ownerAddress(ownerAddress)
 			, m_lifetime(lifetime)
 			, m_pChildren(pChildren)
 	{}
@@ -46,8 +47,8 @@ namespace catapult { namespace state {
 		return *m_pChildren;
 	}
 
-	const Key& RootNamespace::ownerPublicKey() const {
-		return m_ownerPublicKey;
+	const Address& RootNamespace::ownerAddress() const {
+		return m_ownerAddress;
 	}
 
 	const NamespaceLifetime& RootNamespace::lifetime() const {
@@ -125,7 +126,7 @@ namespace catapult { namespace state {
 
 	void RootNamespace::setAlias(NamespaceId id, const NamespaceAlias& alias) {
 		// check if root
-		if (m_id == id){
+		if (m_id == id) {
 			m_alias = alias;
 			return;
 		}
@@ -139,15 +140,19 @@ namespace catapult { namespace state {
 	}
 
 	bool RootNamespace::operator==(const RootNamespace& rhs) const {
-		return m_id == rhs.m_id && m_ownerPublicKey == rhs.m_ownerPublicKey;
+		return m_id == rhs.m_id && m_ownerAddress == rhs.m_ownerAddress;
 	}
 
 	bool RootNamespace::operator!=(const RootNamespace& rhs) const {
 		return !(*this == rhs);
 	}
 
+	bool RootNamespace::canExtend(const RootNamespace& previous) const {
+		return m_id == previous.m_id && m_ownerAddress == previous.m_ownerAddress && previous.m_lifetime.isActive(m_lifetime.Start);
+	}
+
 	RootNamespace RootNamespace::renew(const NamespaceLifetime& newLifetime) const {
-		return RootNamespace(m_id, m_ownerPublicKey, newLifetime, m_pChildren);
+		return RootNamespace(m_id, m_ownerAddress, newLifetime, m_pChildren);
 	}
 
 	RootNamespace::OrderedChildPaths RootNamespace::sortedChildPaths() const {

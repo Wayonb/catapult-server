@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,12 +24,16 @@
 
 namespace catapult { namespace crypto {
 
-	struct Salt_tag { static constexpr size_t Size = 32; };
-	using Salt = utils::ByteArray<Salt_tag>;
-
 	struct SharedKey_tag { static constexpr size_t Size = 32; };
 	using SharedKey = utils::ByteArray<SharedKey_tag>;
 
-	/// Generates shared key using \a keyPair, \a otherPublicKey and \a salt.
-	SharedKey DeriveSharedKey(const KeyPair& keyPair, const Key& otherPublicKey, const Salt& salt);
+	/// Generates HKDF of \a sharedSecret using default zeroed salt and constant label "catapult".
+	SharedKey Hkdf_Hmac_Sha256_32(const Key& sharedSecret);
+
+	/// Derives shared secret from \a keyPair and \a otherPublicKey.
+	Key DeriveSharedSecret(const KeyPair& keyPair, const Key& otherPublicKey);
+
+	/// Generates shared key using \a keyPair and \a otherPublicKey.
+	/// \note: One of the provided keys is expected to be an ephemeral key.
+	SharedKey DeriveSharedKey(const KeyPair& keyPair, const Key& otherPublicKey);
 }}

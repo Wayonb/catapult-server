@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,12 +20,12 @@
 **/
 
 #pragma once
-#include "catapult/ionet/ConnectionSecurityMode.h"
 #include "catapult/ionet/PacketSocketOptions.h"
-#include "catapult/model/NetworkInfo.h"
+#include "catapult/model/NetworkIdentifier.h"
 #include "catapult/model/NodeIdentity.h"
 #include "catapult/utils/FileSize.h"
 #include "catapult/utils/TimeSpan.h"
+#include "catapult/constants.h"
 
 namespace catapult { namespace net {
 
@@ -38,9 +39,8 @@ namespace catapult { namespace net {
 				, Timeout(utils::TimeSpan::FromSeconds(10))
 				, SocketWorkingBufferSize(utils::FileSize::FromKilobytes(4))
 				, SocketWorkingBufferSensitivity(0) // memory reclamation disabled
-				, MaxPacketDataSize(utils::FileSize::FromMegabytes(100))
-				, OutgoingSecurityMode(ionet::ConnectionSecurityMode::None)
-				, IncomingSecurityModes(ionet::ConnectionSecurityMode::None)
+				, MaxPacketDataSize(utils::FileSize::FromBytes(Default_Max_Packet_Data_Size))
+				, OutgoingProtocols(ionet::IpProtocol::IPv4)
 				, AllowIncomingSelfConnections(true)
 				, AllowOutgoingSelfConnections(false)
 		{}
@@ -64,11 +64,8 @@ namespace catapult { namespace net {
 		/// Maximum packet data size.
 		utils::FileSize MaxPacketDataSize;
 
-		/// Security mode of outgoing connections initiated by this node.
-		ionet::ConnectionSecurityMode OutgoingSecurityMode;
-
-		/// Accepted security modes of incoming connections initiated by other nodes.
-		ionet::ConnectionSecurityMode IncomingSecurityModes;
+		/// Outgoing connection protocols.
+		ionet::IpProtocol OutgoingProtocols;
 
 		/// Allows incoming self connections when \c true.
 		bool AllowIncomingSelfConnections;
@@ -76,13 +73,19 @@ namespace catapult { namespace net {
 		/// Allows outgoing self connections when \c true.
 		bool AllowOutgoingSelfConnections;
 
+		/// Ssl options.
+		ionet::PacketSocketSslOptions SslOptions;
+
 	public:
 		/// Gets the packet socket options represented by the configured settings.
 		ionet::PacketSocketOptions toSocketOptions() const {
 			ionet::PacketSocketOptions options;
+			options.AcceptHandshakeTimeout = Timeout;
 			options.WorkingBufferSize = SocketWorkingBufferSize.bytes();
 			options.WorkingBufferSensitivity = SocketWorkingBufferSensitivity;
 			options.MaxPacketDataSize = MaxPacketDataSize.bytes();
+			options.OutgoingProtocols = OutgoingProtocols;
+			options.SslOptions = SslOptions;
 			return options;
 		}
 	};

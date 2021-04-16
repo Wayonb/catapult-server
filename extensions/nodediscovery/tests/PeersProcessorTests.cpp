@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,6 +22,7 @@
 #include "nodediscovery/src/PeersProcessor.h"
 #include "catapult/ionet/NodeContainer.h"
 #include "catapult/utils/ArraySet.h"
+#include "nodediscovery/tests/test/NodeDiscoveryTestUtils.h"
 #include "tests/test/net/NodeTestUtils.h"
 #include "tests/TestHarness.h"
 
@@ -29,8 +31,6 @@ namespace catapult { namespace nodediscovery {
 #define TEST_CLASS PeersProcessorTests
 
 	namespace {
-		constexpr auto Network_Identifier = model::NetworkIdentifier::Mijin_Test;
-
 		// region MockNodePingRequestInitiator
 
 		class MockNodePingRequestInitiator {
@@ -88,7 +88,12 @@ namespace catapult { namespace nodediscovery {
 		public:
 			TestContext()
 					: ServerPublicKey(test::GenerateRandomByteArray<Key>())
-					, Processor(ServerPublicKey, NodeContainer, PingRequestInitiator.ref(), Network_Identifier, CaptureNode(ResponseNodes))
+					, Processor(
+							ServerPublicKey,
+							NodeContainer,
+							PingRequestInitiator.ref(),
+							test::CreateNodeDiscoveryNetworkFingerprint(),
+							CaptureNode(ResponseNodes))
 			{}
 
 		public:
@@ -100,7 +105,7 @@ namespace catapult { namespace nodediscovery {
 		};
 
 		ionet::NodeMetadata CreateNamedMetadata(const std::string& name) {
-			return ionet::NodeMetadata(Network_Identifier, name);
+			return ionet::NodeMetadata(test::CreateNodeDiscoveryNetworkFingerprint(), name);
 		}
 
 		std::vector<ionet::Node> ToNodes(const std::vector<model::NodeIdentity>& identities) {
@@ -208,7 +213,7 @@ namespace catapult { namespace nodediscovery {
 		auto identity = model::NodeIdentity{ test::GenerateRandomByteArray<Key>(), "11.22.33.44" };
 		auto candidateNode = test::CreateNamedNode(identity, "candidate");
 
-		// - configure the ping response node to have a different network (processor is configured with Mijin_Test)
+		// - configure the ping response node to have a different network (processor is configured with Private_Test)
 		context.PingRequestInitiator.setResponseNode(identity, ionet::Node(identity, candidateNode.endpoint(), ionet::NodeMetadata()));
 
 		// Act: process candidate node

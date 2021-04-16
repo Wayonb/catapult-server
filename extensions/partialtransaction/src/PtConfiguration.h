@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,7 +21,7 @@
 
 #pragma once
 #include "catapult/utils/FileSize.h"
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 
 namespace catapult { namespace utils { class ConfigurationBag; } }
 
@@ -33,7 +34,7 @@ namespace catapult { namespace partialtransaction {
 		utils::FileSize CacheMaxResponseSize;
 
 		/// Maximum size of the partial transactions cache.
-		uint32_t CacheMaxSize;
+		utils::FileSize CacheMaxSize;
 
 	private:
 		PtConfiguration() = default;
@@ -47,6 +48,6 @@ namespace catapult { namespace partialtransaction {
 		static PtConfiguration LoadFromBag(const utils::ConfigurationBag& bag);
 
 		/// Loads a partial transactions configuration from \a resourcesPath.
-		static PtConfiguration LoadFromPath(const boost::filesystem::path& resourcesPath);
+		static PtConfiguration LoadFromPath(const std::filesystem::path& resourcesPath);
 	};
 }}

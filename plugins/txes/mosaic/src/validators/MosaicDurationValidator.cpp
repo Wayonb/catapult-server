@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -34,14 +35,18 @@ namespace catapult { namespace validators {
 			if (BlockDuration() == notification.Properties.duration())
 				return ValidationResult::Success;
 
-			// always allow a new mosaic (MosaicPropertiesValidator checks for valid duration in this case)
+			// as an optimization, since duration is additive, check notification before checking cache
+			if (maxMosaicDuration < notification.Properties.duration())
+				return Failure_Mosaic_Invalid_Duration;
+
+			// allow a new mosaic because checks above passed
 			const auto& cache = context.Cache.sub<cache::MosaicCache>();
 			auto mosaicIter = cache.find(notification.MosaicId);
 			if (!mosaicIter.tryGet())
 				return ValidationResult::Success;
 
-			const auto& entry = mosaicIter.get();
-			auto currentDuration = entry.definition().properties().duration();
+			const auto& mosaicEntry = mosaicIter.get();
+			auto currentDuration = mosaicEntry.definition().properties().duration();
 
 			// cannot change eternal durations
 			if (BlockDuration() == currentDuration)

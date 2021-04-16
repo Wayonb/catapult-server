@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,7 +20,7 @@
 **/
 
 #include "Validators.h"
-#include "src/model/AccountLinkTransaction.h"
+#include "src/model/AccountKeyLinkTransaction.h"
 #include "catapult/cache_core/AccountStateCache.h"
 #include "catapult/state/AccountState.h"
 #include "catapult/validators/ValidatorContext.h"
@@ -34,29 +35,23 @@ namespace catapult { namespace validators {
 			return resolvers.resolve(address);
 		}
 
-		const Key& GetResolvedKey(const Key& key, const model::ResolverContext&) {
-			return key;
-		}
-
-		template<typename TKey>
-		bool IsRemote(const cache::ReadOnlyAccountStateCache& cache, const TKey& key) {
-			auto accountStateIter = cache.find(key);
+		bool IsRemote(const cache::ReadOnlyAccountStateCache& cache, const Address& address) {
+			auto accountStateIter = cache.find(address);
 			return accountStateIter.tryGet() && state::IsRemote(accountStateIter.get().AccountType);
 		}
 	}
 
 	DEFINE_STATEFUL_VALIDATOR(RemoteInteraction, ([](const Notification& notification, const ValidatorContext& context) {
-		if (model::AccountLinkTransaction::Entity_Type == notification.TransactionType)
+		if (model::AccountKeyLinkTransaction::Entity_Type == notification.TransactionType)
 			return ValidationResult::Success;
 
 		const auto& cache = context.Cache.sub<cache::AccountStateCache>();
 		const auto& addresses = notification.ParticipantsByAddress;
-		const auto& keys = notification.ParticipantsByKey;
-		auto predicate = [&cache, &context](const auto& key) {
-			return IsRemote(cache, GetResolvedKey(key, context.Resolvers));
+		auto predicate = [&cache, &context](const auto& address) {
+			return IsRemote(cache, GetResolvedKey(address, context.Resolvers));
 		};
-		return std::any_of(addresses.cbegin(), addresses.cend(), predicate) || std::any_of(keys.cbegin(), keys.cend(), predicate)
+		return std::any_of(addresses.cbegin(), addresses.cend(), predicate)
 				? Failure_AccountLink_Remote_Account_Participant_Prohibited
 				: ValidationResult::Success;
-	}));
+	}))
 }}

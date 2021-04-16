@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -44,7 +45,7 @@ namespace catapult { namespace chain {
 				return pAggregateTransaction;
 
 			// copy the transaction data without cosignatures
-			uint32_t truncatedSize = sizeof(model::AggregateTransaction) + pAggregateTransaction->PayloadSize;
+			uint32_t truncatedSize = SizeOf32<model::AggregateTransaction>() + pAggregateTransaction->PayloadSize;
 			auto pTransactionWithoutCosignatures = utils::MakeSharedWithSize<model::AggregateTransaction>(truncatedSize);
 			std::memcpy(static_cast<void*>(pTransactionWithoutCosignatures.get()), pAggregateTransaction.get(), truncatedSize);
 			pTransactionWithoutCosignatures->Size = truncatedSize;
@@ -129,12 +130,12 @@ namespace catapult { namespace chain {
 				std::unique_ptr<const PtValidator>&& pValidator,
 				const CompletedTransactionSink& completedTransactionSink,
 				const FailedTransactionSink& failedTransactionSink,
-				const std::shared_ptr<thread::IoThreadPool>& pPool)
+				thread::IoThreadPool& pool)
 				: m_transactionsCache(transactionsCache)
 				, m_pValidator(std::move(pValidator))
 				, m_completedTransactionSink(completedTransactionSink)
 				, m_failedTransactionSink(failedTransactionSink)
-				, m_pPool(pPool)
+				, m_ioContext(pool.ioContext())
 		{}
 
 	private:
@@ -146,7 +147,7 @@ namespace catapult { namespace chain {
 		};
 
 	public:
-		thread::future<TransactionUpdateResult> update(const model::TransactionInfo& transactionInfo) {
+		thread::future<PtUpdateResult> update(const model::TransactionInfo& transactionInfo) {
 			if (model::Entity_Type_Aggregate_Bonded != transactionInfo.pEntity->Type)
 				CATAPULT_THROW_INVALID_ARGUMENT("PtUpdater only supports bonded aggregate transactions");
 
@@ -160,10 +161,10 @@ namespace catapult { namespace chain {
 				cosignatures = ExtractCosignatures(*pAggregateTransaction, aggregateHash, transactionInfoFromCache);
 
 				if (transactionInfoFromCache)
-					return update(cosignatures, TransactionUpdateResult::UpdateType::Existing);
+					return update(cosignatures, PtUpdateResult::UpdateType::Existing);
 			}
 
-			auto pPromise = std::make_shared<thread::promise<TransactionUpdateResult>>(); // needs to be copyable to pass to post
+			auto pPromise = std::make_shared<thread::promise<PtUpdateResult>>(); // needs to be copyable to pass to post
 			auto updateFuture = pPromise->get_future();
 
 			TransactionUpdateContext updateContext;
@@ -171,7 +172,7 @@ namespace catapult { namespace chain {
 			updateContext.AggregateHash = aggregateHash;
 			updateContext.Cosignatures = std::move(cosignatures);
 			updateContext.pExtractedAddresses = transactionInfo.OptionalExtractedAddresses;
-			boost::asio::post(m_pPool->ioContext(), [pThis = shared_from_this(), updateContext, pPromise{std::move(pPromise)}]() {
+			boost::asio::post(m_ioContext, [pThis = shared_from_this(), updateContext, pPromise{std::move(pPromise)}]() {
 				pThis->updateImpl(updateContext).then([pPromise](auto&& resultFuture) {
 					pPromise->set_value(resultFuture.get());
 				});
@@ -181,22 +182,23 @@ namespace catapult { namespace chain {
 		}
 
 	private:
-		thread::future<TransactionUpdateResult> updateImpl(const TransactionUpdateContext& updateContext) {
+		thread::future<PtUpdateResult> updateImpl(const TransactionUpdateContext& updateContext) {
 			const auto& aggregateHash = updateContext.AggregateHash;
 			auto pAggregateTransactionWithoutCosignatures = RemoveCosignatures(updateContext.pAggregateTransaction);
 			if (!isValid(*pAggregateTransactionWithoutCosignatures, aggregateHash))
-				return thread::make_ready_future(TransactionUpdateResult{ TransactionUpdateResult::UpdateType::Invalid, 0 });
+				return thread::make_ready_future(PtUpdateResult{ PtUpdateResult::UpdateType::Invalid, 0 });
 
 			// notice that the merkle component hash is not stored in the pt cache
 			auto transactionInfo = model::DetachedTransactionInfo(pAggregateTransactionWithoutCosignatures, aggregateHash);
 			transactionInfo.OptionalExtractedAddresses = updateContext.pExtractedAddresses;
-			m_transactionsCache.modifier().add(transactionInfo);
+			if (!m_transactionsCache.modifier().add(transactionInfo))
+				return thread::make_ready_future(PtUpdateResult{ PtUpdateResult::UpdateType::Neutral, 0 });
 
 			// if no cosignatures are present, check if the aggregate doesn't require any cosignatures (e.g. 1-of-1)
 			if (updateContext.Cosignatures.empty())
 				checkCompleteness(aggregateHash);
 
-			return update(updateContext.Cosignatures, TransactionUpdateResult::UpdateType::New);
+			return update(updateContext.Cosignatures, PtUpdateResult::UpdateType::New);
 		}
 
 	public:
@@ -204,7 +206,7 @@ namespace catapult { namespace chain {
 			auto pPromise = std::make_shared<thread::promise<CosignatureUpdateResult>>(); // needs to be copyable to pass to post
 			auto updateFuture = pPromise->get_future();
 
-			boost::asio::post(m_pPool->ioContext(), [pThis = shared_from_this(), cosignature, pPromise{std::move(pPromise)}]() {
+			boost::asio::post(m_ioContext, [pThis = shared_from_this(), cosignature, pPromise{std::move(pPromise)}]() {
 				auto result = pThis->updateImpl(cosignature);
 				pPromise->set_value(std::move(result));
 			});
@@ -237,11 +239,9 @@ namespace catapult { namespace chain {
 			return addCosignature(cosignature);
 		}
 
-		thread::future<TransactionUpdateResult> update(
-				const DetachedCosignatures& cosignatures,
-				TransactionUpdateResult::UpdateType updateType) {
+		thread::future<PtUpdateResult> update(const DetachedCosignatures& cosignatures, PtUpdateResult::UpdateType updateType) {
 			if (cosignatures.empty())
-				return thread::make_ready_future(TransactionUpdateResult{ updateType, 0u });
+				return thread::make_ready_future(PtUpdateResult{ updateType, 0u });
 
 			std::vector<thread::future<CosignatureUpdateResult>> futures;
 			for (const auto& cosignature : cosignatures)
@@ -254,14 +254,14 @@ namespace catapult { namespace chain {
 					return CosignatureUpdateResult::Added_Incomplete == result || CosignatureUpdateResult::Added_Complete == result;
 				});
 
-				return TransactionUpdateResult{ updateType, static_cast<size_t>(numCosignaturesAdded) };
+				return PtUpdateResult{ updateType, static_cast<size_t>(numCosignaturesAdded) };
 			});
 		}
 
 		CosignatureUpdateResult addCosignature(const model::DetachedCosignature& cosignature) {
 			{
 				auto modifier = m_transactionsCache.modifier();
-				if (!modifier.add(cosignature.ParentHash, cosignature.SignerPublicKey, cosignature.Signature))
+				if (!modifier.add(cosignature.ParentHash, cosignature))
 					return CosignatureUpdateResult::Redundant;
 			}
 
@@ -367,7 +367,7 @@ namespace catapult { namespace chain {
 
 			modifier.add(removedInfo);
 			for (const auto& cosignature : staleTransactionInfo.EligibleCosignatures)
-				modifier.add(staleTransactionInfo.AggregateHash, cosignature.SignerPublicKey, cosignature.Signature);
+				modifier.add(staleTransactionInfo.AggregateHash, cosignature);
 		}
 
 		PtValidator::Result<CosignatoriesValidationResult> validateCosignatories(
@@ -394,7 +394,7 @@ namespace catapult { namespace chain {
 		std::unique_ptr<const PtValidator> m_pValidator;
 		CompletedTransactionSink m_completedTransactionSink;
 		FailedTransactionSink m_failedTransactionSink;
-		std::shared_ptr<thread::IoThreadPool> m_pPool;
+		boost::asio::io_context& m_ioContext;
 	};
 
 	PtUpdater::PtUpdater(
@@ -402,18 +402,18 @@ namespace catapult { namespace chain {
 			std::unique_ptr<const PtValidator>&& pValidator,
 			const CompletedTransactionSink& completedTransactionSink,
 			const FailedTransactionSink& failedTransactionSink,
-			const std::shared_ptr<thread::IoThreadPool>& pPool)
+			thread::IoThreadPool& pool)
 			: m_pImpl(std::make_shared<Impl>(
 					transactionsCache,
 					std::move(pValidator),
 					completedTransactionSink,
 					failedTransactionSink,
-					pPool))
+					pool))
 	{}
 
 	PtUpdater::~PtUpdater() = default;
 
-	thread::future<TransactionUpdateResult> PtUpdater::update(const model::TransactionInfo& transactionInfo) {
+	thread::future<PtUpdateResult> PtUpdater::update(const model::TransactionInfo& transactionInfo) {
 		return m_pImpl->update(transactionInfo);
 	}
 

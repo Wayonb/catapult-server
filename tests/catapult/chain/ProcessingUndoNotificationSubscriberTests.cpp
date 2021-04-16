@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -47,7 +48,10 @@ namespace catapult { namespace chain {
 			explicit TestContext(observers::NotifyMode executeMode = observers::NotifyMode::Commit)
 					: m_cache({})
 					, m_cacheDelta(m_cache.createDelta())
-					, m_observerContext(observers::ObserverState(m_cacheDelta), Height(123), executeMode, CreateResolverContext())
+					, m_observerContext(
+							model::NotificationContext(Height(123), CreateResolverContext()),
+							observers::ObserverState(m_cacheDelta, m_blockStatementBuilder),
+							executeMode)
 					, m_sub(m_observer, m_observerContext) {
 				CATAPULT_LOG(debug) << "preparing test context with execute mode " << executeMode;
 			}
@@ -80,6 +84,10 @@ namespace catapult { namespace chain {
 					// - appropriate resolvers were passed down
 					EXPECT_EQ(MosaicId(22), observerContext.Resolvers.resolve(UnresolvedMosaicId(11)));
 				}
+
+				// - no resolution statements were created
+				auto pStatement = m_blockStatementBuilder.build();
+				EXPECT_EQ(0u, pStatement->MosaicResolutionStatements.size());
 			}
 
 			void assertUndoObserverHashes(const std::vector<Hash256>& expectedHashes) {
@@ -96,6 +104,7 @@ namespace catapult { namespace chain {
 			cache::CatapultCache m_cache;
 			cache::CatapultCacheDelta m_cacheDelta;
 
+			model::BlockStatementBuilder m_blockStatementBuilder;
 			observers::ObserverContext m_observerContext;
 
 			ProcessingUndoNotificationSubscriber m_sub;
@@ -218,12 +227,12 @@ namespace catapult { namespace chain {
 	TEST(TEST_CLASS, CanUndoMultipleNotificationsWithVaryingSizesAndChannels) {
 		// Arrange:
 		TestContext context;
-		auto signer = test::GenerateRandomByteArray<Key>();
+		auto sender = test::GenerateRandomByteArray<Address>();
 		auto hash = test::GenerateRandomByteArray<Hash256>();
-		auto notification1 = model::AccountPublicKeyNotification(signer);
+		auto notification1 = model::AccountAddressNotification(sender);
 		auto notification2 = test::CreateNotification(Notification_Type_All);
-		auto notification3 = model::EntityNotification(model::NetworkIdentifier::Mijin_Test, 0, 0, 0);
-		auto notification4 = model::TransactionNotification(signer, hash, static_cast<model::EntityType>(22), Timestamp(11));
+		auto notification3 = model::EntityNotification(model::NetworkIdentifier::Private_Test, 0, 0, 0);
+		auto notification4 = model::TransactionNotification(sender, hash, static_cast<model::EntityType>(22), Timestamp(11));
 
 		// - process notifications
 		context.sub().notify(notification1);
@@ -239,7 +248,7 @@ namespace catapult { namespace chain {
 		// - notice that notification1 is observer-only
 		// - notice that notification3 is validator-only
 		context.assertUndoObserverCalls({
-			model::Core_Transaction_Notification, Notification_Type_All, model::Core_Register_Account_Public_Key_Notification
+			model::Core_Transaction_Notification, Notification_Type_All, model::Core_Register_Account_Address_Notification
 		});
 
 		// - check data integrity

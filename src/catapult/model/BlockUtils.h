@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,8 +24,6 @@
 #include "Elements.h"
 #include "EntityInfo.h"
 
-namespace catapult { namespace crypto { class KeyPair; } }
-
 namespace catapult { namespace model {
 
 	// region hashes
@@ -32,9 +31,40 @@ namespace catapult { namespace model {
 	/// Calculates the block transactions hash of \a transactionInfos into \a blockTransactionsHash.
 	void CalculateBlockTransactionsHash(const std::vector<const TransactionInfo*>& transactionInfos, Hash256& blockTransactionsHash);
 
-	/// Calculates the generation hash from a previous generation hash (\a previousGenerationHash)
-	/// and a public key (\a publicKey).
-	GenerationHash CalculateGenerationHash(const GenerationHash& previousGenerationHash, const Key& publicKey);
+	/// Calculates the generation hash from \a gamma.
+	GenerationHash CalculateGenerationHash(const crypto::ProofGamma& gamma);
+
+	// endregion
+
+	// region block type
+
+	/// Calculates the block type at \a height given \a importanceGrouping.
+	model::EntityType CalculateBlockTypeFromHeight(Height height, uint64_t importanceGrouping);
+
+	// endregion
+
+	// region block transactions info
+
+	/// Information about transactions stored in a block.
+	struct BlockTransactionsInfo {
+		/// Number of (top-level) transactions.
+		uint32_t Count = 0;
+
+		/// Total fee of all transactions.
+		Amount TotalFee;
+	};
+
+	/// Information about transactions stored in a block, including transaction registry dependent information.
+	struct ExtendedBlockTransactionsInfo : public BlockTransactionsInfo {
+		/// Number of transactions (including embedded transactions).
+		uint32_t DeepCount = 0;
+	};
+
+	/// Calculates information about transactions stored in \a block.
+	BlockTransactionsInfo CalculateBlockTransactionsInfo(const Block& block);
+
+	/// Calculates information about transactions stored in \a block given \a transactionRegistry.
+	ExtendedBlockTransactionsInfo CalculateBlockTransactionsInfo(const Block& block, const TransactionRegistry& transactionRegistry);
 
 	// endregion
 
@@ -46,22 +76,6 @@ namespace catapult { namespace model {
 
 	/// Validates signature of \a block header.
 	bool VerifyBlockHeaderSignature(const Block& block);
-
-	// endregion
-
-	// region fees
-
-	/// Information about transactions stored in a block.
-	struct BlockTransactionsInfo {
-		/// Number of transactions.
-		uint32_t Count = 0;
-
-		/// Total fee of all transactions.
-		Amount TotalFee;
-	};
-
-	/// Calculates information about transactions stored in \a block.
-	BlockTransactionsInfo CalculateBlockTransactionsInfo(const Block& block);
 
 	// endregion
 
@@ -101,9 +115,10 @@ namespace catapult { namespace model {
 		catapult::Timestamp Timestamp;
 	};
 
-	/// Creates an unsigned Block given \a context, signer public key (\a signerPublicKey) and \a transactions
+	/// Creates an unsigned Block with \a blockType given \a context, signer public key (\a signerPublicKey) and \a transactions
 	/// for a network with identifier \a networkIdentifier.
 	std::unique_ptr<Block> CreateBlock(
+			EntityType blockType,
 			const PreviousBlockContext& context,
 			NetworkIdentifier networkIdentifier,
 			const Key& signerPublicKey,

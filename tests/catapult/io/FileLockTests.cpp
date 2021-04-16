@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,8 +22,7 @@
 #include "catapult/io/FileLock.h"
 #include "tests/test/nodeps/BasicLockTests.h"
 #include "tests/test/nodeps/Filesystem.h"
-#include <boost/filesystem/path.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 using catapult::test::TempFileGuard;
 
@@ -60,7 +60,7 @@ namespace catapult { namespace io {
 		}, "");
 
 		// Assert:
-		EXPECT_TRUE(boost::filesystem::exists(guard.name()));
+		EXPECT_TRUE(std::filesystem::exists(guard.name()));
 	}
 
 	TEST(TEST_CLASS, LockFileCanBeRemovedAfterOriginalProcessExits) {
@@ -75,13 +75,13 @@ namespace catapult { namespace io {
 		}, "");
 
 		// Sanity:
-		EXPECT_TRUE(boost::filesystem::exists(guard.name()));
+		EXPECT_TRUE(std::filesystem::exists(guard.name()));
 
 		// Act:
-		boost::filesystem::remove(guard.name());
+		std::filesystem::remove(guard.name());
 
 		// Assert:
-		EXPECT_FALSE(boost::filesystem::exists(guard.name()));
+		EXPECT_FALSE(std::filesystem::exists(guard.name()));
 	}
 
 	TEST(TEST_CLASS, LockFileCannotBeAcquiredFromOtherProcess) {
@@ -92,7 +92,7 @@ namespace catapult { namespace io {
 		lock.try_lock();
 
 		// Sanity:
-		ASSERT_TRUE(boost::filesystem::exists(guard.name()));
+		ASSERT_TRUE(std::filesystem::exists(guard.name()));
 
 		// Act: create a new process, that tries to acquire same lock
 		ASSERT_EXIT({
@@ -102,7 +102,7 @@ namespace catapult { namespace io {
 		}, ::testing::ExitedWithCode(0), "");
 
 		// Assert:
-		EXPECT_TRUE(boost::filesystem::exists(guard.name()));
+		EXPECT_TRUE(std::filesystem::exists(guard.name()));
 	}
 
 #ifdef __clang__

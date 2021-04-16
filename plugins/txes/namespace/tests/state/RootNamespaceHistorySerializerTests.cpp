@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -105,7 +106,7 @@ namespace catapult { namespace state {
 		void AssertRootHeader(
 				const std::vector<uint8_t>& buffer,
 				size_t offset,
-				const Key& owner,
+				const Address& owner,
 				Height lifetimeStart,
 				Height lifetimeEnd,
 				uint64_t numChildren,
@@ -157,7 +158,7 @@ namespace catapult { namespace state {
 				pData += sizeof(NamespaceId);
 			}
 
-			result.AliasType = static_cast<state::AliasType>(*pData++);
+			result.AliasType = static_cast<AliasType>(*pData++);
 			return result;
 		}
 
@@ -407,12 +408,12 @@ namespace catapult { namespace state {
 			auto owner = test::CreateRandomOwner();
 			RootNamespaceHistory history(NamespaceId(123));
 			history.push_back(owner, test::CreateLifetime(11, 111));
-			history.push_back(owner, test::CreateLifetime(222, 333));
+			history.push_back(owner, test::CreateLifetime(110, 333));
 			history.back().add(Namespace(test::CreatePath({ 123, 124 })));
 			history.back().add(Namespace(test::CreatePath({ 123, 124, 125 })));
 			history.back().add(Namespace(test::CreatePath({ 123, 126 })));
 			prepareAliases(history);
-			history.push_back(owner, test::CreateLifetime(444, 555));
+			history.push_back(owner, test::CreateLifetime(323, 555));
 			history.back().add(Namespace(test::CreatePath({ 123, 126, 129 })));
 
 			// Act:
@@ -430,13 +431,13 @@ namespace catapult { namespace state {
 				AssertNamespaceData(buffer, offset, expectedChildNamespaceData);
 				offset += 4 * 2 + 6 * sizeof(NamespaceId) + expectedAliasDataSize;
 
-				AssertRootHeader(buffer, offset, owner, Height(222), Height(333), 0);
+				AssertRootHeader(buffer, offset, owner, Height(110), Height(333), 0);
 				offset += sizeof(RootNamespaceHeader);
 
-				AssertRootHeader(buffer, offset, owner, Height(444), Height(555), 0);
+				AssertRootHeader(buffer, offset, owner, Height(323), Height(555), 0);
 			} else {
 				// - since no historical entries are present, all (active) child namespaces need to be serialized
-				AssertRootHeader(buffer, offset, owner, Height(444), Height(555), 4);
+				AssertRootHeader(buffer, offset, owner, Height(323), Height(555), 4);
 				offset += sizeof(RootNamespaceHeader);
 
 				AssertNamespaceData(buffer, offset, expectedChildNamespaceData);
@@ -480,25 +481,27 @@ namespace catapult { namespace state {
 
 	namespace {
 		template<typename TTraits, typename TPrepareAliases>
-		void AssertCanSaveHistoryWithDepthGreaterThanOneDifferentOwner(
+		void AssertCanSaveHistoryWithDepthGreaterThanOneUnlinked(
 				const std::vector<NamespaceDataWithAliasPayload>& expectedChildNamespaceData,
 				size_t expectedAliasDataSize,
+				const Address& owner1,
+				const Address& owner2,
+				const Address& owner3,
+				Height renewHeight1,
+				Height renewHeight2,
 				TPrepareAliases prepareAliases) {
 			// Arrange:
 			std::vector<uint8_t> buffer;
 			mocks::MockMemoryStream stream(buffer);
 
-			auto owner1 = test::CreateRandomOwner();
-			auto owner2 = test::CreateRandomOwner();
-			auto owner3 = test::CreateRandomOwner();
 			RootNamespaceHistory history(NamespaceId(123));
 			history.push_back(owner1, test::CreateLifetime(11, 111));
-			history.push_back(owner2, test::CreateLifetime(222, 333));
+			history.push_back(owner2, test::CreateLifetime(renewHeight1.unwrap(), 333));
 			history.back().add(Namespace(test::CreatePath({ 123, 124 })));
 			history.back().add(Namespace(test::CreatePath({ 123, 124, 125 })));
 			history.back().add(Namespace(test::CreatePath({ 123, 126 })));
 			prepareAliases(history);
-			history.push_back(owner3, test::CreateLifetime(444, 555));
+			history.push_back(owner3, test::CreateLifetime(renewHeight2.unwrap(), 555));
 			history.back().add(Namespace(test::CreatePath({ 123, 126 })));
 
 			// Act:
@@ -516,7 +519,7 @@ namespace catapult { namespace state {
 				AssertRootHeader(buffer, offset, owner1, Height(11), Height(111), 0);
 				offset += sizeof(RootNamespaceHeader);
 
-				AssertRootHeader(buffer, offset, owner2, Height(222), Height(333), 3);
+				AssertRootHeader(buffer, offset, owner2, renewHeight1, Height(333), 3);
 				offset += sizeof(RootNamespaceHeader);
 
 				AssertNamespaceData(buffer, offset, expectedChildNamespaceData);
@@ -524,13 +527,64 @@ namespace catapult { namespace state {
 			}
 
 			// - since namespace owner is different, all children are always serialized
-			AssertRootHeader(buffer, offset, owner3, Height(444), Height(555), 1);
+			AssertRootHeader(buffer, offset, owner3, renewHeight2, Height(555), 1);
 			offset += sizeof(RootNamespaceHeader);
 
 			AssertNamespaceData(buffer, offset, {
 				{ NamespaceId(126), NamespaceId() }
 			});
 		}
+	}
+
+	SERIALIZER_TEST(CanSaveHistoryWithDepthGreaterThanOneSameOwnerInactive) {
+		// Arrange:
+		std::vector<NamespaceDataWithAliasPayload> expectedChildNamespaceData{
+			{ NamespaceId(124), NamespaceId() },
+			{ NamespaceId(124), NamespaceId(125) },
+			{ NamespaceId(126), NamespaceId() }
+		};
+
+		// Assert:
+		auto owner = test::CreateRandomOwner();
+		AssertCanSaveHistoryWithDepthGreaterThanOneUnlinked<TTraits>(
+				expectedChildNamespaceData,
+				0,
+				owner,
+				owner,
+				owner,
+				Height(111),
+				Height(350),
+				[](const auto&) {});
+	}
+
+	SERIALIZER_TEST(CanSaveHistoryWithDepthGreaterThanOneSameOwnerInactive_WithAliases) {
+		// Arrange:
+		auto aliasedAddress = test::GenerateRandomByteArray<Address>();
+		std::vector<NamespaceDataWithAliasPayload> expectedChildNamespaceData{
+			{ NamespaceId(124), NamespaceId(), NamespaceAlias(MosaicId(444)) },
+			{ NamespaceId(124), NamespaceId(125), NamespaceAlias(aliasedAddress) },
+			{ NamespaceId(126), NamespaceId(), NamespaceAlias(MosaicId(987)) }
+		};
+
+		auto prepareAliases = [&aliasedAddress](auto& history) {
+			// Arrange: aliases are set on the middle history entry
+			history.back().setAlias(NamespaceId(124), NamespaceAlias(MosaicId(444)));
+			history.back().setAlias(NamespaceId(125), NamespaceAlias(aliasedAddress));
+			history.back().setAlias(NamespaceId(126), NamespaceAlias(MosaicId(987)));
+		};
+
+		// Assert:
+		auto owner = test::CreateRandomOwner();
+		auto aliasDataSize = 2 * sizeof(MosaicId) + Address::Size;
+		AssertCanSaveHistoryWithDepthGreaterThanOneUnlinked<TTraits>(
+				expectedChildNamespaceData,
+				aliasDataSize,
+				owner,
+				owner,
+				owner,
+				Height(111),
+				Height(350),
+				prepareAliases);
 	}
 
 	SERIALIZER_TEST(CanSaveHistoryWithDepthGreaterThanOneDifferentOwner) {
@@ -542,7 +596,15 @@ namespace catapult { namespace state {
 		};
 
 		// Assert:
-		AssertCanSaveHistoryWithDepthGreaterThanOneDifferentOwner<TTraits>(expectedChildNamespaceData, 0, [](const auto&) {});
+		AssertCanSaveHistoryWithDepthGreaterThanOneUnlinked<TTraits>(
+				expectedChildNamespaceData,
+				0,
+				test::CreateRandomOwner(),
+				test::CreateRandomOwner(),
+				test::CreateRandomOwner(),
+				Height(110),
+				Height(323),
+				[](const auto&) {});
 	}
 
 	SERIALIZER_TEST(CanSaveHistoryWithDepthGreaterThanOneDifferentOwner_WithAliases) {
@@ -554,15 +616,24 @@ namespace catapult { namespace state {
 			{ NamespaceId(126), NamespaceId(), NamespaceAlias(MosaicId(987)) }
 		};
 
-		// Assert:
-		auto aliasDataSize = 2 * sizeof(MosaicId) + Address::Size;
-		AssertCanSaveHistoryWithDepthGreaterThanOneDifferentOwner<TTraits>(expectedChildNamespaceData, aliasDataSize, [&aliasedAddress](
-				auto& history) {
+		auto prepareAliases = [&aliasedAddress](auto& history) {
 			// Arrange: aliases are set on the middle history entry
 			history.back().setAlias(NamespaceId(124), NamespaceAlias(MosaicId(444)));
 			history.back().setAlias(NamespaceId(125), NamespaceAlias(aliasedAddress));
 			history.back().setAlias(NamespaceId(126), NamespaceAlias(MosaicId(987)));
-		});
+		};
+
+		// Assert:
+		auto aliasDataSize = 2 * sizeof(MosaicId) + Address::Size;
+		AssertCanSaveHistoryWithDepthGreaterThanOneUnlinked<TTraits>(
+				expectedChildNamespaceData,
+				aliasDataSize,
+				test::CreateRandomOwner(),
+				test::CreateRandomOwner(),
+				test::CreateRandomOwner(),
+				Height(110),
+				Height(323),
+				prepareAliases);
 	}
 
 	// endregion
@@ -593,7 +664,7 @@ namespace catapult { namespace state {
 
 			static void AssertCanLoadHistoryWithDepthOneWithoutChildren(
 					io::InputStream& inputStream,
-					const Key& owner,
+					const Address& owner,
 					const NamespaceAlias& alias) {
 				// Act:
 				auto history = TTraits::Serializer::Load(inputStream);
@@ -612,7 +683,7 @@ namespace catapult { namespace state {
 
 			static void AssertCanLoadHistoryWithDepthOneWithChildren(
 					io::InputStream& inputStream,
-					const Key& owner,
+					const Address& owner,
 					const std::vector<NamespaceAlias>& aliases) {
 				// Act:
 				auto history = TTraits::Serializer::Load(inputStream);
@@ -635,7 +706,7 @@ namespace catapult { namespace state {
 
 			static void AssertCanLoadHistoryWithDepthGreaterThanOneSameOwner(
 					io::InputStream& inputStream,
-					const Key& owner,
+					const Address& owner,
 					const std::vector<NamespaceAlias>& aliases) {
 				// Act:
 				auto history = TTraits::Serializer::Load(inputStream);
@@ -645,7 +716,7 @@ namespace catapult { namespace state {
 				EXPECT_EQ(NamespaceId(123), history.id());
 
 				if (TTraits::Has_Historical_Entries) {
-					test::AssertRootNamespace(history.back(), owner, Height(444), Height(555), 4);
+					test::AssertRootNamespace(history.back(), owner, Height(332), Height(555), 4);
 					EXPECT_EQ(NamespaceId(123), history.back().child(NamespaceId(124)).parentId());
 					EXPECT_EQ(NamespaceId(124), history.back().child(NamespaceId(125)).parentId());
 					EXPECT_EQ(NamespaceId(123), history.back().child(NamespaceId(126)).parentId());
@@ -660,7 +731,7 @@ namespace catapult { namespace state {
 
 					// - check history (one back)
 					history.pop_back();
-					test::AssertRootNamespace(history.back(), owner, Height(222), Height(333), 4);
+					test::AssertRootNamespace(history.back(), owner, Height(110), Height(333), 4);
 
 					// - check history (two back)
 					history.pop_back();
@@ -670,11 +741,13 @@ namespace catapult { namespace state {
 				test::AssertRootNamespace(history.back(), owner, Height(11), Height(111), 4);
 			}
 
-			static void AssertCanLoadHistoryWithDepthGreaterThanOneDifferentOwner(
+			static void AssertCanLoadHistoryWithDepthGreaterThanOneUnlinked(
 					io::InputStream& inputStream,
-					const Key& owner1,
-					const Key& owner2,
-					const Key& owner3,
+					const Address& owner1,
+					const Address& owner2,
+					const Address& owner3,
+					Height renewHeight1,
+					Height renewHeight2,
 					const std::vector<NamespaceAlias>& aliases) {
 				// Act:
 				auto history = TTraits::Serializer::Load(inputStream);
@@ -684,7 +757,7 @@ namespace catapult { namespace state {
 				EXPECT_EQ(NamespaceId(123), history.id());
 
 				if (TTraits::Has_Historical_Entries) {
-					test::AssertRootNamespace(history.back(), owner3, Height(444), Height(555), 1);
+					test::AssertRootNamespace(history.back(), owner3, renewHeight2, Height(555), 1);
 					EXPECT_EQ(NamespaceId(123), history.back().child(NamespaceId(126)).parentId());
 
 					// - check aliases
@@ -693,7 +766,7 @@ namespace catapult { namespace state {
 
 					// - check history (one back)
 					history.pop_back();
-					test::AssertRootNamespace(history.back(), owner2, Height(222), Height(333), 3);
+					test::AssertRootNamespace(history.back(), owner2, renewHeight1, Height(333), 3);
 					EXPECT_EQ(NamespaceId(123), history.back().child(NamespaceId(124)).parentId());
 					EXPECT_EQ(NamespaceId(124), history.back().child(NamespaceId(125)).parentId());
 					EXPECT_EQ(NamespaceId(123), history.back().child(NamespaceId(126)).parentId());
@@ -800,12 +873,12 @@ namespace catapult { namespace state {
 			auto owner = test::CreateRandomOwner();
 			RootNamespaceHistory originalHistory(NamespaceId(123));
 			originalHistory.push_back(owner, test::CreateLifetime(11, 111));
-			originalHistory.push_back(owner, test::CreateLifetime(222, 333));
+			originalHistory.push_back(owner, test::CreateLifetime(110, 333));
 			originalHistory.back().add(Namespace(test::CreatePath({ 123, 124 })));
 			originalHistory.back().add(Namespace(test::CreatePath({ 123, 124, 125 })));
 			originalHistory.back().add(Namespace(test::CreatePath({ 123, 126 })));
 			prepareAliases(originalHistory);
-			originalHistory.push_back(owner, test::CreateLifetime(444, 555));
+			originalHistory.push_back(owner, test::CreateLifetime(323, 555));
 			originalHistory.back().add(Namespace(test::CreatePath({ 123, 126, 129 })));
 
 			// Act:
@@ -831,19 +904,22 @@ namespace catapult { namespace state {
 
 	namespace {
 		template<typename TTraits, typename TPrepareAliases>
-		void AssertCanRoundtripHistoryWithDepthGreaterThanOneDifferentOwner(TPrepareAliases prepareAliases) {
+		void AssertCanRoundtripHistoryWithDepthGreaterThanOneUnlinked(
+				const Address& owner1,
+				const Address& owner2,
+				const Address& owner3,
+				Height::ValueType renewHeight1,
+				Height::ValueType renewHeight2,
+				TPrepareAliases prepareAliases) {
 			// Arrange:
-			auto owner1 = test::CreateRandomOwner();
-			auto owner2 = test::CreateRandomOwner();
-			auto owner3 = test::CreateRandomOwner();
 			RootNamespaceHistory originalHistory(NamespaceId(123));
 			originalHistory.push_back(owner1, test::CreateLifetime(11, 111));
-			originalHistory.push_back(owner2, test::CreateLifetime(222, 333));
+			originalHistory.push_back(owner2, test::CreateLifetime(renewHeight1, 333));
 			originalHistory.back().add(Namespace(test::CreatePath({ 123, 124 })));
 			originalHistory.back().add(Namespace(test::CreatePath({ 123, 124, 125 })));
 			originalHistory.back().add(Namespace(test::CreatePath({ 123, 126 })));
 			prepareAliases(originalHistory);
-			originalHistory.push_back(owner3, test::CreateLifetime(444, 555));
+			originalHistory.push_back(owner3, test::CreateLifetime(renewHeight2, 555));
 			originalHistory.back().add(Namespace(test::CreatePath({ 123, 126 })));
 
 			// Act:
@@ -854,17 +930,54 @@ namespace catapult { namespace state {
 		}
 	}
 
-	SERIALIZER_TEST(CanRoundtripHistoryWithDepthGreaterThanOneDifferentOwner) {
-		AssertCanRoundtripHistoryWithDepthGreaterThanOneDifferentOwner<TTraits>([](const auto&) {});
+	SERIALIZER_TEST(CanRoundtripHistoryWithDepthGreaterThanOneSameOwnerInactive) {
+		// Arrange:
+		auto prepareAliases = [](const auto&) {};
+
+		// Act + Assert:
+		auto owner = test::CreateRandomOwner();
+		AssertCanRoundtripHistoryWithDepthGreaterThanOneUnlinked<TTraits>(owner, owner, owner, 311, 350, prepareAliases);
 	}
 
-	SERIALIZER_TEST(CanRoundtripHistoryWithDepthGreaterThanOneDifferentOwner_WithAliases) {
-		AssertCanRoundtripHistoryWithDepthGreaterThanOneDifferentOwner<TTraits>([](auto& history) {
+	SERIALIZER_TEST(CanRoundtripHistoryWithDepthGreaterThanOneSameOwnerInactive_WithAliases) {
+		// Arrange:
+		auto prepareAliases = [](auto& history) {
 			// Arrange: aliases are set on the middle history entry
 			history.back().setAlias(NamespaceId(124), NamespaceAlias(MosaicId(444)));
 			history.back().setAlias(NamespaceId(125), NamespaceAlias(test::GenerateRandomByteArray<Address>()));
 			history.back().setAlias(NamespaceId(126), NamespaceAlias(MosaicId(987)));
-		});
+		};
+
+		// Act + Assert:
+		auto owner = test::CreateRandomOwner();
+		AssertCanRoundtripHistoryWithDepthGreaterThanOneUnlinked<TTraits>(owner, owner, owner, 311, 350, prepareAliases);
+	}
+
+	SERIALIZER_TEST(CanRoundtripHistoryWithDepthGreaterThanOneDifferentOwner) {
+		// Arrange:
+		auto prepareAliases = [](const auto&) {};
+
+		// Act + Assert:
+		auto owner1 = test::CreateRandomOwner();
+		auto owner2 = test::CreateRandomOwner();
+		auto owner3 = test::CreateRandomOwner();
+		AssertCanRoundtripHistoryWithDepthGreaterThanOneUnlinked<TTraits>(owner1, owner2, owner3, 310, 323, prepareAliases);
+	}
+
+	SERIALIZER_TEST(CanRoundtripHistoryWithDepthGreaterThanOneDifferentOwner_WithAliases) {
+		// Arrange:
+		auto prepareAliases = [](auto& history) {
+			// Arrange: aliases are set on the middle history entry
+			history.back().setAlias(NamespaceId(124), NamespaceAlias(MosaicId(444)));
+			history.back().setAlias(NamespaceId(125), NamespaceAlias(test::GenerateRandomByteArray<Address>()));
+			history.back().setAlias(NamespaceId(126), NamespaceAlias(MosaicId(987)));
+		};
+
+		// Act + Assert:
+		auto owner1 = test::CreateRandomOwner();
+		auto owner2 = test::CreateRandomOwner();
+		auto owner3 = test::CreateRandomOwner();
+		AssertCanRoundtripHistoryWithDepthGreaterThanOneUnlinked<TTraits>(owner1, owner2, owner3, 310, 323, prepareAliases);
 	}
 
 	// endregion

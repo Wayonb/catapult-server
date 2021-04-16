@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -37,12 +38,8 @@ namespace catapult { namespace consumers {
 
 		class BlockChainCheckConsumer {
 		public:
-			BlockChainCheckConsumer(
-					uint32_t maxChainSize,
-					const utils::TimeSpan& maxBlockFutureTime,
-					const chain::TimeSupplier& timeSupplier)
-					: m_maxChainSize(maxChainSize)
-					, m_maxBlockFutureTime(maxBlockFutureTime)
+			BlockChainCheckConsumer(const utils::TimeSpan& maxBlockFutureTime, const chain::TimeSupplier& timeSupplier)
+					: m_maxBlockFutureTime(maxBlockFutureTime)
 					, m_timeSupplier(timeSupplier)
 			{}
 
@@ -51,18 +48,30 @@ namespace catapult { namespace consumers {
 				if (elements.empty())
 					return Abort(Failure_Consumer_Empty_Input);
 
-				if (elements.size() > m_maxChainSize)
-					return Abort(Failure_Consumer_Remote_Chain_Too_Many_Blocks);
-
 				if (!isChainTimestampAllowed(elements.back().Block.Timestamp))
 					return Abort(Failure_Consumer_Remote_Chain_Too_Far_In_Future);
 
 				utils::HashPointerSet hashes;
 				const model::BlockElement* pPreviousElement = nullptr;
+				const Hash256* pPreviousImportanceBlockHash = nullptr;
 				for (const auto& element : elements) {
 					// check for a valid chain link
 					if (pPreviousElement && !IsLink(*pPreviousElement, element.Block))
 						return Abort(Failure_Consumer_Remote_Chain_Improper_Link);
+
+					// check for importance link
+					if (model::IsImportanceBlock(element.Block.Type)) {
+						const auto& blockFooter = model::GetBlockFooter<model::ImportanceBlockFooter>(element.Block);
+						if (pPreviousImportanceBlockHash && *pPreviousImportanceBlockHash != blockFooter.PreviousImportanceBlockHash) {
+							CATAPULT_LOG(warning)
+									<< "block at height " << element.Block.Height << " has PreviousImportanceBlockHash "
+									<< blockFooter.PreviousImportanceBlockHash << " but " << *pPreviousImportanceBlockHash
+									<< " is expected";
+							return Abort(Failure_Consumer_Remote_Chain_Improper_Importance_Link);
+						}
+
+						pPreviousImportanceBlockHash = &element.EntityHash;
+					}
 
 					// check for duplicate transactions
 					for (const auto& transactionElement : element.Transactions) {
@@ -82,16 +91,14 @@ namespace catapult { namespace consumers {
 			}
 
 		private:
-			uint32_t m_maxChainSize;
 			utils::TimeSpan m_maxBlockFutureTime;
 			chain::TimeSupplier m_timeSupplier;
 		};
 	}
 
 	disruptor::ConstBlockConsumer CreateBlockChainCheckConsumer(
-			uint32_t maxChainSize,
 			const utils::TimeSpan& maxBlockFutureTime,
 			const chain::TimeSupplier& timeSupplier) {
-		return BlockChainCheckConsumer(maxChainSize, maxBlockFutureTime, timeSupplier);
+		return BlockChainCheckConsumer(maxBlockFutureTime, timeSupplier);
 	}
 }}

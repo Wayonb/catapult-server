@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -33,17 +34,17 @@ namespace catapult { namespace state {
 		SecretLockInfo() : LockInfo()
 		{}
 
-		/// Creates a secret lock info around \a senderPublicKey, \a mosaicId, \a amount, \a endHeight, \a hashAlgorithm, \a secret
+		/// Creates a secret lock info around \a ownerAddress, \a mosaicId, \a amount, \a endHeight, \a hashAlgorithm, \a secret
 		/// and \a recipientAddress.
 		SecretLockInfo(
-				const Key& senderPublicKey,
+				const Address& ownerAddress,
 				catapult::MosaicId mosaicId,
 				catapult::Amount amount,
 				Height endHeight,
 				model::LockHashAlgorithm hashAlgorithm,
 				const Hash256& secret,
 				const catapult::Address& recipientAddress)
-				: LockInfo(senderPublicKey, mosaicId, amount, endHeight)
+				: LockInfo(ownerAddress, mosaicId, amount, endHeight)
 				, HashAlgorithm(hashAlgorithm)
 				, Secret(secret)
 				, RecipientAddress(recipientAddress)
@@ -63,4 +64,9 @@ namespace catapult { namespace state {
 		/// Composite hash.
 		Hash256 CompositeHash;
 	};
+
+	/// Gets the lock identifier for \a lockInfo.
+	inline const Hash256& GetLockIdentifier(const SecretLockInfo& lockInfo) {
+		return lockInfo.CompositeHash;
+	}
 }}

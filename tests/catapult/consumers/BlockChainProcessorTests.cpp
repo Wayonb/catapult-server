@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,6 +29,7 @@
 #include "tests/catapult/consumers/test/ConsumerTestUtils.h"
 #include "tests/test/cache/CacheTestUtils.h"
 #include "tests/test/core/BlockTestUtils.h"
+#include "tests/test/nodeps/KeyTestUtils.h"
 #include "tests/test/nodeps/ParamsCapture.h"
 #include "tests/TestHarness.h"
 
@@ -88,7 +90,7 @@ namespace catapult { namespace consumers {
 		struct BlockHitPredicateFactoryParams {
 		public:
 			BlockHitPredicateFactoryParams(const cache::ReadOnlyCatapultCache& cache)
-					: IsPassedMarkedCache(test::IsMarkedCache(cache))
+					: IsPassedMarkedCache(test::IsMarkedCache(cache, test::IsMarkedCacheMode::Any))
 					, NumStatistics(cache.sub<cache::BlockStatisticCache>().size())
 			{}
 
@@ -132,7 +134,7 @@ namespace catapult { namespace consumers {
 					, Timestamp(timestamp)
 					, EntityInfos(entityInfos)
 					, State(state.Cache.dependentState())
-					, IsPassedMarkedCache(test::IsMarkedCache(state.Cache))
+					, IsPassedMarkedCache(test::IsMarkedCache(state.Cache, test::IsMarkedCacheMode::Any))
 					, NumStatistics(state.Cache.sub<cache::BlockStatisticCache>().size())
 			{}
 
@@ -199,6 +201,8 @@ namespace catapult { namespace consumers {
 
 		// region ProcessorTestContext
 
+		enum class PrepareAccountMode { Not_In_Cache, No_Vrf_Public_Key, Wrong_Vrf_Public_Key, Remote_Harvester, Default };
+
 		struct ProcessorTestContext {
 		public:
 			explicit ProcessorTestContext(ReceiptValidationMode receiptValidationMode = ReceiptValidationMode::Disabled)
@@ -220,18 +224,82 @@ namespace catapult { namespace consumers {
 			BlockChainProcessor Processor;
 
 		public:
-			ValidationResult Process(const model::BlockElement& parentBlockElement, BlockElements& elements) {
+			ValidationResult Process(
+					const model::BlockElement& parentBlockElement,
+					BlockElements& elements,
+					const std::function<PrepareAccountMode (Height)>& lookupPrepareAccountMode) {
 				auto cache = test::CreateCatapultCacheWithMarkerAccount();
-				auto delta = cache.createDelta();
-				delta.dependentState().LastRecalculationHeight = Default_Last_Recalculation_Height;
-				auto observerState = observers::ObserverState(delta);
+				auto cacheDelta = cache.createDelta();
+
+				// set vrf keys for all block signers
+				auto previousGenerationHash = parentBlockElement.GenerationHash;
+				auto& accountStateCacheDelta = cacheDelta.sub<cache::AccountStateCache>();
+				for (auto& element : elements) {
+					auto prepareAccountMode = lookupPrepareAccountMode(element.Block.Height);
+					auto vrfKeyPair = PrepareAccount(accountStateCacheDelta, element.Block.SignerPublicKey, prepareAccountMode);
+
+					auto vrfProof = crypto::GenerateVrfProof(previousGenerationHash, vrfKeyPair);
+					auto& blockGenerationHashProof = const_cast<model::Block&>(element.Block).GenerationHashProof;
+					blockGenerationHashProof = { vrfProof.Gamma, vrfProof.VerificationHash, vrfProof.Scalar };
+					previousGenerationHash = model::CalculateGenerationHash(element.Block.GenerationHashProof.Gamma);
+				}
+
+				cacheDelta.dependentState().LastRecalculationHeight = Default_Last_Recalculation_Height;
+				auto observerState = observers::ObserverState(cacheDelta);
 
 				return Processor(WeakBlockInfo(parentBlockElement), elements, observerState);
+			}
+
+			ValidationResult Process(const model::BlockElement& parentBlockElement, BlockElements& elements) {
+				return Process(parentBlockElement, elements, [](auto) { return PrepareAccountMode::Default; });
+			}
+
+			ValidationResult Process(
+					const model::Block& parentBlock,
+					BlockElements& elements,
+					const std::function<PrepareAccountMode (Height)>& lookupPrepareAccountMode) {
+				// use the real parent block hash to ensure the chain is linked
+				return Process(test::BlockToBlockElement(parentBlock), elements, lookupPrepareAccountMode);
 			}
 
 			ValidationResult Process(const model::Block& parentBlock, BlockElements& elements) {
 				// use the real parent block hash to ensure the chain is linked
 				return Process(test::BlockToBlockElement(parentBlock), elements);
+			}
+
+		private:
+			static crypto::KeyPair PrepareAccount(
+					cache::AccountStateCacheDelta& accountStateCacheDelta,
+					const Key& signerPublicKey,
+					PrepareAccountMode prepareAccountMode) {
+				if (PrepareAccountMode::Not_In_Cache < prepareAccountMode)
+					accountStateCacheDelta.addAccount(signerPublicKey, Height(1));
+
+				auto mainPublicKey = signerPublicKey;
+				if (PrepareAccountMode::Remote_Harvester == prepareAccountMode) {
+					auto remoteAccountStateIter = accountStateCacheDelta.find(signerPublicKey);
+
+					mainPublicKey = test::GenerateRandomByteArray<Key>();
+					accountStateCacheDelta.addAccount(mainPublicKey, remoteAccountStateIter.get().AddressHeight);
+					auto mainAccountStateIter = accountStateCacheDelta.find(mainPublicKey);
+
+					remoteAccountStateIter.get().SupplementalPublicKeys.linked().set(mainPublicKey);
+					remoteAccountStateIter.get().AccountType = state::AccountType::Remote;
+
+					mainAccountStateIter.get().SupplementalPublicKeys.linked().set(signerPublicKey);
+					mainAccountStateIter.get().AccountType = state::AccountType::Main;
+				}
+
+				auto vrfKeyPair = test::GenerateKeyPair();
+				if (PrepareAccountMode::No_Vrf_Public_Key < prepareAccountMode) {
+					auto accountStateIter = accountStateCacheDelta.find(mainPublicKey);
+					auto vrfPublicKey = PrepareAccountMode::Wrong_Vrf_Public_Key < prepareAccountMode
+							? vrfKeyPair.publicKey()
+							: test::GenerateRandomByteArray<Key>();
+					accountStateIter.get().SupplementalPublicKeys.vrf().set(vrfPublicKey);
+				}
+
+				return vrfKeyPair;
 			}
 
 		public:
@@ -425,6 +493,41 @@ namespace catapult { namespace consumers {
 
 	// endregion
 
+	// region valid - remote harvester
+
+	namespace {
+		void AssertCanProcessValidBlocksWithRemoteHarvester(size_t numBlocks, size_t remoteIndex) {
+			// Arrange:
+			auto elements = test::CreateBlockElements(numBlocks);
+			ProcessorTestContext context;
+			auto pParentBlock = test::GenerateEmptyRandomBlock();
+			PrepareChain(Height(11), *pParentBlock, elements);
+
+			// Act:
+			auto targetHeight = elements[remoteIndex].Block.Height;
+			auto result = context.Process(*pParentBlock, elements, [targetHeight](auto height) {
+				return targetHeight == height ? PrepareAccountMode::Remote_Harvester : PrepareAccountMode::Default;
+			});
+
+			// Assert:
+			EXPECT_EQ(ValidationResult::Success, result);
+			EXPECT_EQ(numBlocks, context.BlockHitPredicate.params().size());
+			EXPECT_EQ(numBlocks, context.BatchEntityProcessor.params().size());
+			context.assertBlockHitPredicateCalls(*pParentBlock, elements);
+			context.assertBatchEntityProcessorCalls(elements);
+		}
+	}
+
+	TEST(TEST_CLASS, CanProcessSingleBlockWithRemoteHarvester) {
+		AssertCanProcessValidBlocksWithRemoteHarvester(1, 0);
+	}
+
+	TEST(TEST_CLASS, CanProcessBlockChainWithRemoteHarvester) {
+		AssertCanProcessValidBlocksWithRemoteHarvester(3, 1); // block 2/3 has remote harvester
+	}
+
+	// endregion
+
 	// region invalid - unlinked
 
 	namespace {
@@ -456,9 +559,50 @@ namespace catapult { namespace consumers {
 
 	// endregion
 
+	// region invalid - vrf
+
+	namespace {
+		void AssertExecuteShortCircuitsOnVrfFailure(validators::ValidationResult expectedResult, PrepareAccountMode prepareAccountMode) {
+			// Arrange: modify the second block signer account
+			ProcessorTestContext context;
+			auto pParentBlock = test::GenerateEmptyRandomBlock();
+			auto elements = test::CreateBlockElements(3);
+			PrepareChain(Height(11), *pParentBlock, elements);
+
+			// Act:
+			auto targetHeight = elements[1].Block.Height;
+			auto result = context.Process(*pParentBlock, elements, [prepareAccountMode, targetHeight](auto height) {
+				return targetHeight == height ? prepareAccountMode : PrepareAccountMode::Default;
+			});
+
+			// Assert:
+			// - block hit predicate returned { true }
+			// - only one processor was called (after true)
+			EXPECT_EQ(expectedResult, result);
+			EXPECT_EQ(1u, context.BlockHitPredicate.params().size());
+			EXPECT_EQ(1u, context.BatchEntityProcessor.params().size());
+			context.assertBlockHitPredicateCalls(*pParentBlock, elements);
+			context.assertBatchEntityProcessorCalls(elements);
+		}
+	}
+
+	TEST(TEST_CLASS, ExecuteShortCircuitsOnBlockWithUnknownSigner) {
+		AssertExecuteShortCircuitsOnVrfFailure(chain::Failure_Chain_Block_Unknown_Signer, PrepareAccountMode::Not_In_Cache);
+	}
+
+	TEST(TEST_CLASS, ExecuteShortCircuitsOnBlockWithSignerWithNoVrfPublicKey) {
+		AssertExecuteShortCircuitsOnVrfFailure(chain::Failure_Chain_Block_Invalid_Vrf_Proof, PrepareAccountMode::No_Vrf_Public_Key);
+	}
+
+	TEST(TEST_CLASS, ExecuteShortCircuitsOnBlockWithSignerWithWrongVrfPublicKey) {
+		AssertExecuteShortCircuitsOnVrfFailure(chain::Failure_Chain_Block_Invalid_Vrf_Proof, PrepareAccountMode::Wrong_Vrf_Public_Key);
+	}
+
+	// endregion
+
 	// region invalid - unhit
 
-	TEST(TEST_CLASS, ExecuteShortCircutsOnUnhitBlock) {
+	TEST(TEST_CLASS, ExecuteShortCircuitsOnUnhitBlock) {
 		// Arrange: cause the second hit check to return false
 		ProcessorTestContext context;
 		context.BlockHitPredicate.setFailure(2);
@@ -485,7 +629,7 @@ namespace catapult { namespace consumers {
 	// region invalid - processor
 
 	namespace {
-		void AssertShortCircutsOnProcessorResult(ValidationResult processorResult) {
+		void AssertShortCircuitsOnProcessorResult(ValidationResult processorResult) {
 			// Arrange: cause the second processor call to return a non-success code
 			ProcessorTestContext context;
 			context.BatchEntityProcessor.setResult(processorResult, 2);
@@ -508,19 +652,19 @@ namespace catapult { namespace consumers {
 		}
 	}
 
-	TEST(TEST_CLASS, ExecuteShortCircutsOnProcessorResult_Neutral) {
-		AssertShortCircutsOnProcessorResult(ValidationResult::Neutral);
+	TEST(TEST_CLASS, ExecuteShortCircuitsOnProcessorResult_Neutral) {
+		AssertShortCircuitsOnProcessorResult(ValidationResult::Neutral);
 	}
 
-	TEST(TEST_CLASS, ExecuteShortCircutsOnProcessorResult_Failure) {
-		AssertShortCircutsOnProcessorResult(ValidationResult::Failure);
+	TEST(TEST_CLASS, ExecuteShortCircuitsOnProcessorResult_Failure) {
+		AssertShortCircuitsOnProcessorResult(ValidationResult::Failure);
 	}
 
 	// endregion
 
 	// region invalid - state hash
 
-	TEST(TEST_CLASS, ExecuteShortCircutsOnInconsistentStateHash) {
+	TEST(TEST_CLASS, ExecuteShortCircuitsOnInconsistentStateHash) {
 		// Arrange:
 		ProcessorTestContext context;
 		auto pParentBlock = test::GenerateEmptyRandomBlock();
@@ -547,7 +691,7 @@ namespace catapult { namespace consumers {
 
 	// region invalid - block receipts hash
 
-	TEST(TEST_CLASS, ExecuteShortCircutsOnInconsistentBlockReceiptsHash) {
+	TEST(TEST_CLASS, ExecuteShortCircuitsOnInconsistentBlockReceiptsHash) {
 		// Arrange:
 		ProcessorTestContext context(ReceiptValidationMode::Enabled);
 		auto pParentBlock = test::GenerateEmptyRandomBlock();
@@ -600,7 +744,7 @@ namespace catapult { namespace consumers {
 			auto i = 0u;
 			auto previousGenerationHash = parentBlockElement.GenerationHash;
 			for (const auto& blockElement : elements) {
-				auto expectedGenerationHash = model::CalculateGenerationHash(previousGenerationHash, blockElement.Block.SignerPublicKey);
+				auto expectedGenerationHash = model::CalculateGenerationHash(blockElement.Block.GenerationHashProof.Gamma);
 				EXPECT_EQ(expectedGenerationHash, blockElement.GenerationHash) << "generation hash at " << i;
 				previousGenerationHash = expectedGenerationHash;
 				++i;

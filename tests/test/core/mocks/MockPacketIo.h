@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -148,7 +149,7 @@ namespace catapult { namespace mocks {
 	private:
 		static std::shared_ptr<ionet::Packet> PayloadToPacket(const ionet::PacketPayload& payload) {
 			const auto& header = payload.header();
-			auto pPacket = ionet::CreateSharedPacket<ionet::Packet>(header.Size - sizeof(ionet::Packet));
+			auto pPacket = ionet::CreateSharedPacket<ionet::Packet>(header.Size - SizeOf32<ionet::Packet>());
 			pPacket->Type = header.Type;
 
 			size_t dataOffset = 0;

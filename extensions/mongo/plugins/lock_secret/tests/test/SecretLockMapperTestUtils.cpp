@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,11 +29,10 @@ using namespace catapult::mongo::mappers;
 
 namespace catapult { namespace test {
 
-	void AssertEqualLockInfoData(
-			const state::SecretLockInfo& lockInfo,
-			const Address& address,
-			const bsoncxx::document::view& dbLockInfo) {
-		AssertEqualBaseLockInfoData(lockInfo, address, dbLockInfo);
+	void AssertEqualLockInfoData(const state::SecretLockInfo& lockInfo, const bsoncxx::document::view& dbLockInfo) {
+		EXPECT_EQ(6u + 4, GetFieldCount(dbLockInfo));
+		AssertEqualBaseLockInfoData(lockInfo, dbLockInfo);
+
 		EXPECT_EQ(lockInfo.HashAlgorithm, static_cast<model::LockHashAlgorithm>(GetUint8(dbLockInfo, "hashAlgorithm")));
 		EXPECT_EQ(lockInfo.Secret, GetHashValue(dbLockInfo, "secret"));
 		EXPECT_EQ(lockInfo.RecipientAddress, GetAddressValue(dbLockInfo, "recipientAddress"));

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -35,19 +36,21 @@ namespace catapult { namespace config {
 
 #define LOAD_ACCOUNT_PROPERTY(NAME) LOAD_PROPERTY("account", NAME)
 
-		LOAD_ACCOUNT_PROPERTY(BootPrivateKey);
 		LOAD_ACCOUNT_PROPERTY(EnableDelegatedHarvestersAutoDetection);
 
 #undef LOAD_ACCOUNT_PROPERTY
 
 #define LOAD_STORAGE_PROPERTY(NAME) LOAD_PROPERTY("storage", NAME)
 
+		LOAD_STORAGE_PROPERTY(SeedDirectory);
 		LOAD_STORAGE_PROPERTY(DataDirectory);
+		LOAD_STORAGE_PROPERTY(CertificateDirectory);
+		LOAD_STORAGE_PROPERTY(VotingKeysDirectory);
 		LOAD_STORAGE_PROPERTY(PluginsDirectory);
 
 #undef LOAD_STORAGE_PROPERTY
 
-		utils::VerifyBagSizeLte(bag, 4);
+		utils::VerifyBagSizeExact(bag, 6);
 		return config;
 	}
 

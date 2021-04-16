@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,8 +21,11 @@
 
 #include "HarvestingConfiguration.h"
 #include "catapult/config/ConfigurationFileLoader.h"
+#include "catapult/model/Address.h"
 #include "catapult/utils/ConfigurationBag.h"
 #include "catapult/utils/ConfigurationUtils.h"
+
+DEFINE_ADDRESS_CONFIGURATION_VALUE_SUPPORT_ALLOW_EMPTY(true)
 
 namespace catapult { namespace harvesting {
 
@@ -36,21 +40,23 @@ namespace catapult { namespace harvesting {
 
 #define LOAD_HARVESTING_PROPERTY(NAME) LOAD_PROPERTY("harvesting", NAME)
 
-		LOAD_HARVESTING_PROPERTY(HarvesterPrivateKey);
+		LOAD_HARVESTING_PROPERTY(HarvesterSigningPrivateKey);
+		LOAD_HARVESTING_PROPERTY(HarvesterVrfPrivateKey);
+
 		LOAD_HARVESTING_PROPERTY(EnableAutoHarvesting);
 		LOAD_HARVESTING_PROPERTY(MaxUnlockedAccounts);
 		LOAD_HARVESTING_PROPERTY(DelegatePrioritizationPolicy);
-		LOAD_HARVESTING_PROPERTY(BeneficiaryPublicKey);
+		LOAD_HARVESTING_PROPERTY(BeneficiaryAddress);
 
 #undef LOAD_HARVESTING_PROPERTY
 
-		utils::VerifyBagSizeLte(bag, 5);
+		utils::VerifyBagSizeExact(bag, 6);
 		return config;
 	}
 
 #undef LOAD_PROPERTY
 
-	HarvestingConfiguration HarvestingConfiguration::LoadFromPath(const boost::filesystem::path& resourcesPath) {
+	HarvestingConfiguration HarvestingConfiguration::LoadFromPath(const std::filesystem::path& resourcesPath) {
 		return config::LoadIniConfiguration<HarvestingConfiguration>(resourcesPath / "config-harvesting.properties");
 	}
 }}

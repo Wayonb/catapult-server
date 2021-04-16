@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -33,7 +34,7 @@ namespace catapult { namespace local {
 
 		std::vector<std::string> GetAllQueueNames() {
 			return {
-				"block_change", "transaction_status",
+				"block_change", "finalization", "transaction_status",
 				"partial_transactions_change", "unconfirmed_transactions_change",
 				"block_recover",
 				"block_sync", "state_change"
@@ -52,7 +53,7 @@ namespace catapult { namespace local {
 				// and an unrelated marker file
 				for (const auto& queueName : GetAllQueueNames()) {
 					auto directory = m_dataDirectory.spoolDir(queueName);
-					boost::filesystem::create_directories(directory.path());
+					std::filesystem::create_directories(directory.path());
 
 					io::IndexFile(directory.file("index.dat")).set(indexValue);
 					io::IndexFile(directory.file("marker")).set(0);
@@ -72,20 +73,20 @@ namespace catapult { namespace local {
 			}
 
 			bool exists(const std::string& queueName) const {
-				return boost::filesystem::exists(m_dataDirectory.spoolDir(queueName).path());
+				return std::filesystem::exists(m_dataDirectory.spoolDir(queueName).path());
 			}
 
 			size_t countRootFiles() const {
-				auto begin = boost::filesystem::directory_iterator(m_dataDirectory.rootDir().path());
-				auto end = boost::filesystem::directory_iterator();
+				auto begin = std::filesystem::directory_iterator(m_dataDirectory.rootDir().path());
+				auto end = std::filesystem::directory_iterator();
 				return static_cast<size_t>(std::count_if(begin, end, [](const auto& entry) {
-					return boost::filesystem::is_regular_file(entry.path());
+					return std::filesystem::is_regular_file(entry.path());
 				}));
 			}
 
 			size_t countFiles(const std::string& queueName) const {
-				auto begin = boost::filesystem::directory_iterator(m_dataDirectory.spoolDir(queueName).path());
-				auto end = boost::filesystem::directory_iterator();
+				auto begin = std::filesystem::directory_iterator(m_dataDirectory.spoolDir(queueName).path());
+				auto end = std::filesystem::directory_iterator();
 				return static_cast<size_t>(std::distance(begin, end));
 			}
 
@@ -98,7 +99,7 @@ namespace catapult { namespace local {
 			}
 
 			void removeIndex(const std::string& queueName, const std::string& indexName) {
-				boost::filesystem::remove(m_dataDirectory.spoolDir(queueName).file(indexName));
+				std::filesystem::remove(m_dataDirectory.spoolDir(queueName).file(indexName));
 			}
 
 		private:
@@ -141,7 +142,7 @@ namespace catapult { namespace local {
 			}
 
 			static std::vector<std::string> GetRetainedQueueNames() {
-				return { "block_change", "transaction_status" };
+				return { "block_change", "finalization", "transaction_status" };
 			}
 
 			static uint64_t GetExpectedStateChangeIndexServerValue(uint64_t indexValue, uint64_t) {
@@ -162,7 +163,7 @@ namespace catapult { namespace local {
 			}
 
 			static std::vector<std::string> GetRetainedQueueNames() {
-				return { "block_change", "transaction_status", "block_sync" };
+				return { "block_change", "finalization", "transaction_status", "block_sync" };
 			}
 
 			static uint64_t GetExpectedStateChangeIndexServerValue(uint64_t, uint64_t indexServerValue) {
@@ -186,7 +187,7 @@ namespace catapult { namespace local {
 		template<typename TTraits>
 		void RepairAndCheckNonStateChangeDirectories(TestContext& context, uint64_t expectedIndexValue, size_t numRepairs = 1) {
 			// Sanity:
-			EXPECT_EQ(6u, TTraits::GetPurgedQueueNames().size() + TTraits::GetRetainedQueueNames().size());
+			EXPECT_EQ(7u, TTraits::GetPurgedQueueNames().size() + TTraits::GetRetainedQueueNames().size());
 			EXPECT_EQ(1u, context.countRootFiles());
 
 			// Act:
@@ -199,7 +200,7 @@ namespace catapult { namespace local {
 
 			// - only marker left in root dir
 			EXPECT_EQ(1u, context.countRootFiles());
-			EXPECT_TRUE(boost::filesystem::exists(context.rootMarkerFilename()));
+			EXPECT_TRUE(std::filesystem::exists(context.rootMarkerFilename()));
 
 			// - check retained directories
 			for (const auto& retainedQueueName : TTraits::GetRetainedQueueNames())
@@ -268,7 +269,7 @@ namespace catapult { namespace local {
 		TestContext context(SetupMode::None, 111);
 
 		// Sanity:
-		EXPECT_EQ(7u, GetAllQueueNames().size());
+		EXPECT_EQ(8u, GetAllQueueNames().size());
 
 		// Act:
 		context.repair(TTraits::Commit_Step);

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,10 +23,7 @@
 #include "EntityBody.h"
 #include "SizePrefixedEntity.h"
 
-namespace catapult {
-	namespace crypto { class KeyPair; }
-	namespace model { class TransactionRegistry; }
-}
+namespace catapult { namespace model { class TransactionRegistry; } }
 
 namespace catapult { namespace model {
 
@@ -52,6 +50,9 @@ namespace catapult { namespace model {
 
 	/// Insertion operator for outputting \a entity to \a out.
 	std::ostream& operator<<(std::ostream& out, const VerifiableEntity& entity);
+
+	/// Gets the address of the signer of \a entity.
+	Address GetSignerAddress(const VerifiableEntity& entity);
 
 	/// Checks the real size of \a entity against its reported size and returns \c true if the sizes match.
 	/// \a registry contains all known transaction types.

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,13 +20,15 @@
 **/
 
 #pragma once
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 #include <functional>
 #include <memory>
 
 namespace catapult {
-	namespace config { class CatapultConfiguration; }
-	namespace crypto { class KeyPair; }
+	namespace config {
+		class CatapultConfiguration;
+		class CatapultKeys;
+	}
 }
 
 namespace catapult { namespace process {
@@ -41,11 +44,11 @@ namespace catapult { namespace process {
 
 	/// Prototype for creating a process host.
 	/// \note Return value is a shared_ptr because unique_ptr of void is not allowed.
-	using CreateProcessHost = std::function<std::shared_ptr<void> (config::CatapultConfiguration&&, const crypto::KeyPair&)>;
+	using CreateProcessHost = std::function<std::shared_ptr<void> (config::CatapultConfiguration&&, const config::CatapultKeys&)>;
 
 	/// Extracts the resources path from the command line arguments.
 	/// \a argc commmand line arguments are accessible via \a argv.
-	boost::filesystem::path GetResourcesPath(int argc, const char** argv);
+	std::filesystem::path GetResourcesPath(int argc, const char** argv);
 
 	/// Main entry point for a catapult process named \a host with default process options.
 	/// \a argc commmand line arguments are accessible via \a argv.

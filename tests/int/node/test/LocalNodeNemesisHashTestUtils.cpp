@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -46,16 +47,21 @@ namespace catapult { namespace test {
 		}
 	}
 
-	void SetNemesisReceiptsHash(const std::string& destination) {
+	void SetNemesisReceiptsHash(const std::string& destination, NemesisStorageDisposition disposition) {
 		// calculate the receipts hash (default nemesis block has zeroed receipts hash)
-		ModifyNemesis(destination, [](auto& nemesisBlock, const auto&) {
+		auto modify = NemesisStorageDisposition::Seed == disposition ? ModifySeedNemesis : ModifyNemesis;
+		modify(destination, [](auto& nemesisBlock, const auto&) {
 			model::BlockStatementBuilder blockStatementBuilder;
 
 			// 1. add harvest fee receipt
 			auto totalFee = model::CalculateBlockTransactionsInfo(nemesisBlock).TotalFee;
 
 			auto feeMosaicId = Default_Currency_Mosaic_Id;
-			model::BalanceChangeReceipt receipt(model::Receipt_Type_Harvest_Fee, nemesisBlock.SignerPublicKey, feeMosaicId, totalFee);
+			model::BalanceChangeReceipt receipt(
+					model::Receipt_Type_Harvest_Fee,
+					model::GetSignerAddress(nemesisBlock),
+					feeMosaicId,
+					totalFee);
 			blockStatementBuilder.addReceipt(receipt);
 
 			// 2. add mosaic aliases (supply tx first uses alias, block mosaic order is deterministic)
@@ -72,9 +78,13 @@ namespace catapult { namespace test {
 		});
 	}
 
-	void SetNemesisStateHash(const std::string& destination, const config::CatapultConfiguration& config) {
+	void SetNemesisStateHash(
+			const std::string& destination,
+			NemesisStorageDisposition disposition,
+			const config::CatapultConfiguration& config) {
 		// calculate the state hash (default nemesis block has zeroed state hash)
-		ModifyNemesis(destination, [&config](auto& nemesisBlock, const auto& nemesisBlockElement) {
+		auto modify = NemesisStorageDisposition::Seed == disposition ? ModifySeedNemesis : ModifyNemesis;
+		modify(destination, [&config](auto& nemesisBlock, const auto& nemesisBlockElement) {
 			nemesisBlock.StateHash = CalculateNemesisStateHash(nemesisBlockElement, config);
 		});
 	}

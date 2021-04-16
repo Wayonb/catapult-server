@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -67,6 +68,9 @@ namespace catapult { namespace model {
 
 	/// Insertion operator for outputting \a transaction to \a out.
 	std::ostream& operator<<(std::ostream& out, const EmbeddedTransaction& transaction);
+
+	/// Gets the address of the signer of \a transaction.
+	Address GetSignerAddress(const EmbeddedTransaction& transaction);
 
 	/// Checks the real size of \a transaction against its reported size and returns \c true if the sizes match.
 	/// \a registry contains all known transaction types.

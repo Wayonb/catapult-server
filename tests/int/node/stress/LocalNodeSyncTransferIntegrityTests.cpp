@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -59,15 +60,15 @@ namespace catapult { namespace local {
 		// region utils
 
 		void ResignBlock(model::Block& block) {
-			for (const auto* pPrivateKeyString : test::Mijin_Test_Private_Keys) {
+			for (const auto* pPrivateKeyString : test::Test_Network_Private_Keys) {
 				auto keyPair = crypto::KeyPair::FromString(pPrivateKeyString);
 				if (keyPair.publicKey() == block.SignerPublicKey) {
-					extensions::BlockExtensions(test::GetNemesisGenerationHash()).signFullBlock(keyPair, block);
+					extensions::BlockExtensions(test::GetNemesisGenerationHashSeed()).signFullBlock(keyPair, block);
 					return;
 				}
 			}
 
-			CATAPULT_THROW_RUNTIME_ERROR("unable to find block signer among mijin test private keys");
+			CATAPULT_THROW_RUNTIME_ERROR("unable to find block signer among test private keys");
 		}
 
 		// endregion
@@ -100,7 +101,7 @@ namespace catapult { namespace local {
 			auto blocks = TTraits::GetBlocks(builder, transactionsBuilder);
 
 			// Act:
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			auto pIo = test::PushEntities(connection, ionet::PacketType::Push_Block, blocks);
 
 			// - wait for the chain height to change and for all height readers to disconnect
@@ -171,7 +172,7 @@ namespace catapult { namespace local {
 			auto blocks = TTraits::GetBlocks(builder, transactionsBuilder);
 
 			// Act:
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			auto pIo = test::PushEntities(connection, ionet::PacketType::Push_Block, blocks);
 
 			// - wait for the chain height to change and for all height readers to disconnect
@@ -212,7 +213,7 @@ namespace catapult { namespace local {
 			auto pTailBlock = utils::UniqueToShared(builder2.asSingleBlock(transactionsBuilder2));
 
 			// Act:
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			auto pIo1 = test::PushEntities(connection, ionet::PacketType::Push_Block, blocks);
 			auto pIo2 = test::PushEntity(connection, ionet::PacketType::Push_Block, pTailBlock);
 
@@ -301,7 +302,7 @@ namespace catapult { namespace local {
 			}
 
 			// Act:
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			auto pIo1 = test::PushEntities(connection, ionet::PacketType::Push_Block, invalidBlocks);
 			auto pIo2 = test::PushEntity(connection, ionet::PacketType::Push_Block, pTailBlock);
 
@@ -451,7 +452,7 @@ namespace catapult { namespace local {
 			}
 
 			// Act:
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			auto pIo1 = test::PushEntities(connection, ionet::PacketType::Push_Block, invalidBlocks);
 			auto pIo2 = test::PushEntity(connection, ionet::PacketType::Push_Block, pTailBlock);
 

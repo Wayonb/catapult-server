@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -88,7 +89,10 @@ namespace catapult { namespace packetserver {
 
 		// - connect to the server as a reader
 		auto pPool = test::CreateStartedIoThreadPool();
-		auto pIo = test::ConnectToLocalHost(pPool->ioContext(), test::GetLocalHostPort(), context.publicKey());
+		auto pIo = test::ConnectToLocalHost(pPool->ioContext(), test::GetLocalHostPort());
+
+		// - wait for a single connection
+		WAIT_FOR_ONE_EXPR(context.counter(Counter_Name));
 
 		// Assert: a single connection was accepted
 		EXPECT_EQ(1u, context.counter(Counter_Name));
@@ -146,10 +150,10 @@ namespace catapult { namespace packetserver {
 
 		// - connect to the server as a reader
 		auto pPool = test::CreateStartedIoThreadPool();
-		auto pIo = test::ConnectToLocalHost(pPool->ioContext(), test::GetLocalHostPort(), context.publicKey());
+		auto pIo = test::ConnectToLocalHost(pPool->ioContext(), test::GetLocalHostPort());
 
-		// Sanity: a single connection was accepted
-		EXPECT_EQ(1u, context.counter(Counter_Name));
+		// - wait for a single connection
+		WAIT_FOR_ONE_EXPR(context.counter(Counter_Name));
 
 		// Act: send a simple squares request
 		ionet::ByteBuffer packetBuffer;
@@ -174,10 +178,41 @@ namespace catapult { namespace packetserver {
 
 	// endregion
 
+	// region bannedNodeIdentitySink
+
+	TEST(TEST_CLASS, ReadersAreRegisteredInBannedNodeIdentitySink) {
+		// Arrange:
+		TestContext context;
+		context.boot();
+		auto sink = context.testState().state().hooks().bannedNodeIdentitySink();
+
+		// - connect to the server as a reader
+		auto pPool = test::CreateStartedIoThreadPool();
+		auto pIo = test::ConnectToLocalHost(pPool->ioContext(), test::GetLocalHostPort());
+
+		// Sanity: a single connection was accepted
+		WAIT_FOR_ONE_EXPR(context.counter(Counter_Name));
+
+		// - figure out the identity of the connected reader
+		auto pReaders = context.locator().service<net::PacketReaders>(Service_Name);
+		auto clientPublicKey = pReaders->identities().cbegin()->PublicKey;
+
+		// Act: trigger the sink, which should close the connection
+		sink(model::NodeIdentity{ clientPublicKey, "" });
+
+		// - wait for the test to complete
+		pPool->join();
+
+		// Assert: the connection was closed
+		EXPECT_EQ(0u, context.counter(Counter_Name));
+	}
+
+	// endregion
+
 	// region tasks
 
-	TEST(TEST_CLASS, AgePeersTaskIsScheduled) {
-		test::AssertRegisteredTask(TestContext(), 1, "age peers task for service Readers");
+	TEST(TEST_CLASS, TasksAreRegistered) {
+		test::AssertRegisteredTasks(TestContext(), { "age peers task for service Readers" });
 	}
 
 	// endregion

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -51,14 +52,7 @@ namespace catapult { namespace harvesting {
 
 	public:
 		/// Creates a scheduled harvesting task around \a options and \a pHarvester.
-		ScheduledHarvesterTask(const ScheduledHarvesterTaskOptions& options, std::unique_ptr<Harvester>&& pHarvester)
-				: m_harvestingAllowed(options.HarvestingAllowed)
-				, m_lastBlockElementSupplier(options.LastBlockElementSupplier)
-				, m_timeSupplier(options.TimeSupplier)
-				, m_rangeConsumer(options.RangeConsumer)
-				, m_pHarvester(std::move(pHarvester))
-				, m_isAnyHarvestedBlockPending(false)
-		{}
+		ScheduledHarvesterTask(const ScheduledHarvesterTaskOptions& options, std::unique_ptr<Harvester>&& pHarvester);
 
 	public:
 		/// Triggers the harvesting process and in case of successfull block creation
@@ -72,6 +66,6 @@ namespace catapult { namespace harvesting {
 		const decltype(TaskOptions::RangeConsumer) m_rangeConsumer;
 		std::unique_ptr<Harvester> m_pHarvester;
 
-		std::atomic_bool m_isAnyHarvestedBlockPending;
+		std::shared_ptr<std::atomic_bool> m_pIsAnyHarvestedBlockPending;
 	};
 }}

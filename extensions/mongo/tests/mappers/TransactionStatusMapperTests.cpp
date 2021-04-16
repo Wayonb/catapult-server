@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,11 +32,9 @@ namespace catapult { namespace mongo { namespace mappers {
 	TEST(TEST_CLASS, CanMapTransactionStatus) {
 		// Arrange:
 		auto hash = test::GenerateRandomByteArray<Hash256>();
-		auto status = 123456u;
-		auto deadline = Timestamp(321);
 
 		// Act:
-		auto document = ToDbModel(model::TransactionStatus(hash, status, deadline));
+		auto document = ToDbModel(model::TransactionStatus(hash, Timestamp(321), 123456));
 		auto documentView = document.view();
 
 		// Assert:

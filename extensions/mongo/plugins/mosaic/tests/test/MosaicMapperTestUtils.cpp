@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -35,17 +36,16 @@ namespace catapult { namespace test {
 		}
 	}
 
-	void AssertEqualMosaicData(
-			const state::MosaicEntry& mosaicEntry,
-			const Address& ownerAddress,
-			const bsoncxx::document::view& dbMosaicEntry) {
+	void AssertEqualMosaicData(const state::MosaicEntry& mosaicEntry, const bsoncxx::document::view& dbMosaicEntry) {
+		EXPECT_EQ(9u, GetFieldCount(dbMosaicEntry));
+		EXPECT_EQ(1u, GetUint32(dbMosaicEntry, "version"));
+
 		EXPECT_EQ(mosaicEntry.mosaicId(), MosaicId(GetUint64(dbMosaicEntry, "id")));
 		EXPECT_EQ(mosaicEntry.supply(), Amount(GetUint64(dbMosaicEntry, "supply")));
 
 		const auto& definition = mosaicEntry.definition();
 		EXPECT_EQ(definition.startHeight(), Height(GetUint64(dbMosaicEntry, "startHeight")));
-		EXPECT_EQ(definition.ownerPublicKey(), GetKeyValue(dbMosaicEntry, "ownerPublicKey"));
-		EXPECT_EQ(ownerAddress, GetAddressValue(dbMosaicEntry, "ownerAddress"));
+		EXPECT_EQ(definition.ownerAddress(), GetAddressValue(dbMosaicEntry, "ownerAddress"));
 		EXPECT_EQ(definition.revision(), GetUint32(dbMosaicEntry, "revision"));
 
 		AssertMosaicProperties(definition.properties(), dbMosaicEntry);

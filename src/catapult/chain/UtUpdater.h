@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -34,6 +35,28 @@ namespace catapult {
 }
 
 namespace catapult { namespace chain {
+
+	// region results
+
+	/// Result of a transaction update.
+	struct UtUpdateResult {
+		/// Possible update types.
+		enum class UpdateType {
+			/// New transaction.
+			New,
+
+			/// Invalid transaction.
+			Invalid,
+
+			/// Neutral transaction (e.g. cache is full).
+			Neutral
+		};
+
+		/// Type of the update.
+		UpdateType Type;
+	};
+
+	// endregion
 
 	/// Provides batch updating of an unconfirmed transactions cache.
 	class UtUpdater {
@@ -88,7 +111,7 @@ namespace catapult { namespace chain {
 
 	public:
 		/// Updates this cache by applying new transaction infos in \a utInfos.
-		void update(const std::vector<model::TransactionInfo>& utInfos);
+		std::vector<UtUpdateResult> update(const std::vector<model::TransactionInfo>& utInfos);
 
 		/// Updates this cache by applying new transaction infos in \a utInfos and
 		/// removing transactions with hashes in \a confirmedTransactionHashes.

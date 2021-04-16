@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -40,8 +41,12 @@ namespace catapult { namespace model {
 		const char* ToString(EntityType entityType) {
 			switch (utils::to_underlying_type(entityType)) {
 			// well known types defined in EntityType.h
-			CASE_WELL_KNOWN_ENTITY_TYPE(Nemesis_Block);
-			CASE_WELL_KNOWN_ENTITY_TYPE(Block);
+			CASE_WELL_KNOWN_ENTITY_TYPE(Block_Nemesis);
+			CASE_WELL_KNOWN_ENTITY_TYPE(Block_Normal);
+			CASE_WELL_KNOWN_ENTITY_TYPE(Block_Importance);
+
+			CASE_WELL_KNOWN_ENTITY_TYPE(Voting_Key_Link);
+			CASE_WELL_KNOWN_ENTITY_TYPE(Vrf_Key_Link);
 
 			// plugin entity types
 			#include "plugins/txes/account_link/src/model/AccountLinkEntityType.h"

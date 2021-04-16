@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,6 +22,7 @@
 #pragma once
 #include "AccountStateBaseSets.h"
 #include "AccountStateCacheSerializers.h"
+#include "HighValueAccounts.h"
 #include "ReadOnlyAccountStateCache.h"
 #include "catapult/cache/CacheMixinAliases.h"
 #include "catapult/cache/ReadOnlyViewSupplier.h"
@@ -63,17 +65,17 @@ namespace catapult { namespace cache {
 		using ReadOnlyView = ReadOnlyAccountStateCache;
 
 	public:
-		/// Creates a view around \a accountStateSets, \a options and \a highValueAddresses.
+		/// Creates a view around \a accountStateSets, \a options and \a highValueAccounts.
 		BasicAccountStateCacheView(
 				const AccountStateCacheTypes::BaseSets& accountStateSets,
 				const AccountStateCacheTypes::Options& options,
-				const model::AddressSet& highValueAddresses);
+				const HighValueAccounts& highValueAccounts);
 
 	private:
 		BasicAccountStateCacheView(
 				const AccountStateCacheTypes::BaseSets& accountStateSets,
 				const AccountStateCacheTypes::Options& options,
-				const model::AddressSet& highValueAddresses,
+				const HighValueAccounts& highValueAccounts,
 				std::unique_ptr<AccountStateCacheViewMixins::KeyLookupAdapter>&& pKeyLookupAdapter);
 
 	public:
@@ -100,24 +102,24 @@ namespace catapult { namespace cache {
 		MosaicId harvestingMosaicId() const;
 
 	public:
-		/// Gets all high value addresses.
-		const model::AddressSet& highValueAddresses() const;
+		/// Gets all high value accounts.
+		const HighValueAccounts& highValueAccounts() const;
 
 	private:
 		const AccountStateCacheTypes::Options& m_options;
-		const model::AddressSet& m_highValueAddresses;
+		const HighValueAccounts& m_highValueAccounts;
 		std::unique_ptr<AccountStateCacheViewMixins::KeyLookupAdapter> m_pKeyLookupAdapter;
 	};
 
 	/// View on top of the account state cache.
 	class AccountStateCacheView : public ReadOnlyViewSupplier<BasicAccountStateCacheView> {
 	public:
-		/// Creates a view around \a accountStateSets, \a options and \a highValueAddresses.
+		/// Creates a view around \a accountStateSets, \a options and \a highValueAccounts.
 		AccountStateCacheView(
 				const AccountStateCacheTypes::BaseSets& accountStateSets,
 				const AccountStateCacheTypes::Options& options,
-				const model::AddressSet& highValueAddresses)
-				: ReadOnlyViewSupplier(accountStateSets, options, highValueAddresses)
+				const HighValueAccounts& highValueAccounts)
+				: ReadOnlyViewSupplier(accountStateSets, options, highValueAccounts)
 		{}
 	};
 }}

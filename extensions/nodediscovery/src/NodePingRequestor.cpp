@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,10 +24,11 @@
 namespace catapult { namespace nodediscovery {
 
 	std::shared_ptr<NodePingRequestor> CreateNodePingRequestor(
-			const std::shared_ptr<thread::IoThreadPool>& pPool,
-			const crypto::KeyPair& keyPair,
+			thread::IoThreadPool& pool,
+			const Key& serverPublicKey,
 			const net::ConnectionSettings& settings,
-			model::NetworkIdentifier networkIdentifier) {
-		return std::make_shared<NodePingRequestor>(pPool, keyPair, settings, NodePingResponseCompatibilityChecker(networkIdentifier));
+			const model::UniqueNetworkFingerprint& networkFingerprint) {
+		auto checker = NodePingResponseCompatibilityChecker(networkFingerprint);
+		return std::make_shared<NodePingRequestor>(pool, serverPublicKey, settings, checker);
 	}
 }}

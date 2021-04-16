@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,11 +20,12 @@
 **/
 
 #include "ProcessMain.h"
+#include "Platform.h"
 #include "Signals.h"
 #include "catapult/config/CatapultConfiguration.h"
+#include "catapult/config/CatapultKeys.h"
 #include "catapult/config/ValidateConfiguration.h"
-#include "catapult/crypto/KeyPair.h"
-#include "catapult/crypto/KeyUtils.h"
+#include "catapult/crypto/OpensslMemory.h"
 #include "catapult/io/FileLock.h"
 #include "catapult/thread/ThreadInfo.h"
 #include "catapult/utils/ExceptionLogging.h"
@@ -51,10 +53,18 @@ namespace catapult { namespace process {
 			return pFilter;
 		}
 
-		std::shared_ptr<void> SetupLogging(const config::LoggingConfiguration& config) {
+		std::shared_ptr<void> SetupLogging(const std::string& host, const config::LoggingConfiguration& config) {
 			auto pBootstrapper = std::make_shared<utils::LoggingBootstrapper>();
-			pBootstrapper->addConsoleLogger(config::GetConsoleLoggerOptions(config.Console), *CreateLogFilter(config.Console));
+
 			pBootstrapper->addFileLogger(config::GetFileLoggerOptions(config.File), *CreateLogFilter(config.File));
+
+			// log version only to file before initializing console
+			std::ostringstream versionStream;
+			versionStream << "catapult " << host << std::endl;
+			version::WriteVersionInformation(versionStream);
+			CATAPULT_LOG(important) << versionStream.str();
+
+			pBootstrapper->addConsoleLogger(config::GetConsoleLoggerOptions(config.Console), *CreateLogFilter(config.Console));
 			return PORTABLE_MOVE(pBootstrapper);
 		}
 
@@ -75,21 +85,24 @@ namespace catapult { namespace process {
 		// endregion
 
 		void Run(config::CatapultConfiguration&& config, ProcessOptions processOptions, const CreateProcessHost& createProcessHost) {
-			auto keyPair = crypto::KeyPair::FromString(config.User.BootPrivateKey);
+			auto catapultKeys = config::CatapultKeys(config.User.CertificateDirectory);
 
-			CATAPULT_LOG(info) << "booting process with public key " << crypto::FormatKey(keyPair.publicKey());
-			auto pProcessHost = createProcessHost(std::move(config), keyPair);
+			CATAPULT_LOG(important)
+					<< "booting process with keys:"
+					<< std::endl << " -   CA " << catapultKeys.caPublicKey()
+					<< std::endl << " - NODE " << catapultKeys.nodeKeyPair().publicKey();
+			auto pProcessHost = createProcessHost(std::move(config), catapultKeys);
 
 			if (ProcessOptions::Exit_After_Termination_Signal == processOptions)
 				WaitForTerminationSignal();
 
-			CATAPULT_LOG(info) << "shutting down process";
+			CATAPULT_LOG(important) << "SHUTTING DOWN PROCESS";
 			pProcessHost.reset();
 		}
 	}
 
-	boost::filesystem::path GetResourcesPath(int argc, const char** argv) {
-		return boost::filesystem::path(argc > 1 ? argv[1] : "..") / "resources";
+	std::filesystem::path GetResourcesPath(int argc, const char** argv) {
+		return std::filesystem::path(argc > 1 ? argv[1] : "..") / "resources";
 	}
 
 	int ProcessMain(int argc, const char** argv, const std::string& host, const CreateProcessHost& createProcessHost) {
@@ -103,18 +116,20 @@ namespace catapult { namespace process {
 			ProcessOptions processOptions,
 			const CreateProcessHost& createProcessHost) {
 		std::set_terminate(&TerminateHandler);
-		thread::SetThreadName("Process Main (" + host + ")");
+		thread::SetThreadName(host + " catapult");
 		version::WriteVersionInformation(std::cout);
+
+		crypto::SetupOpensslMemoryFunctions();
 
 		// 1. load and validate the configuration
 		auto config = LoadConfiguration(argc, argv, host);
 		ValidateConfiguration(config);
 
 		// 2. initialize logging
-		auto pLoggingGuard = SetupLogging(config.Logging);
+		auto pLoggingGuard = SetupLogging(host, config.Logging);
 
 		// 3. check instance
-		boost::filesystem::path lockFilePath = config.User.DataDirectory;
+		std::filesystem::path lockFilePath = config.User.DataDirectory;
 		lockFilePath /= host + ".lock";
 		io::FileLock instanceLock(lockFilePath.generic_string());
 		if (!instanceLock.try_lock()) {
@@ -122,7 +137,10 @@ namespace catapult { namespace process {
 			return -3;
 		}
 
-		// 4. run the server
+		// 4. platform specific settings
+		PlatformSettings();
+
+		// 5. run the server
 		Run(std::move(config), processOptions, createProcessHost);
 		return 0;
 	}

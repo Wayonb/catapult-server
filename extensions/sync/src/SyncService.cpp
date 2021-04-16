@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -39,13 +40,7 @@ namespace catapult { namespace sync {
 		constexpr auto Service_Id = ionet::ServiceIdentifier(0x53594E43);
 
 		thread::Task CreateConnectPeersTask(extensions::ServiceState& state, net::PacketWriters& packetWriters) {
-			auto settings = extensions::SelectorSettings(
-					state.cache(),
-					state.config().BlockChain.TotalChainImportance,
-					state.nodes(),
-					Service_Id,
-					ionet::NodeRoles::Peer,
-					state.config().Node.OutgoingConnections);
+			auto settings = extensions::CreateOutgoingSelectorSettings(state, Service_Id, ionet::NodeRoles::Peer);
 			auto task = extensions::CreateConnectPeersTask(settings, packetWriters);
 			task.Name += " for service Sync";
 			return task;
@@ -53,6 +48,7 @@ namespace catapult { namespace sync {
 
 		chain::ChainSynchronizerConfiguration CreateChainSynchronizerConfiguration(const config::CatapultConfiguration& config) {
 			chain::ChainSynchronizerConfiguration chainSynchronizerConfig;
+			chainSynchronizerConfig.MaxHashesPerSyncAttempt = config.Node.MaxHashesPerSyncAttempt;
 			chainSynchronizerConfig.MaxBlocksPerSyncAttempt = config.Node.MaxBlocksPerSyncAttempt;
 			chainSynchronizerConfig.MaxChainBytesPerSyncAttempt = config.Node.MaxChainBytesPerSyncAttempt.bytes32();
 			chainSynchronizerConfig.MaxRollbackBlocks = config.BlockChain.MaxRollbackBlocks;
@@ -62,10 +58,12 @@ namespace catapult { namespace sync {
 		thread::Task CreateSynchronizerTask(const extensions::ServiceState& state, net::PacketWriters& packetWriters) {
 			const auto& config = state.config();
 			auto chainSynchronizer = chain::CreateChainSynchronizer(
-					api::CreateLocalChainApi(state.storage(), [&score = state.score()]() {
-						return score.get();
-					}),
+					api::CreateLocalChainApi(
+							state.storage(),
+							[&score = state.score()]() { return score.get(); },
+							extensions::CreateLocalFinalizedHeightSupplier(state)),
 					CreateChainSynchronizerConfiguration(config),
+					extensions::CreateLocalFinalizedHeightSupplier(state),
 					state.hooks().completionAwareBlockRangeConsumerFactory()(Sync_Source));
 
 			thread::Task task;
@@ -82,8 +80,10 @@ namespace catapult { namespace sync {
 		thread::Task CreatePullUtTask(const extensions::ServiceState& state, net::PacketWriters& packetWriters) {
 			auto utSynchronizer = chain::CreateUtSynchronizer(
 					state.config().Node.MinFeeMultiplier,
+					state.timeSupplier(),
 					[&cache = state.utCache()]() { return cache.view().shortHashes(); },
-					state.hooks().transactionRangeConsumerFactory()(Sync_Source));
+					state.hooks().transactionRangeConsumerFactory()(Sync_Source),
+					extensions::CreateShouldProcessTransactionsPredicate(state));
 
 			thread::Task task;
 			task.Name = "pull unconfirmed transactions task";

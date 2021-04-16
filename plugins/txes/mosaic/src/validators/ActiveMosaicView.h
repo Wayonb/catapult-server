@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -48,7 +49,7 @@ namespace catapult { namespace validators {
 		validators::ValidationResult tryGet(MosaicId id, Height height, FindIterator& iter) const;
 
 		/// Tries to get an entry iterator (\a iter) for an active mosaic with \a id at \a height given its purported \a owner.
-		validators::ValidationResult tryGet(MosaicId id, Height height, const Key& owner, FindIterator& iter) const;
+		validators::ValidationResult tryGet(MosaicId id, Height height, const Address& owner, FindIterator& iter) const;
 
 	private:
 		const cache::ReadOnlyCatapultCache& m_cache;

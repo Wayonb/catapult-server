@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -37,7 +38,9 @@ namespace catapult { namespace mongo {
 						{
 							{ "databaseUri", "mongodb://hostname:port" },
 							{ "databaseName", "foo" },
-							{ "maxWriterThreads", "3" }
+							{ "maxWriterThreads", "3" },
+							{ "maxDropBatchSize", "7" },
+							{ "writeTimeout", "22s" }
 						}
 					},
 					{
@@ -60,6 +63,8 @@ namespace catapult { namespace mongo {
 				EXPECT_EQ("", config.DatabaseUri);
 				EXPECT_EQ("", config.DatabaseName);
 				EXPECT_EQ(0u, config.MaxWriterThreads);
+				EXPECT_EQ(0u, config.MaxDropBatchSize);
+				EXPECT_EQ(utils::TimeSpan(), config.WriteTimeout);
 				EXPECT_EQ(std::unordered_set<std::string>(), config.Plugins);
 			}
 
@@ -68,6 +73,8 @@ namespace catapult { namespace mongo {
 				EXPECT_EQ("mongodb://hostname:port", config.DatabaseUri);
 				EXPECT_EQ("foo", config.DatabaseName);
 				EXPECT_EQ(3u, config.MaxWriterThreads);
+				EXPECT_EQ(7u, config.MaxDropBatchSize);
+				EXPECT_EQ(utils::TimeSpan::FromSeconds(22), config.WriteTimeout);
 				EXPECT_EQ(std::unordered_set<std::string>({ "Alpha", "gamma" }), config.Plugins);
 			}
 		};
@@ -90,6 +97,8 @@ namespace catapult { namespace mongo {
 		EXPECT_EQ("mongodb://127.0.0.1:27017", config.DatabaseUri);
 		EXPECT_EQ("catapult", config.DatabaseName);
 		EXPECT_EQ(8u, config.MaxWriterThreads);
+		EXPECT_EQ(100u, config.MaxDropBatchSize);
+		EXPECT_EQ(utils::TimeSpan::FromMinutes(10), config.WriteTimeout);
 		EXPECT_FALSE(config.Plugins.empty());
 	}
 

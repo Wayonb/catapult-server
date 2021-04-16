@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -32,20 +33,19 @@ namespace catapult { namespace test {
 	using MutableTransactions = std::vector<std::shared_ptr<model::Transaction>>;
 
 	/// Hash string of the deterministic transaction.
-#ifdef SIGNATURE_SCHEME_KECCAK
-	constexpr auto Deterministic_Transaction_Hash_String = "05DDD42BB6D2A47E6861FDA4AE31CFF57B72E1053A9CECF04B639EA735A74CDB";
-#else
-	constexpr auto Deterministic_Transaction_Hash_String = "928C1370941AAACE99C91D31D6C6B4FA511F83387C4DA99536F8F0B62545D755";
-#endif
+	constexpr auto Deterministic_Transaction_Hash_String = "D9B07A005CEC59E86310BAC4B48223330CD5746621EC4AAF5943FB4F0FFE1635";
 
-	/// Gets the default generation hash used in tests.
-	GenerationHash GetDefaultGenerationHash();
+	/// Gets the default generation hash seed used in tests.
+	GenerationHashSeed GetDefaultGenerationHashSeed();
+
+	/// Gets the default size of a random transaction.
+	size_t GetDefaultRandomTransactionSize();
 
 	/// Generates a transaction with random data.
 	std::unique_ptr<model::Transaction> GenerateRandomTransaction();
 
-	/// Generates a transaction for a network with specified generation hash (\a generationHash).
-	std::unique_ptr<model::Transaction> GenerateRandomTransaction(const GenerationHash& generationHash);
+	/// Generates a transaction for a network with specified generation hash seed (\a generationHashSeed).
+	std::unique_ptr<model::Transaction> GenerateRandomTransaction(const GenerationHashSeed& generationHashSeed);
 
 	/// Generates a transaction with random data around \a signer.
 	std::unique_ptr<model::Transaction> GenerateRandomTransaction(const Key& signer);
@@ -57,7 +57,7 @@ namespace catapult { namespace test {
 	ConstTransactions MakeConst(const MutableTransactions& transactions);
 
 	/// Generates a random transaction with size \a entitySize.
-	std::unique_ptr<model::Transaction> GenerateRandomTransactionWithSize(size_t entitySize);
+	std::unique_ptr<model::Transaction> GenerateRandomTransactionWithSize(uint32_t entitySize);
 
 	/// Generates a transaction with \a deadline.
 	std::unique_ptr<model::Transaction> GenerateTransactionWithDeadline(Timestamp deadline);
@@ -72,7 +72,19 @@ namespace catapult { namespace test {
 	model::TransactionRange CreateEntityRange(const std::vector<const model::Transaction*>& transactions);
 
 	/// Creates a random (detached) cosignature.
-	model::DetachedCosignature CreateRandomCosignature();
+	model::DetachedCosignature CreateRandomDetachedCosignature();
+
+	/// Asserts that \a expectedCosignature and \a actualCosignature are equal with optional \a message.
+	void AssertCosignature(
+			const model::Cosignature& expectedCosignature,
+			const model::Cosignature& actualCosignature,
+			const std::string& message = "");
+
+	/// Asserts that \a expectedCosignatures and \a actualCosignatures are equivalent with optional \a message.
+	void AssertCosignatures(
+			const std::vector<model::Cosignature>& expectedCosignatures,
+			const std::vector<model::Cosignature>& actualCosignatures,
+			const std::string& message = "");
 
 /// Adds basic transaction property tests for \a NAME transaction with custom arguments.
 #define ADD_BASIC_TRANSACTION_PROPERTY_TESTS_WITH_ARGS(NAME, ...) \

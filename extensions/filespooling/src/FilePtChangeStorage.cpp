@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,6 +22,7 @@
 #include "FilePtChangeStorage.h"
 #include "catapult/io/PodIoUtils.h"
 #include "catapult/io/TransactionInfoSerializer.h"
+#include "catapult/model/Cosignature.h"
 #include "catapult/subscribers/SubscriberOperationTypes.h"
 
 namespace catapult { namespace filespooling {
@@ -43,11 +45,9 @@ namespace catapult { namespace filespooling {
 
 			void notifyAddCosignature(
 					const model::TransactionInfo& parentTransactionInfo,
-					const Key& signer,
-					const Signature& signature) override {
+					const model::Cosignature& cosignature) override {
 				io::Write8(*m_pOutputStream, utils::to_underlying_type(subscribers::PtChangeOperationType::Add_Cosignature));
-				m_pOutputStream->write(signer);
-				m_pOutputStream->write(signature);
+				m_pOutputStream->write({ reinterpret_cast<const uint8_t*>(&cosignature), sizeof(model::Cosignature) });
 				io::WriteTransactionInfo(parentTransactionInfo, *m_pOutputStream);
 			}
 

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,7 +23,7 @@
 #include "catapult/cache/CacheDatabaseMixin.h"
 #include "catapult/cache/CacheDescriptorAdapters.h"
 #include "catapult/deltaset/BaseSetDelta.h"
-#include "catapult/model/NetworkInfo.h"
+#include "catapult/model/NetworkIdentifier.h"
 #include "catapult/state/AccountState.h"
 #include "catapult/utils/Casting.h"
 #include "catapult/utils/Hashers.h"
@@ -83,12 +84,19 @@ namespace catapult { namespace cache {
 			/// Importance grouping.
 			uint64_t ImportanceGrouping;
 
+			/// Voting set grouping.
+			uint64_t VotingSetGrouping;
+
 			/// Minimum harvester balance.
 			/// \note This doubles as the minimum balance of tracked high value accounts.
 			Amount MinHarvesterBalance;
 
 			/// Maximum harvester balance.
 			Amount MaxHarvesterBalance;
+
+			/// Minimum voter balance.
+			/// \note This doubles as the minimum balance of tracked high value accounts with balances.
+			Amount MinVoterBalance;
 
 			/// Mosaic id used as primary chain currency.
 			MosaicId CurrencyMosaicId;

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,6 +24,8 @@
 #include "catapult/utils/Logging.h"
 
 namespace catapult { namespace consumers {
+
+	// region RecentHashCache
 
 	RecentHashCache::RecentHashCache(const chain::TimeSupplier& timeSupplier, const HashCheckOptions& options)
 			: m_timeSupplier(timeSupplier)
@@ -78,4 +81,19 @@ namespace catapult { namespace consumers {
 		if (m_options.MaxCacheSize == m_cache.size())
 			CATAPULT_LOG(warning) << "short lived hash check cache is full";
 	}
+
+	// endregion
+
+	// region SynchronizedRecentHashCache
+
+	SynchronizedRecentHashCache::SynchronizedRecentHashCache(const chain::TimeSupplier& timeSupplier, const HashCheckOptions& options)
+			: m_recentHashCache(timeSupplier, options)
+	{}
+
+	bool SynchronizedRecentHashCache::add(const Hash256& hash) {
+		utils::SpinLockGuard guard(m_lock);
+		return m_recentHashCache.add(hash);
+	}
+
+	// endregion
 }}

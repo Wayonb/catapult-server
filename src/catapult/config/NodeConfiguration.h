@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,8 +20,8 @@
 **/
 
 #pragma once
-#include "catapult/ionet/ConnectionSecurityMode.h"
 #include "catapult/ionet/NodeRoles.h"
+#include "catapult/ionet/NodeVersion.h"
 #include "catapult/model/TransactionSelectionStrategy.h"
 #include "catapult/utils/FileSize.h"
 #include "catapult/utils/TimeSpan.h"
@@ -35,9 +36,6 @@ namespace catapult { namespace config {
 	public:
 		/// Server port.
 		unsigned short Port;
-
-		/// Server api port.
-		unsigned short ApiPort;
 
 		/// Maximum number of incoming connections per identity over primary port.
 		uint32_t MaxIncomingConnectionsPerIdentity;
@@ -55,11 +53,18 @@ namespace catapult { namespace config {
 		/// \note This should be \c false if broker process is running.
 		bool EnableAutoSyncCleanup;
 
+		/// Maximum number of payloads to store in each file database disk file.
+		/// \note This is recommended to be a factor of 10000.
+		uint32_t FileDatabaseBatchSize;
+
 		/// \c true if transaction spam throttling should be enabled.
 		bool EnableTransactionSpamThrottling;
 
 		/// Maximum fee that will boost a transaction through the spam throttle when spam throttling is enabled.
 		Amount TransactionSpamThrottlingMaxBoostFee;
+
+		/// Maximum number of hashes per sync attempt.
+		uint32_t MaxHashesPerSyncAttempt;
 
 		/// Maximum number of blocks per sync attempt.
 		uint32_t MaxBlocksPerSyncAttempt;
@@ -82,6 +87,10 @@ namespace catapult { namespace config {
 		/// Minimum fee multiplier of transactions to propagate and include in blocks.
 		BlockFeeMultiplier MinFeeMultiplier;
 
+		/// Transaction pulls will only be initiated when the timestamp of the last block in the local chain is within this value
+		/// of the network time.
+		utils::TimeSpan MaxTimeBehindPullTransactionsStart;
+
 		/// Transaction selection strategy used for syncing and harvesting unconfirmed transactions.
 		model::TransactionSelectionStrategy TransactionSelectionStrategy;
 
@@ -89,7 +98,7 @@ namespace catapult { namespace config {
 		utils::FileSize UnconfirmedTransactionsCacheMaxResponseSize;
 
 		/// Maximum size of the unconfirmed transactions cache.
-		uint32_t UnconfirmedTransactionsCacheMaxSize;
+		utils::FileSize UnconfirmedTransactionsCacheMaxSize;
 
 		/// Timeout for connecting to a peer.
 		utils::TimeSpan ConnectTimeout;
@@ -107,14 +116,20 @@ namespace catapult { namespace config {
 		/// Maximum packet data size.
 		utils::FileSize MaxPacketDataSize;
 
-		/// Size of the block disruptor circular buffer.
-		uint32_t BlockDisruptorSize;
+		/// Number of slots in the block disruptor circular buffer.
+		uint32_t BlockDisruptorSlotCount;
+
+		/// Maximum memory of all elements in the block disruptor circular buffer.
+		utils::FileSize BlockDisruptorMaxMemorySize;
 
 		/// Multiple of elements at which a block element should be traced through queue and completion.
 		uint32_t BlockElementTraceInterval;
 
-		/// Size of the transaction disruptor circular buffer.
-		uint32_t TransactionDisruptorSize;
+		/// Number of slots in the transaction disruptor circular buffer.
+		uint32_t TransactionDisruptorSlotCount;
+
+		/// Maximum memory of all elements in the transaction disruptor circular buffer.
+		utils::FileSize TransactionDisruptorMaxMemorySize;
 
 		/// Multiple of elements at which a transaction element should be traced through queue and completion.
 		uint32_t TransactionElementTraceInterval;
@@ -125,23 +140,54 @@ namespace catapult { namespace config {
 		/// \c true if all dispatcher inputs should be audited.
 		bool EnableDispatcherInputAuditing;
 
-		/// Security mode of outgoing connections initiated by this node.
-		ionet::ConnectionSecurityMode OutgoingSecurityMode;
-
-		/// Accepted security modes of incoming connections initiated by other nodes.
-		ionet::ConnectionSecurityMode IncomingSecurityModes;
-
-		/// Maximum cache database write batch size.
-		utils::FileSize MaxCacheDatabaseWriteBatchSize;
-
 		/// Maximum number of nodes to track in memory.
 		uint32_t MaxTrackedNodes;
+
+		/// Minimum supported version of partner nodes.
+		ionet::NodeVersion MinPartnerNodeVersion;
+
+		/// Maximum supported version of partner nodes.
+		ionet::NodeVersion MaxPartnerNodeVersion;
 
 		/// Trusted hosts that are allowed to execute protected API calls on this node.
 		std::unordered_set<std::string> TrustedHosts;
 
 		/// Networks that should be treated as local.
 		std::unordered_set<std::string> LocalNetworks;
+
+		/// Network interface on which to listen.
+		std::string ListenInterface;
+
+	public:
+		/// Cache database configuration.
+		struct CacheDatabaseSubConfiguration {
+			/// \c true if operational statistics should be captured and logged.
+			bool EnableStatistics;
+
+			/// Maximum number of open files.
+			uint32_t MaxOpenFiles;
+
+			/// Maximum number of background threads.
+			uint32_t MaxBackgroundThreads;
+
+			/// Maximum number of threads that will concurrently perform a compaction.
+			uint32_t MaxSubcompactionThreads;
+
+			/// Block cache size.
+			/// \note Optimizes for point lookup when nonzero.
+			utils::FileSize BlockCacheSize;
+
+			/// Memtable memory budget.
+			/// \note Optimizes level style compaction when nonzero.
+			utils::FileSize MemtableMemoryBudget;
+
+			/// Maximum write batch size.
+			utils::FileSize MaxWriteBatchSize;
+		};
+
+	public:
+		/// Cache database configuration.
+		CacheDatabaseSubConfiguration CacheDatabase;
 
 	public:
 		/// Local node configuration.
@@ -153,7 +199,7 @@ namespace catapult { namespace config {
 			std::string FriendlyName;
 
 			/// Node version.
-			uint32_t Version;
+			ionet::NodeVersion Version;
 
 			/// Node roles.
 			ionet::NodeRoles Roles;
@@ -215,6 +261,12 @@ namespace catapult { namespace config {
 
 			/// Maximum size allowed during full read rate monitoring period.
 			utils::FileSize MaxReadRateMonitoringTotalSize;
+
+			/// Minimum number of transaction failures to trigger a ban.
+			uint32_t MinTransactionFailuresCountForBan;
+
+			/// Minimum percentage of transaction failures to trigger a ban.
+			uint32_t MinTransactionFailuresPercentForBan;
 		};
 
 	public:

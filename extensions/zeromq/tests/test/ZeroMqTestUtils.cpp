@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,10 +21,12 @@
 
 #include "ZeroMqTestUtils.h"
 #include "sdk/src/extensions/ConversionExtensions.h"
+#include "zeromq/src/PackedFinalizedBlockHeader.h"
 #include "zeromq/src/PublisherUtils.h"
 #include "catapult/model/Address.h"
 #include "catapult/model/Cosignature.h"
 #include "catapult/model/Elements.h"
+#include "catapult/model/FinalizationRound.h"
 #include "catapult/model/Transaction.h"
 #include "catapult/model/TransactionStatus.h"
 #include "tests/TestHarness.h"
@@ -31,7 +34,7 @@
 namespace catapult { namespace test {
 
 	namespace {
-		constexpr auto Network_Identifier = model::NetworkIdentifier::Mijin_Test;
+		constexpr auto Network_Identifier = model::NetworkIdentifier::Private_Test;
 
 		template<typename TEntity>
 		void AssertMessagePart(const zmq::message_t& messagePart, const TEntity* pExpectedData, size_t expectedSize) {
@@ -80,7 +83,8 @@ namespace catapult { namespace test {
 	void SubscribeForAddresses(zmq::socket_t& socket, zeromq::TransactionMarker marker, const model::UnresolvedAddressSet& addresses) {
 		for (const auto& address : addresses) {
 			auto topic = zeromq::CreateTopic(marker, address);
-			socket.setsockopt(ZMQ_SUBSCRIBE, topic.data(), topic.size());
+			auto topicBuffer = zmq::const_buffer(reinterpret_cast<const void*>(topic.data()), topic.size());
+			socket.set(zmq::sockopt::subscribe, topicBuffer);
 		}
 	}
 
@@ -101,8 +105,8 @@ namespace catapult { namespace test {
 		ASSERT_EQ(4u, message.size());
 
 		auto marker = zeromq::BlockMarker::Block_Marker;
-		AssertMessagePart(message[0], &marker, sizeof(marker));
-		AssertMessagePart(message[1], &blockElement.Block, sizeof(model::BlockHeader));
+		AssertMessagePart(message[0], &marker, sizeof(zeromq::BlockMarker));
+		AssertMessagePart(message[1], &blockElement.Block, model::GetBlockHeaderSize(blockElement.Block.Type));
 		AssertMessagePart(message[2], &blockElement.EntityHash, Hash256::Size);
 		AssertMessagePart(message[3], &blockElement.GenerationHash, Hash256::Size);
 	}
@@ -111,8 +115,21 @@ namespace catapult { namespace test {
 		ASSERT_EQ(2u, message.size());
 
 		auto marker = zeromq::BlockMarker::Drop_Blocks_Marker;
-		AssertMessagePart(message[0], &marker, sizeof(marker));
+		AssertMessagePart(message[0], &marker, sizeof(zeromq::BlockMarker));
 		AssertMessagePart(message[1], &height, sizeof(Height));
+	}
+
+	void AssertFinalizedBlockMessage(
+			const zmq::multipart_t& message,
+			const model::FinalizationRound& round,
+			Height height,
+			const Hash256& hash) {
+		ASSERT_EQ(2u, message.size());
+
+		auto marker = zeromq::BlockMarker::Finalized_Block_Marker;
+		auto expectedHeader = zeromq::PackedFinalizedBlockHeader{ round, height, hash };
+		AssertMessagePart(message[0], &marker, sizeof(zeromq::BlockMarker));
+		AssertMessagePart(message[1], &expectedHeader, sizeof(zeromq::PackedFinalizedBlockHeader));
 	}
 
 	void AssertTransactionElementMessage(
@@ -159,7 +176,7 @@ namespace catapult { namespace test {
 		ASSERT_EQ(2u, message.size());
 
 		AssertMessagePart(message[0], topic.data(), topic.size());
-		AssertMessagePart(message[1], &transactionStatus, sizeof(transactionStatus));
+		AssertMessagePart(message[1], &transactionStatus, sizeof(model::TransactionStatus));
 	}
 
 	void AssertDetachedCosignatureMessage(
@@ -169,7 +186,7 @@ namespace catapult { namespace test {
 		ASSERT_EQ(2u, message.size());
 
 		AssertMessagePart(message[0], topic.data(), topic.size());
-		AssertMessagePart(message[1], &detachedCosignature, sizeof(detachedCosignature));
+		AssertMessagePart(message[1], &detachedCosignature, sizeof(model::DetachedCosignature));
 	}
 
 	void AssertMessages(

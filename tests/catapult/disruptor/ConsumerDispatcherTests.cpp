@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,7 +32,11 @@ namespace catapult { namespace disruptor {
 #define TEST_CLASS ConsumerDispatcherTests
 
 	namespace {
-		static constexpr ConsumerDispatcherOptions Test_Dispatcher_Options{ "ConsumerDispatcherTests", 16u * 1024 };
+		// region test utils
+
+		constexpr auto Dispatcher_Name = "ConsumerDispatcherTests";
+		constexpr auto Test_Dispatcher_Options = ConsumerDispatcherOptions(Dispatcher_Name, 16u * 1024);
+		constexpr uint64_t Block_Header_Size = sizeof(model::BlockHeader) + sizeof(model::PaddedBlockFooter);
 
 		auto CreateNoOpConsumer() {
 			return [](const auto&) {
@@ -47,28 +52,36 @@ namespace catapult { namespace disruptor {
 		void AssertHasProcessedNoElements(ConsumerDispatcher& dispatcher) {
 			EXPECT_EQ(0u, dispatcher.numAddedElements());
 			EXPECT_EQ(0u, dispatcher.numActiveElements());
+			EXPECT_EQ(utils::FileSize(), dispatcher.memorySize());
 			EXPECT_TRUE(dispatcher.isRunning());
 		}
+
+		// endregion
 	}
 
 	// region create + shutdown
 
-	TEST(TEST_CLASS, CannotCreateDispatcherWithNullName) {
-		// Arrange:
-		auto options = Test_Dispatcher_Options;
-		options.DispatcherName = nullptr;
+	namespace {
+		void AssertCannotCreateWithOptions(const consumer<ConsumerDispatcherOptions&>& modifyOptions) {
+			// Arrange:
+			auto options = Test_Dispatcher_Options;
+			modifyOptions(options);
 
-		// Act + Assert:
-		EXPECT_THROW(ConsumerDispatcher(options, {}), catapult_invalid_argument);
+			// Act + Assert:
+			EXPECT_THROW(ConsumerDispatcher(options, {}), catapult_invalid_argument);
+		}
 	}
 
-	TEST(TEST_CLASS, CannotCreateDispatcherWithZeroSizeDisruptor) {
-		// Arrange:
-		auto options = Test_Dispatcher_Options;
-		options.DisruptorSize = 0;
+	TEST(TEST_CLASS, CannotCreateDispatcherWithNullName) {
+		AssertCannotCreateWithOptions([](auto& options) { options.DispatcherName = nullptr; });
+	}
 
-		// Act + Assert:
-		EXPECT_THROW(ConsumerDispatcher(options, {}), catapult_invalid_argument);
+	TEST(TEST_CLASS, CannotCreateDispatcherWithZeroSlotCount) {
+		AssertCannotCreateWithOptions([](auto& options) { options.DisruptorSlotCount = 0; });
+	}
+
+	TEST(TEST_CLASS, CannotCreateDispatcherWithZeroMaxMemorySize) {
+		AssertCannotCreateWithOptions([](auto& options) { options.DisruptorMaxMemorySize = utils::FileSize(); });
 	}
 
 	TEST(TEST_CLASS, CanCreateEmptyDispatcher) {
@@ -190,16 +203,16 @@ namespace catapult { namespace disruptor {
 
 	// endregion
 
-	// region numActiveElements
+	// region numActiveElements / memorySize
 
-	TEST(TEST_CLASS, NumActiveElementsReportsNumberOfInProgressElements) {
+	TEST(TEST_CLASS, NumActiveElementsAndMemorySizeReportNumberOfInProgressElements) {
 		// Arrange:
 		test::AutoSetFlag isExecutingBlockedElementCallback;
 		test::AutoSetFlag isElementCallbackUnblocked;
 		auto pIsExecuting = isExecutingBlockedElementCallback.state();
 		auto pIsUnblocked = isElementCallbackUnblocked.state();
 
-		auto ranges = test::PrepareRanges(6);
+		auto ranges = test::PrepareRanges(6, 1);
 		ConsumerDispatcher dispatcher(Test_Dispatcher_Options, { CreateNoOpConsumer() });
 
 		// Act: block the third element
@@ -219,9 +232,10 @@ namespace catapult { namespace disruptor {
 		// - wait until the blocked element callback is called
 		isExecutingBlockedElementCallback.state()->wait();
 
-		// Assert: all elements should be added and four should be active
+		// Assert: all elements should be added and four should be active (each range contains 3 + i elements)
 		EXPECT_EQ(6u, dispatcher.numAddedElements());
 		EXPECT_EQ(4u, dispatcher.numActiveElements());
+		EXPECT_EQ(utils::FileSize::FromBytes((5 + 6 + 7 + 8) * Block_Header_Size), dispatcher.memorySize());
 
 		// Act: allow all elements to complete
 		isElementCallbackUnblocked.state()->set();
@@ -230,6 +244,7 @@ namespace catapult { namespace disruptor {
 		// Assert: no elements should be active
 		EXPECT_EQ(6u, dispatcher.numAddedElements());
 		EXPECT_EQ(0u, dispatcher.numActiveElements());
+		EXPECT_EQ(utils::FileSize(), dispatcher.memorySize());
 	}
 
 	// endregion
@@ -382,6 +397,7 @@ namespace catapult { namespace disruptor {
 		EXPECT_EQ(1u, collectedHeights.size());
 		EXPECT_EQ(ranges.size(), dispatcher.numAddedElements());
 		EXPECT_EQ(0u, dispatcher.numActiveElements());
+		EXPECT_EQ(utils::FileSize(), dispatcher.memorySize());
 		EXPECT_EQ(expectedHeights, collectedHeights.get());
 		EXPECT_EQ(1u, numInspectorCalls);
 	}
@@ -417,6 +433,7 @@ namespace catapult { namespace disruptor {
 		// Assert:
 		EXPECT_EQ(ranges.size(), dispatcher.numAddedElements());
 		EXPECT_EQ(0u, dispatcher.numActiveElements());
+		EXPECT_EQ(utils::FileSize(), dispatcher.memorySize());
 		EXPECT_EQ(expectedHeights, collectedHeights.get());
 		EXPECT_EQ(expectedHeights, inspectedHeights.get());
 		EXPECT_EQ(std::vector<CompletionStatus>(5, CompletionStatus::Normal), inspectedStatuses);
@@ -448,6 +465,7 @@ namespace catapult { namespace disruptor {
 		// Assert:
 		EXPECT_EQ(ranges.size(), dispatcher.numAddedElements());
 		EXPECT_EQ(0u, dispatcher.numActiveElements());
+		EXPECT_EQ(utils::FileSize(), dispatcher.memorySize());
 		EXPECT_EQ(expectedHeights, collectedHeights[0].get());
 		EXPECT_EQ(expectedHeights, collectedHeights[1].get());
 		EXPECT_EQ(expectedHeights, collectedHeights[2].get());
@@ -531,7 +549,7 @@ namespace catapult { namespace disruptor {
 
 	// endregion
 
-	// region exception + space exhaution
+	// region consumer exception
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -570,11 +588,19 @@ namespace catapult { namespace disruptor {
 #pragma clang diagnostic pop
 #endif
 
+	// endregion
+
+	// region space exhaustion
+
 	namespace {
+		utils::FileSize CalculatePrepareRangesSize(size_t seedCount) {
+			return utils::FileSize::FromBytes(model::BlockRange::MergeRanges(test::PrepareRanges(seedCount)).totalSize());
+		}
+
 		template<typename TAction>
-		void RunDispatcherFullTest(const ConsumerDispatcherOptions& options, TAction action) {
+		void RunDispatcherFullTest(const ConsumerDispatcherOptions& options, size_t seedCount, TAction action) {
 			// Arrange:
-			auto ranges = test::PrepareRanges(options.DisruptorSize - 1);
+			auto ranges = test::PrepareRanges(seedCount);
 			std::atomic<size_t> counter(0);
 			std::unique_ptr<ConsumerDispatcher> pDispatcher;
 			test::AutoSetFlag continueFlag;
@@ -590,70 +616,104 @@ namespace catapult { namespace disruptor {
 				}
 			});
 
-			// Act: first consumer is processing disruptorSize - 1 elements, second consumer just waits
+			// Act: first consumer is processing seedCount elements, second consumer just waits
 			ProcessAll(*pDispatcher, std::move(ranges));
-			WAIT_FOR_VALUE(options.DisruptorSize - 1, counter);
+			WAIT_FOR_VALUE(seedCount, counter);
 
 			// Assert:
 			action(*pDispatcher, continueFlag);
 		}
+
+		void AssertDispatcherThrowsWhenDisruptorSpaceIsExhausted(const ConsumerDispatcherOptions& options, size_t seedCount) {
+			// Arrange:
+			RunDispatcherFullTest(options, seedCount, [](auto& dispatcher, const auto&) {
+				// Act + Assert: adding another element to the disruptor will fail
+				CATAPULT_LOG(info) << "consumer attempting to process another element";
+				EXPECT_THROW(dispatcher.processElement(ConsumerInput(test::CreateBlockEntityRange(1))), catapult_runtime_error);
+			});
+		}
+
+		void AssertDispatcherReturnsZeroWhenDisruptorSpaceIsExhaustedAndShouldThrowWhenFullIsFalse(
+				const ConsumerDispatcherOptions& options,
+				size_t seedCount) {
+			// Arrange:
+			RunDispatcherFullTest(options, seedCount, [seedCount](auto& dispatcher, const auto&) {
+				CATAPULT_LOG(info) << "consumer attempting to process another element";
+				auto killerId = dispatcher.processElement(ConsumerInput(test::CreateBlockEntityRange(1)));
+
+				// Assert: no element was added to disruptor
+				EXPECT_EQ(0u, killerId);
+				EXPECT_EQ(seedCount, dispatcher.numAddedElements());
+				EXPECT_EQ(seedCount, dispatcher.numActiveElements());
+			});
+		}
+
+		void AssertDispatcherCanProcessAdditionalElementsAfterZeroIsReturnedDueToFullDisruptor(
+				const ConsumerDispatcherOptions& options,
+				size_t seedCount) {
+			// Arrange:
+			RunDispatcherFullTest(options, seedCount, [seedCount](auto& dispatcher, auto& continueFlag) {
+				CATAPULT_LOG(info) << "consumer attempting to process another element";
+				auto killerId = dispatcher.processElement(ConsumerInput(test::CreateBlockEntityRange(1)));
+
+				// Sanity: dispatcher is full
+				EXPECT_EQ(0u, killerId);
+				EXPECT_EQ(seedCount, dispatcher.numAddedElements());
+
+				// Act: drain the dispatcher
+				continueFlag.state()->set();
+				WAIT_FOR_ZERO_EXPR(dispatcher.numActiveElements());
+
+				// - add another range
+				auto lastId = dispatcher.processElement(ConsumerInput(test::CreateBlockEntityRange(1)));
+
+				// Assert: the range was added
+				EXPECT_EQ(seedCount + 1, lastId);
+				EXPECT_EQ(seedCount + 1, dispatcher.numAddedElements());
+			});
+		}
 	}
 
-	TEST(TEST_CLASS, DispatcherThrowsWhenDisruptorSpaceIsExhausted) {
-		// Act:
-		static constexpr auto Disruptor_Size = 8u;
-		RunDispatcherFullTest({ "ConsumerDispatcherTests", Disruptor_Size }, [](auto& dispatcher, const auto&) {
-			// Act + Assert: adding another element to the disruptor will fail
-			CATAPULT_LOG(info) << "consumer attempting to process another element";
-			EXPECT_THROW(dispatcher.processElement(ConsumerInput(test::CreateBlockEntityRange(1))), catapult_runtime_error);
-		});
+	TEST(TEST_CLASS, DispatcherThrowsWhenDisruptorSpaceIsExhausted_Slots) {
+		auto options = ConsumerDispatcherOptions(Dispatcher_Name, 8);
+		AssertDispatcherThrowsWhenDisruptorSpaceIsExhausted(options, 7);
 	}
 
-	TEST(TEST_CLASS, DispatcherReturnsZeroWhenDisruptorSpaceIsExhaustedAndShouldThrowWhenFullIsFalse) {
-		// Arrange:
-		static constexpr auto Disruptor_Size = 8u;
-		auto options = ConsumerDispatcherOptions{ "ConsumerDispatcherTests", Disruptor_Size };
+	TEST(TEST_CLASS, DispatcherThrowsWhenDisruptorSpaceIsExhausted_Memory) {
+		auto options = ConsumerDispatcherOptions(Dispatcher_Name, 10000);
+		options.DisruptorMaxMemorySize = CalculatePrepareRangesSize(7);
+		AssertDispatcherThrowsWhenDisruptorSpaceIsExhausted(options, 7);
+	}
+
+	TEST(TEST_CLASS, DispatcherReturnsZeroWhenDisruptorSpaceIsExhaustedAndShouldThrowWhenFullIsFalse_Slots) {
+		auto options = ConsumerDispatcherOptions(Dispatcher_Name, 8);
 		options.ShouldThrowWhenFull = false;
-
-		// Act:
-		RunDispatcherFullTest(options, [](auto& dispatcher, const auto&) {
-			CATAPULT_LOG(info) << "consumer attempting to process another element";
-			auto killerId = dispatcher.processElement(ConsumerInput(test::CreateBlockEntityRange(1)));
-
-			// Assert: no element was added to disruptor
-			EXPECT_EQ(0u, killerId);
-			EXPECT_EQ(Disruptor_Size - 1, dispatcher.numAddedElements());
-			EXPECT_EQ(Disruptor_Size - 1, dispatcher.numActiveElements());
-		});
+		AssertDispatcherReturnsZeroWhenDisruptorSpaceIsExhaustedAndShouldThrowWhenFullIsFalse(options, 7);
 	}
 
-	TEST(TEST_CLASS, DispatcherCanProcessAdditionalElementsAfterZeroIsReturnedDueToFullDisruptor) {
-		// Arrange:
-		static constexpr auto Disruptor_Size = 8u;
-		auto options = ConsumerDispatcherOptions{ "ConsumerDispatcherTests", Disruptor_Size };
+	TEST(TEST_CLASS, DispatcherReturnsZeroWhenDisruptorSpaceIsExhaustedAndShouldThrowWhenFullIsFalse_Memory) {
+		auto options = ConsumerDispatcherOptions(Dispatcher_Name, 10000);
+		options.DisruptorMaxMemorySize = CalculatePrepareRangesSize(7);
 		options.ShouldThrowWhenFull = false;
-
-		// Act:
-		RunDispatcherFullTest(options, [](auto& dispatcher, auto& continueFlag) {
-			CATAPULT_LOG(info) << "consumer attempting to process another element";
-			auto killerId = dispatcher.processElement(ConsumerInput(test::CreateBlockEntityRange(1)));
-
-			// Sanity: dispatcher is full
-			EXPECT_EQ(0u, killerId);
-			EXPECT_EQ(Disruptor_Size - 1, dispatcher.numAddedElements());
-
-			// Act: drain the dispatcher
-			continueFlag.state()->set();
-			WAIT_FOR_ZERO_EXPR(dispatcher.numActiveElements());
-
-			// - add another range
-			auto lastId = dispatcher.processElement(ConsumerInput(test::CreateBlockEntityRange(1)));
-
-			// Assert: the range was added
-			EXPECT_EQ(Disruptor_Size, lastId);
-			EXPECT_EQ(Disruptor_Size, dispatcher.numAddedElements());
-		});
+		AssertDispatcherReturnsZeroWhenDisruptorSpaceIsExhaustedAndShouldThrowWhenFullIsFalse(options, 7);
 	}
+
+	TEST(TEST_CLASS, DispatcherCanProcessAdditionalElementsAfterZeroIsReturnedDueToFullDisruptor_Slots) {
+		auto options = ConsumerDispatcherOptions(Dispatcher_Name, 8);
+		options.ShouldThrowWhenFull = false;
+		AssertDispatcherCanProcessAdditionalElementsAfterZeroIsReturnedDueToFullDisruptor(options, 7);
+	}
+
+	TEST(TEST_CLASS, DispatcherCanProcessAdditionalElementsAfterZeroIsReturnedDueToFullDisruptor_Memory) {
+		auto options = ConsumerDispatcherOptions(Dispatcher_Name, 10000);
+		options.DisruptorMaxMemorySize = CalculatePrepareRangesSize(7);
+		options.ShouldThrowWhenFull = false;
+		AssertDispatcherCanProcessAdditionalElementsAfterZeroIsReturnedDueToFullDisruptor(options, 7);
+	}
+
+	// endregion
+
+	// region space exhaustion - edge cases
 
 	namespace {
 		auto CreateConsumers(
@@ -690,9 +750,7 @@ namespace catapult { namespace disruptor {
 			std::unique_ptr<ConsumerDispatcher> pDispatcher;
 			test::AutoSetFlag continueFlag;
 			auto consumers = CreateConsumers(counters, totalCounter, offset, continueFlag.state());
-			pDispatcher = std::make_unique<ConsumerDispatcher>(
-					ConsumerDispatcherOptions{ "ConsumerDispatcherTests", Disruptor_Size },
-					consumers);
+			pDispatcher = std::make_unique<ConsumerDispatcher>(ConsumerDispatcherOptions(Dispatcher_Name, Disruptor_Size), consumers);
 
 			// - let consumers process offset ranges, their position is at offset afterwards
 			//   (except for the inspector which is at position offset - 1)

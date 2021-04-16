@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -64,7 +65,7 @@ namespace catapult { namespace observers {
 			const ObserverContext& context) { \
 		using NotificationFacade = state::Mosaic##NAME##RestrictionNotificationFacade<NAME##MODE##Notification::Notification_Type>; \
 		ObserveNotification<NotificationFacade>(NotifyMode::MODE, notification, context); \
-	}));
+	}))
 
 	DEFINE_MOSAIC_RESTRICTION_MODIFICATION_OBSERVER(Global, Commit)
 	DEFINE_MOSAIC_RESTRICTION_MODIFICATION_OBSERVER(Global, Rollback)

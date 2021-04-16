@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,9 +24,20 @@
 #include <vector>
 #include <stdint.h>
 
+namespace boost {
+	namespace asio {
+		namespace ssl {
+			template<typename NextLayer>
+			class stream;
+		}
+	}
+}
+
 namespace catapult { namespace ionet {
 
 	using ByteBuffer = std::vector<uint8_t>;
 
-	using socket = boost::asio::ip::tcp::socket;
+	using NetworkSocket = boost::asio::ip::tcp::socket;
+
+	using Socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>;
 }}

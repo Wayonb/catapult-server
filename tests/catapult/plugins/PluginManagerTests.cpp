@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,7 +22,6 @@
 #include "catapult/plugins/PluginManager.h"
 #include "sdk/src/extensions/ConversionExtensions.h"
 #include "catapult/cache/CatapultCache.h"
-#include "catapult/model/Address.h"
 #include "tests/test/cache/SimpleCache.h"
 #include "tests/test/core/mocks/MockNotificationSubscriber.h"
 #include "tests/test/core/mocks/MockTransaction.h"
@@ -43,12 +43,13 @@ namespace catapult { namespace plugins {
 		// Assert:
 		EXPECT_FALSE(config.PreferCacheDatabase);
 		EXPECT_TRUE(config.CacheDatabaseDirectory.empty());
+		EXPECT_EQ(utils::FileSize::FromKilobytes(0), config.CacheDatabaseConfig.MaxWriteBatchSize);
 	}
 
 	TEST(TEST_CLASS, CanCreateManager) {
 		// Arrange:
 		auto config = model::BlockChainConfiguration::Uninitialized();
-		config.BlockPruneInterval = 15;
+		config.BlockTimeSmoothingFactor = 15;
 
 		auto storageConfig = StorageConfiguration();
 		storageConfig.CacheDatabaseDirectory = "abc";
@@ -63,7 +64,7 @@ namespace catapult { namespace plugins {
 		PluginManager manager(config, storageConfig, userConfig, inflationConfig);
 
 		// Assert: compare sentinel values from component configs because the manager copies the configs
-		EXPECT_EQ(15u, manager.config().BlockPruneInterval);
+		EXPECT_EQ(15u, manager.config().BlockTimeSmoothingFactor);
 
 		EXPECT_EQ("abc", manager.storageConfig().CacheDatabaseDirectory);
 
@@ -78,12 +79,12 @@ namespace catapult { namespace plugins {
 		auto storageConfig = StorageConfiguration();
 		storageConfig.PreferCacheDatabase = true;
 		storageConfig.CacheDatabaseDirectory = "abc";
-		storageConfig.MaxCacheDatabaseWriteBatchSize = utils::FileSize::FromKilobytes(23);
+		storageConfig.CacheDatabaseConfig.MaxWriteBatchSize = utils::FileSize::FromKilobytes(23);
 
 		auto assertCacheConfiguration = [](const auto& cacheConfig, const auto& expectedDirectory) {
 			EXPECT_TRUE(cacheConfig.ShouldUseCacheDatabase);
 			EXPECT_EQ(expectedDirectory, cacheConfig.CacheDatabaseDirectory);
-			EXPECT_EQ(utils::FileSize::FromKilobytes(23), cacheConfig.MaxCacheDatabaseWriteBatchSize);
+			EXPECT_EQ(utils::FileSize::FromKilobytes(23), cacheConfig.CacheDatabaseConfig.MaxWriteBatchSize);
 			EXPECT_FALSE(cacheConfig.ShouldStorePatriciaTrees);
 		};
 
@@ -663,8 +664,8 @@ namespace catapult { namespace plugins {
 	}
 
 	TEST(TEST_CLASS, CanCreateDefaultNotificationPublisher) {
-		// Assert: 8 basic and 1 custom notifications should be raised
-		AssertCanCreateNotificationPublisher(8u + 1, [](const auto& manager) {
+		// Assert: 8 basic and 2 custom notifications should be raised
+		AssertCanCreateNotificationPublisher(8u + 2, [](const auto& manager) {
 			return manager.createNotificationPublisher();
 		});
 	}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -32,13 +33,13 @@ namespace catapult { namespace validators {
 	DEFINE_COMMON_VALIDATOR_TESTS(AddressAlias,)
 
 	namespace {
-		template<typename TKey>
-		auto CreateAndSeedCache(const TKey& key) {
+		template<typename TAccountIdentifier>
+		auto CreateAndSeedCache(const TAccountIdentifier& accountIdentifier) {
 			auto cache = test::CoreSystemCacheFactory::Create(model::BlockChainConfiguration::Uninitialized());
 			{
 				auto cacheDelta = cache.createDelta();
 				auto& accountStateCacheDelta = cacheDelta.sub<cache::AccountStateCache>();
-				accountStateCacheDelta.addAccount(key, Height());
+				accountStateCacheDelta.addAccount(accountIdentifier, Height());
 				cache.commit(Height());
 			}
 

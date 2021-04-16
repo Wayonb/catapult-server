@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -27,7 +28,7 @@ namespace catapult { namespace test {
 	template<typename TTraits>
 	auto CreateRandomSecretProofTransaction(uint16_t proofSize) {
 		using TransactionType = typename TTraits::TransactionType;
-		uint32_t entitySize = sizeof(TransactionType) + proofSize;
+		uint32_t entitySize = SizeOf32<TransactionType>() + proofSize;
 		auto pTransaction = utils::MakeUniqueWithSize<TransactionType>(entitySize);
 		test::FillWithRandomData({ reinterpret_cast<uint8_t*>(pTransaction.get()), entitySize });
 		pTransaction->Size = entitySize;

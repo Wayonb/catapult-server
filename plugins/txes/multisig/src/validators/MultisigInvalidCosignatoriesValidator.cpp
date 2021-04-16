@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -29,22 +30,22 @@ namespace catapult { namespace validators {
 
 	DEFINE_STATEFUL_VALIDATOR(MultisigInvalidCosignatories, [](const Notification& notification, const ValidatorContext& context) {
 		const auto& multisigCache = context.Cache.sub<cache::MultisigCache>();
+		auto multisigIter = multisigCache.find(notification.Multisig);
 
-		if (!multisigCache.contains(notification.Signer))
-			return 0 == notification.PublicKeyDeletionsCount ? ValidationResult::Success : Failure_Multisig_Unknown_Multisig_Account;
+		if (!multisigIter.tryGet())
+			return 0 == notification.AddressDeletionsCount ? ValidationResult::Success : Failure_Multisig_Unknown_Multisig_Account;
 
-		auto multisigIter = multisigCache.find(notification.Signer);
 		const auto& multisigEntry = multisigIter.get();
-		for (auto i = 0u; i < notification.PublicKeyAdditionsCount; ++i) {
-			if (multisigEntry.hasCosignatory(notification.PublicKeyAdditionsPtr[i]))
+		for (auto i = 0u; i < notification.AddressAdditionsCount; ++i) {
+			if (multisigEntry.hasCosignatory(context.Resolvers.resolve(notification.AddressAdditionsPtr[i])))
 				return Failure_Multisig_Already_A_Cosignatory;
 		}
 
-		for (auto i = 0u; i < notification.PublicKeyDeletionsCount; ++i) {
-			if (!multisigEntry.hasCosignatory(notification.PublicKeyDeletionsPtr[i]))
+		for (auto i = 0u; i < notification.AddressDeletionsCount; ++i) {
+			if (!multisigEntry.hasCosignatory(context.Resolvers.resolve(notification.AddressDeletionsPtr[i])))
 				return Failure_Multisig_Not_A_Cosignatory;
 		}
 
 		return ValidationResult::Success;
-	});
+	})
 }}

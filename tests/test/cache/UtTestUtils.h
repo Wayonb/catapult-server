@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,6 +29,7 @@
 namespace catapult {
 	namespace cache {
 		class MemoryUtCache;
+		class MemoryUtCacheProxy;
 		class MemoryUtCacheView;
 		class UtCache;
 	}
@@ -55,6 +57,9 @@ namespace catapult { namespace test {
 
 	/// Asserts that the deadlines of all transactions stored in \a cache are equal to \a expectedDeadlines.
 	void AssertDeadlines(const cache::MemoryUtCache& cache, const std::vector<Timestamp::ValueType>& expectedDeadlines);
+
+	/// Asserts that \a cacheProxy contains all of the hashes in \a hashes.
+	void AssertContainsAll(const cache::MemoryUtCacheProxy& cacheProxy, const std::vector<Hash256>& hashes);
 
 	/// Asserts that \a cache contains all of the hashes in \a hashes.
 	void AssertContainsAll(const cache::MemoryUtCache& cache, const std::vector<Hash256>& hashes);

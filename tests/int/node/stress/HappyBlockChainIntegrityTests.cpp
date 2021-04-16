@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,13 +29,12 @@
 #include "tests/int/node/test/LocalNodeRequestTestUtils.h"
 #include "tests/int/node/test/LocalNodeTestContext.h"
 #include "tests/test/nodeps/Logging.h"
-#include "tests/test/nodeps/MijinConstants.h"
 #include "tests/test/nodeps/TestConstants.h"
+#include "tests/test/nodeps/TestNetworkConstants.h"
 #include "tests/TestHarness.h"
-#include <boost/filesystem.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
-#include <boost/thread.hpp>
+#include <filesystem>
 
 namespace catapult { namespace local {
 
@@ -56,10 +56,11 @@ namespace catapult { namespace local {
 		}
 
 		ionet::Node CreateNode(uint32_t id) {
-			auto metadata = ionet::NodeMetadata(model::NetworkIdentifier::Mijin_Test, "NODE " + std::to_string(id));
-			metadata.Roles = ionet::NodeRoles::Peer;
+			auto networkFingerprint = model::UniqueNetworkFingerprint(model::NetworkIdentifier::Private_Test);
+			auto metadata = ionet::NodeMetadata(networkFingerprint, "NODE " + std::to_string(id));
+			metadata.Roles = ionet::NodeRoles::IPv4 | ionet::NodeRoles::Peer;
 			return ionet::Node(
-					{ crypto::KeyPair::FromString(test::Mijin_Test_Private_Keys[id]).publicKey(), std::to_string(id) },
+					{ crypto::KeyPair::FromString(test::Test_Network_Private_Keys[id]).publicKey(), std::to_string(id) },
 					test::CreateLocalHostNodeEndpoint(GetPortForNode(id)),
 					metadata);
 		}
@@ -74,6 +75,7 @@ namespace catapult { namespace local {
 
 		void UpdateBlockChainConfiguration(model::BlockChainConfiguration& blockChainConfig) {
 			blockChainConfig.ImportanceGrouping = Max_Rollback_Blocks / 2 + 1;
+			blockChainConfig.VotingSetGrouping = blockChainConfig.ImportanceGrouping;
 			blockChainConfig.MaxRollbackBlocks = Max_Rollback_Blocks;
 			blockChainConfig.MaxDifficultyBlocks = Max_Rollback_Blocks - 1;
 		}
@@ -83,42 +85,38 @@ namespace catapult { namespace local {
 			auto port = GetPortForNode(id);
 			auto& nodeConfig = const_cast<config::NodeConfiguration&>(config.Node);
 			nodeConfig.Port = port;
-			nodeConfig.ApiPort = port + 1;
 
 			// 2. specify custom network settings
 			UpdateBlockChainConfiguration(const_cast<model::BlockChainConfiguration&>(config.BlockChain));
 
-			// 3. give each node its own key
-			auto& userConfig = const_cast<config::UserConfiguration&>(config.User);
-			userConfig.BootPrivateKey = test::Mijin_Test_Private_Keys[id];
-
-			// 4. ensure configuration is valid
+			// 3. ensure configuration is valid
 			ValidateConfiguration(config);
 		}
 
 		void RescheduleTasks(const std::string resourcesDirectory) {
 			namespace pt = boost::property_tree;
 
-			auto configFilePath = (boost::filesystem::path(resourcesDirectory) / "config-task.properties").generic_string();
+			auto configFilePath = (std::filesystem::path(resourcesDirectory) / "config-task.properties").generic_string();
 
 			pt::ptree properties;
 			pt::read_ini(configFilePath, properties);
 
 			// 1. reconnect more rapidly so nodes have a better chance to find each other
-			properties.put("static node refresh task.startDelay", "5ms");
-			properties.put("static node refresh task.minDelay", "500ms");
-			properties.put("connect peers task for service Sync.startDelay", "1s");
-			properties.put("connect peers task for service Sync.repeatDelay", "500ms");
+			properties.put("static node refresh task.startDelay", "125ms");
+			properties.put("static node refresh task.minDelay", "300ms");
+			properties.put("static node refresh task.maxDelay", "2000ms");
+			properties.put("connect peers task for service Sync.startDelay", "250ms");
+			properties.put("connect peers task for service Sync.repeatDelay", "300ms");
 
 			// 2. run far more frequent sync rounds
-			properties.put("synchronizer task.startDelay", "1s");
-			properties.put("synchronizer task.repeatDelay", "500ms");
+			properties.put("synchronizer task.startDelay", "500ms");
+			properties.put("synchronizer task.repeatDelay", "300ms");
 
 			pt::write_ini(configFilePath, properties);
 		}
 
 		uint8_t RandomByteClamped(uint8_t max) {
-			return test::RandomByte() * max / std::numeric_limits<uint8_t>::max();
+			return static_cast<uint8_t>(test::RandomByte() * max / std::numeric_limits<uint8_t>::max());
 		}
 
 		struct ChainStatistics {
@@ -239,8 +237,11 @@ namespace catapult { namespace local {
 				auto totalFee = model::CalculateBlockTransactionsInfo(block).TotalFee;
 
 				model::BlockStatementBuilder blockStatementBuilder;
-				auto currencyMosaicId = test::Default_Currency_Mosaic_Id;
-				model::BalanceChangeReceipt receipt(model::Receipt_Type_Harvest_Fee, block.SignerPublicKey, currencyMosaicId, totalFee);
+				model::BalanceChangeReceipt receipt(
+						model::Receipt_Type_Harvest_Fee,
+						model::GetSignerAddress(block),
+						test::Default_Currency_Mosaic_Id,
+						totalFee);
 				blockStatementBuilder.addReceipt(receipt);
 
 				auto pStatement = blockStatementBuilder.build();
@@ -287,9 +288,9 @@ namespace catapult { namespace local {
 
 		public:
 			test::StateHashCalculator createStateHashCalculator(const NodeTestContext& context, size_t id) const {
-				boost::filesystem::path stateHashDirectory = m_stateHashCalculationDir.name();
+				std::filesystem::path stateHashDirectory = m_stateHashCalculationDir.name();
 				stateHashDirectory /= std::to_string(id);
-				boost::filesystem::create_directories(stateHashDirectory);
+				std::filesystem::create_directories(stateHashDirectory);
 
 				return test::StateHashCalculator(context.prepareFreshDataDirectory(stateHashDirectory.generic_string()));
 			}
@@ -305,7 +306,7 @@ namespace catapult { namespace local {
 		template<typename TNetworkTraits, typename TVerifyTraits>
 		void AssertMultiNodeNetworkCanReachConsensus(TVerifyTraits&& verifyTraits, size_t networkSize) {
 			// Arrange: create nodes
-			test::GlobalLogFilter testLogFilter(utils::LogLevel::Debug);
+			test::GlobalLogFilter testLogFilter(utils::LogLevel::debug);
 			auto networkNodes = CreateNodes(networkSize);
 
 			// Act: boot all nodes
@@ -326,8 +327,10 @@ namespace catapult { namespace local {
 				auto postfix = "_" + std::to_string(i);
 				contexts.push_back(std::make_unique<NodeTestContext>(nodeFlag, peers, configTransform, postfix));
 
+				auto& context = *contexts.back();
+				context.regenerateCertificates(crypto::KeyPair::FromString(test::Test_Network_Private_Keys[i]));
+
 				// - (re)schedule a few tasks and boot the node
-				auto& context = *contexts[i];
 				RescheduleTasks(context.resourcesDirectory());
 				context.boot();
 

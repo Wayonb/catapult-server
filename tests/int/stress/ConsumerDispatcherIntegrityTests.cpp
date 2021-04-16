@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -39,7 +40,7 @@ namespace catapult { namespace disruptor {
 
 	NO_STRESS_TEST(TEST_CLASS, MultipleConsumersCanProcessAllPushedElements) {
 		// Arrange:
-		test::GlobalLogFilter testLogFilter(utils::LogLevel::Info);
+		test::GlobalLogFilter testLogFilter(utils::LogLevel::info);
 		auto numElementsPerInnerIteration = 1024 / GetAdjustmentDivisor();
 		auto numOuterIterations = 256u * 15 / GetAdjustmentDivisor();
 		auto defaultDisruptorSize = 16 * 1024 / GetAdjustmentDivisor();

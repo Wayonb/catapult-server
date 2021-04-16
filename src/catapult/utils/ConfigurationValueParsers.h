@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -88,8 +89,8 @@ namespace catapult { namespace utils {
 	/// Tries to parse \a str into a Hash256 (\a parsedValue).
 	bool TryParseValue(const std::string& str, Hash256& parsedValue);
 
-	/// Tries to parse \a str into a GenerationHash (\a parsedValue).
-	bool TryParseValue(const std::string& str, GenerationHash& parsedValue);
+	/// Tries to parse \a str into a GenerationHashSeed (\a parsedValue).
+	bool TryParseValue(const std::string& str, GenerationHashSeed& parsedValue);
 
 	/// Tries to parse \a str into a string (\a parsedValue).
 	/// \note This function just copies \a str into \a parsedValue.

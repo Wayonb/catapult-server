@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,7 +22,6 @@
 #include "NetworkTestUtils.h"
 #include "catapult/ionet/PacketSocket.h"
 #include "catapult/net/PacketWriters.h"
-#include "catapult/net/VerifyPeer.h"
 #include "catapult/thread/TimedCallback.h"
 #include "tests/test/net/NodeTestUtils.h"
 #include "tests/test/net/SocketTestUtils.h"
@@ -30,28 +30,19 @@
 
 namespace catapult { namespace test {
 
-	std::shared_ptr<ionet::PacketSocket> ConnectToLocalHost(
-			boost::asio::io_context& ioContext,
-			unsigned short port,
-			const Key& serverPublicKey) {
+	std::shared_ptr<ionet::PacketSocket> ConnectToLocalHost(boost::asio::io_context& ioContext, unsigned short port) {
 		// Act: connect to the server
 		std::atomic_bool isConnected(false);
-		auto options = CreatePacketSocketOptions();
+		auto options = CreatePacketSocketOptions(GenerateRandomByteArray<Key>());
 		auto endpoint = CreateLocalHostNodeEndpoint(port);
-		auto clientKeyPair = GenerateKeyPair();
 		std::shared_ptr<ionet::PacketSocket> pIo;
-		ionet::Connect(ioContext, options, endpoint, [&](auto connectCode, const auto& connectedSocketInfo) {
+		ionet::Connect(ioContext, options, endpoint, [&isConnected, &pIo](auto connectCode, const auto& connectedSocketInfo) {
 			CATAPULT_LOG(debug) << "node is connected with code " << connectCode;
 			pIo = connectedSocketInfo.socket();
 			if (!pIo)
 				return;
 
-			auto serverPeerInfo = net::VerifiedPeerInfo{ serverPublicKey, ionet::ConnectionSecurityMode::None };
-			net::VerifyServer(pIo, serverPeerInfo, clientKeyPair, [&isConnected](auto verifyResult, const auto&) {
-				CATAPULT_LOG(debug) << "node verified with result " << verifyResult;
-				if (net::VerifyResult::Success == verifyResult)
-					isConnected = true;
-			});
+			isConnected = true;
 		});
 		WAIT_FOR(isConnected);
 		return pIo;
@@ -64,6 +55,7 @@ namespace catapult { namespace test {
 		packetWriters.connect(CreateLocalHostNode(serverPublicKey), [&](const auto& connectResult) {
 			connectCode = connectResult.Code;
 			++numConnects;
+			return true;
 		});
 		WAIT_FOR_ONE(numConnects);
 

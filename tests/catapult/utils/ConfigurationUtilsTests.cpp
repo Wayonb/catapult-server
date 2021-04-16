@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -94,7 +95,7 @@ namespace catapult { namespace utils {
 
 	// endregion
 
-	// region VerifyBagSizeLte
+	// region VerifyBagSizeExact
 
 	namespace {
 		ConfigurationBag CreateBagForVerifyBagSizeTests() {
@@ -105,24 +106,21 @@ namespace catapult { namespace utils {
 		}
 	}
 
-	TEST(TEST_CLASS, VerifyBagSizeLteDoesNotThrowWhenBagSizeIsLessThanOrEqualToExpectedSize) {
+	TEST(TEST_CLASS, VerifyBagSizeExactDoesNotThrowWhenBagSizeIsEqualToExpectedSize) {
 		// Arrange:
 		auto bag = CreateBagForVerifyBagSizeTests();
 
 		// Act: no exceptions
-		VerifyBagSizeLte(bag, 5);
-		VerifyBagSizeLte(bag, 6);
-		VerifyBagSizeLte(bag, 100);
+		VerifyBagSizeExact(bag, 5);
 	}
 
-	TEST(TEST_CLASS, VerifyBagSizeLteThrowsWhenBagSizeIsGreaterThanExpectedSize) {
+	TEST(TEST_CLASS, VerifyBagSizeExactThrowsWhenBagSizeIsNotEqualToExpectedSize) {
 		// Arrange:
 		auto bag = CreateBagForVerifyBagSizeTests();
 
 		// Act + Assert:
-		EXPECT_THROW(VerifyBagSizeLte(bag, 0), catapult_invalid_argument);
-		EXPECT_THROW(VerifyBagSizeLte(bag, 1), catapult_invalid_argument);
-		EXPECT_THROW(VerifyBagSizeLte(bag, 4), catapult_invalid_argument);
+		for (auto expectedSize : std::initializer_list<size_t>{ 0, 1, 4, 6, 9, 100 })
+			EXPECT_THROW(VerifyBagSizeExact(bag, expectedSize), catapult_invalid_argument) << expectedSize;
 	}
 
 	// endregion

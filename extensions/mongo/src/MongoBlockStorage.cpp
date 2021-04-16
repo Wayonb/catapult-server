@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -51,35 +52,39 @@ namespace catapult { namespace mongo {
 			return mappers::ToModel(cursor, numHashes);
 		}
 
-		void SaveBlockHeader(const mongocxx::database& database, const model::BlockElement& blockElement) {
+		void SaveBlockHeader(
+				const mongocxx::database& database,
+				const model::BlockElement& blockElement,
+				uint32_t totalTransactionsCount) {
 			auto blocks = database["blocks"];
-			auto dbBlock = mappers::ToDbModel(blockElement);
+			auto dbBlock = mappers::ToDbModel(blockElement, totalTransactionsCount);
 
 			// in idempotent mode, if blockElement is already in the database, this call will be bypassed
 			// so nonzero inserted_count check is proper
 			auto result = blocks.insert_one(dbBlock.view()).value().result();
 			if (0 == result.inserted_count())
-				CATAPULT_THROW_RUNTIME_ERROR("saveBlock failed: block header was not inserted");
+				CATAPULT_THROW_RUNTIME_ERROR("SaveBlockHeader failed: block header was not inserted");
 		}
 
-		void SaveTransactions(
+		size_t SaveTransactions(
 				MongoBulkWriter& bulkWriter,
 				Height height,
 				const std::vector<model::TransactionElement>& transactions,
 				const MongoTransactionRegistry& registry,
 				const MongoErrorPolicy& errorPolicy) {
-			std::atomic<size_t> numTotalTransactionDocuments(0);
-			auto createDocuments = [height, &registry, &numTotalTransactionDocuments](const auto& transactionElement, auto index) {
+			std::atomic<size_t> totalTransactionsCount(0);
+			auto createDocuments = [height, &registry, &totalTransactionsCount](const auto& transactionElement, auto index) {
 				auto metadata = MongoTransactionMetadata(transactionElement, height, index);
 				auto documents = mappers::ToDbDocuments(transactionElement.Transaction, metadata, registry);
-				numTotalTransactionDocuments += documents.size();
+				totalTransactionsCount += documents.size();
 				return documents;
 			};
 			auto results = bulkWriter.bulkInsert("transactions", transactions, createDocuments).get();
 			auto aggregateResult = BulkWriteResult::Aggregate(thread::get_all(std::move(results)));
 
 			auto itemsDescription = "transactions at height " + std::to_string(height.unwrap());
-			errorPolicy.checkInserted(numTotalTransactionDocuments, aggregateResult, itemsDescription);
+			errorPolicy.checkInserted(totalTransactionsCount, aggregateResult, itemsDescription);
+			return totalTransactionsCount;
 		}
 
 		void SaveBlockStatement(
@@ -132,26 +137,15 @@ namespace catapult { namespace mongo {
 			statementsFuture.get();
 		}
 
-		void DropDocuments(mongocxx::database& database, const std::string& collectionName, const std::string& indexName, Height height) {
-			auto blocks = database[collectionName];
-			auto filter = document()
-					<< indexName
-					<< open_document << "$gt" << static_cast<int64_t>(height.unwrap()) << close_document
-					<< finalize;
-			auto result = blocks.delete_many(filter.view());
-			if (result)
-				CATAPULT_LOG(info) << "deleted " << result->deleted_count() << " " << collectionName;
-			else
-				CATAPULT_THROW_RUNTIME_ERROR("delete returned empty result");
-		}
-
 		class MongoBlockStorage final : public io::LightBlockStorage {
 		public:
 			MongoBlockStorage(
 					MongoStorageContext& context,
+					uint32_t maxDropBatchSize,
 					const MongoTransactionRegistry& transactionRegistry,
 					const MongoReceiptRegistry& receiptRegistry)
 					: m_context(context)
+					, m_maxDropBatchSize(maxDropBatchSize)
 					, m_transactionRegistry(transactionRegistry)
 					, m_receiptRegistry(receiptRegistry)
 					, m_database(m_context.createDatabaseConnection())
@@ -185,8 +179,10 @@ namespace catapult { namespace mongo {
 			void saveBlock(const model::BlockElement& blockElement) override {
 				auto height = blockElement.Block.Height;
 
-				if (MongoErrorPolicy::Mode::Idempotent == m_errorPolicy.mode())
+				if (MongoErrorPolicy::Mode::Idempotent == m_errorPolicy.mode()) {
 					dropBlocksAfter(height - Height(1));
+					dropAllAfter(height - Height(1)); // forcibly drop orphaned documents
+				}
 
 				auto dbHeight = chainHeight();
 				if (height != dbHeight + Height(1)) {
@@ -195,12 +191,7 @@ namespace catapult { namespace mongo {
 					CATAPULT_THROW_INVALID_ARGUMENT(out.str().c_str());
 				}
 
-				SaveBlockHeader(m_database, blockElement);
-				SaveTransactions(m_context.bulkWriter(), height, blockElement.Transactions, m_transactionRegistry, m_errorPolicy);
-				if (blockElement.OptionalStatement)
-					SaveBlockStatement(m_context.bulkWriter(), height, *blockElement.OptionalStatement, m_receiptRegistry, m_errorPolicy);
-
-				setHeight(blockElement.Block.Height);
+				saveBlockInternal(blockElement);
 			}
 
 			void dropBlocksAfter(Height height) override {
@@ -209,12 +200,31 @@ namespace catapult { namespace mongo {
 					return;
 
 				setHeight(height);
-				dropAll(height);
+				dropAll(height, dbHeight);
 			}
 
 			// endregion
 
 		private:
+			void saveBlockInternal(const model::BlockElement& blockElement) {
+				auto height = blockElement.Block.Height;
+				auto totalTransactionsCount = saveTransactions(height, blockElement.Transactions);
+
+				if (blockElement.OptionalStatement)
+					saveBlockStatement(height, *blockElement.OptionalStatement);
+
+				SaveBlockHeader(m_database, blockElement, static_cast<uint32_t>(totalTransactionsCount));
+				setHeight(height);
+			}
+
+			size_t saveTransactions(Height height, const std::vector<model::TransactionElement>& transactions) {
+				return SaveTransactions(m_context.bulkWriter(), height, transactions, m_transactionRegistry, m_errorPolicy);
+			}
+
+			void saveBlockStatement(Height height, const model::BlockStatement& blockStatement) {
+				SaveBlockStatement(m_context.bulkWriter(), height, blockStatement, m_receiptRegistry, m_errorPolicy);
+			}
+
 			void setHeight(Height height) {
 				auto journalHeight = document()
 						<< "$set" << open_document
@@ -226,16 +236,49 @@ namespace catapult { namespace mongo {
 				m_errorPolicy.checkUpserted(1, result, "height");
 			}
 
-			void dropAll(Height height) {
-				DropDocuments(m_database, "blocks", "block.height", height);
-				DropDocuments(m_database, "transactions", "meta.height", height);
-				DropDocuments(m_database, "transactionStatements", "statement.height", height);
-				DropDocuments(m_database, "addressResolutionStatements", "statement.height", height);
-				DropDocuments(m_database, "mosaicResolutionStatements", "statement.height", height);
+			void dropAll(Height newHeight, Height oldHeight) {
+				auto heightIncrement = Height(m_maxDropBatchSize);
+
+				auto height = oldHeight;
+				while (height > heightIncrement && height - heightIncrement > newHeight) {
+					height = height - heightIncrement;
+					dropAllAfter(height);
+				}
+
+				if (newHeight != height)
+					dropAllAfter(newHeight);
+			}
+
+			void dropAllAfter(Height height) {
+				CATAPULT_LOG(debug) << "dropping blocks after " << height;
+
+				dropDocuments("blocks", "block.height", height);
+				dropDocuments("transactions", "meta.height", height);
+				dropDocuments("transactionStatements", "statement.height", height);
+				dropDocuments("addressResolutionStatements", "statement.height", height);
+				dropDocuments("mosaicResolutionStatements", "statement.height", height);
+			}
+
+			void dropDocuments(const std::string& collectionName, const std::string& indexName, Height height) {
+				auto collection = m_database[collectionName];
+				auto filter = document()
+						<< indexName
+						<< open_document << "$gt" << static_cast<int64_t>(height.unwrap()) << close_document
+						<< finalize;
+
+				mongocxx::options::delete_options options;
+				options.write_concern(m_context.bulkWriter().writeOptions());
+
+				auto result = collection.delete_many(filter.view(), options);
+				if (result)
+					CATAPULT_LOG(debug) << "deleted " << result->deleted_count() << " " << collectionName;
+				else
+					CATAPULT_THROW_RUNTIME_ERROR("delete returned empty result");
 			}
 
 		private:
 			MongoStorageContext& m_context;
+			uint32_t m_maxDropBatchSize;
 			const MongoTransactionRegistry& m_transactionRegistry;
 			const MongoReceiptRegistry& m_receiptRegistry;
 			MongoDatabase m_database;
@@ -245,8 +288,9 @@ namespace catapult { namespace mongo {
 
 	std::unique_ptr<io::LightBlockStorage> CreateMongoBlockStorage(
 			MongoStorageContext& context,
+			uint32_t maxDropBatchSize,
 			const MongoTransactionRegistry& transactionRegistry,
 			const MongoReceiptRegistry& receiptRegistry) {
-		return std::make_unique<MongoBlockStorage>(context, transactionRegistry, receiptRegistry);
+		return std::make_unique<MongoBlockStorage>(context, maxDropBatchSize, transactionRegistry, receiptRegistry);
 	}
 }}

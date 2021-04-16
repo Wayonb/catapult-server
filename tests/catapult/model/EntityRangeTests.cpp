@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -627,7 +628,7 @@ namespace catapult { namespace model {
 			// Assert:
 			EXPECT_FALSE(range.empty());
 			ASSERT_EQ(expectedBlocks.size(), range.size());
-			EXPECT_EQ(sizeof(BlockHeader) * expectedBlocks.size(), range.totalSize());
+			EXPECT_EQ((sizeof(BlockHeader) + sizeof(PaddedBlockFooter)) * expectedBlocks.size(), range.totalSize());
 
 			// Assert: non-const and const iteration should produce the same results
 			auto& mutableRange = const_cast<BlockRange&>(range);
@@ -662,8 +663,8 @@ namespace catapult { namespace model {
 	TEST(TEST_CLASS, CanMergeRangesComposedOfDifferentSubRangeTypes) {
 		// Arrange:
 		RunHeterogeneousMergeRangesTest([](const auto& blocks, const auto& mergedRange) {
-				// Assert:
-				AssertMultiBlockRange(blocks, mergedRange);
+			// Assert:
+			AssertMultiBlockRange(blocks, mergedRange);
 		});
 	}
 

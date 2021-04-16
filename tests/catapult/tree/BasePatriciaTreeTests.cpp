@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -376,8 +377,8 @@ namespace catapult { namespace tree {
 		tree.commit();
 
 		// Assert: both roots were saved to the data source
-		EXPECT_TRUE(!!dataSource.get(root1));
-		EXPECT_TRUE(!!dataSource.get(root2));
+		EXPECT_FALSE(dataSource.get(root1).empty());
+		EXPECT_FALSE(dataSource.get(root2).empty());
 
 		// - lookup of all (set) leafs should succeed
 		std::vector<TreeNode> nodePath;
@@ -406,8 +407,8 @@ namespace catapult { namespace tree {
 		tree.commit();
 
 		// Assert: both roots were saved to the data source
-		EXPECT_TRUE(!!dataSource.get(root1));
-		EXPECT_TRUE(!!dataSource.get(root2));
+		EXPECT_FALSE(dataSource.get(root1).empty());
+		EXPECT_FALSE(dataSource.get(root2).empty());
 
 		// -  first tree: B(alpha, noun), L(alpha), L(verb)
 		// - second tree: B(alpha, B(noun, verb)), B(noun, verb), L(noun), L(verb)

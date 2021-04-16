@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -123,18 +124,19 @@ namespace catapult { namespace utils {
 
 	TEST(TEST_CLASS, CanParseValidLogLevel) {
 		using T = LogLevel;
-		AssertSuccessfulParse("Trace", T::Trace);
-		AssertSuccessfulParse("Debug", T::Debug);
-		AssertSuccessfulParse("Info", T::Info);
-		AssertSuccessfulParse("Warning", T::Warning);
-		AssertSuccessfulParse("Error", T::Error);
-		AssertSuccessfulParse("Fatal", T::Fatal);
-		AssertSuccessfulParse("Min", T::Min);
-		AssertSuccessfulParse("Max", T::Max);
+		AssertSuccessfulParse("Trace", T::trace);
+		AssertSuccessfulParse("Debug", T::debug);
+		AssertSuccessfulParse("Info", T::info);
+		AssertSuccessfulParse("Important", T::important);
+		AssertSuccessfulParse("Warning", T::warning);
+		AssertSuccessfulParse("Error", T::error);
+		AssertSuccessfulParse("Fatal", T::fatal);
+		AssertSuccessfulParse("Min", T::min);
+		AssertSuccessfulParse("Max", T::max);
 	}
 
 	TEST(TEST_CLASS, CannotParseInvalidLogLevel) {
-		AssertEnumParseFailure("Warning", LogLevel::Info);
+		AssertEnumParseFailure("Warning", LogLevel::info);
 	}
 
 	TEST(TEST_CLASS, CanParseValidLogSinkType) {
@@ -465,12 +467,12 @@ namespace catapult { namespace utils {
 		AssertCannotParseInvalidByteArray<Hash256>();
 	}
 
-	TEST(TEST_CLASS, CanParseValidGenerationHash) {
-		AssertCanParseValidByteArray<GenerationHash>();
+	TEST(TEST_CLASS, CanParseValidGenerationHashSeed) {
+		AssertCanParseValidByteArray<GenerationHashSeed>();
 	}
 
-	TEST(TEST_CLASS, CannotParseInvalidGenerationHash) {
-		AssertCannotParseInvalidByteArray<GenerationHash>();
+	TEST(TEST_CLASS, CannotParseInvalidGenerationHashSeed) {
+		AssertCannotParseInvalidByteArray<GenerationHashSeed>();
 	}
 
 	// endregion

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -38,8 +39,8 @@ namespace catapult { namespace chain {
 
 	// region results
 
-	/// Result of a transaction update.
-	struct TransactionUpdateResult {
+	/// Result of a partial transaction update.
+	struct PtUpdateResult {
 		/// Possible update types.
 		enum class UpdateType {
 			/// New transaction.
@@ -49,7 +50,10 @@ namespace catapult { namespace chain {
 			Existing,
 
 			/// Invalid transaction.
-			Invalid
+			Invalid,
+
+			/// Neutral transaction (e.g. cache is full).
+			Neutral
 		};
 
 		/// Type of the update.
@@ -90,20 +94,20 @@ namespace catapult { namespace chain {
 
 	public:
 		/// Creates an updater around \a transactionsCache, \a pValidator, \a completedTransactionSink and \a failedTransactionSink
-		/// using \a pPool for parallelization.
+		/// using \a pool for parallelization.
 		PtUpdater(
 				cache::MemoryPtCacheProxy& transactionsCache,
 				std::unique_ptr<const PtValidator>&& pValidator,
 				const CompletedTransactionSink& completedTransactionSink,
 				const FailedTransactionSink& failedTransactionSink,
-				const std::shared_ptr<thread::IoThreadPool>& pPool);
+				thread::IoThreadPool& pool);
 
 		/// Destroys the updater.
 		~PtUpdater();
 
 	public:
 		/// Updates this cache by adding a new transaction info (\a transactionInfo).
-		thread::future<TransactionUpdateResult> update(const model::TransactionInfo& transactionInfo);
+		thread::future<PtUpdateResult> update(const model::TransactionInfo& transactionInfo);
 
 		/// Updates this cache by adding a new \a cosignature.
 		thread::future<CosignatureUpdateResult> update(const model::DetachedCosignature& cosignature);

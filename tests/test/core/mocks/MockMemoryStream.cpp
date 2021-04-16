@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,8 +20,11 @@
 **/
 
 #include "MockMemoryStream.h"
+#include "catapult/exceptions.h"
 
 namespace catapult { namespace mocks {
+
+	// region MockMemoryStream
 
 	MockMemoryStream::MockMemoryStream(std::vector<uint8_t>& buffer)
 			: MemoryStream(buffer)
@@ -34,4 +38,22 @@ namespace catapult { namespace mocks {
 	size_t MockMemoryStream::numFlushes() const {
 		return m_flushCount;
 	}
+
+	// endregion
+
+	// region MockSeekableMemoryStream
+
+	MockSeekableMemoryStream::MockSeekableMemoryStream() : extensions::MemoryStream(m_buffer) {
+		m_buffer.reserve(1024);
+	}
+
+	const std::vector<uint8_t>& MockSeekableMemoryStream::buffer() const {
+		return m_buffer;
+	}
+
+	void MockSeekableMemoryStream::copyTo(MockSeekableMemoryStream& dest) const {
+		dest.m_buffer = m_buffer;
+	}
+
+	// endregion
 }}

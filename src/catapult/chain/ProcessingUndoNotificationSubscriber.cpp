@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -34,10 +35,9 @@ namespace catapult { namespace chain {
 				? observers::NotifyMode::Rollback
 				: observers::NotifyMode::Commit;
 		auto undoObserverContext = observers::ObserverContext(
+				model::NotificationContext(m_observerContext.Height, m_observerContext.UndecoratedResolvers),
 				observers::ObserverState(m_observerContext.Cache),
-				m_observerContext.Height,
-				undoMode,
-				m_observerContext.Resolvers);
+				undoMode);
 		for (auto iter = m_notificationBuffers.crbegin(); m_notificationBuffers.crend() != iter; ++iter) {
 			const auto* pNotification = reinterpret_cast<const model::Notification*>(iter->data());
 			m_observer.notify(*pNotification, undoObserverContext);

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,12 +29,12 @@ using namespace catapult::mongo::mappers;
 namespace catapult { namespace mongo { namespace plugins {
 
 	namespace {
-		void StreamKeys(bson_stream::document& builder, const std::string& name, const Key* pKeys, uint8_t numKeys) {
-			auto keysArray = builder << name << bson_stream::open_array;
-			for (auto i = 0u; i < numKeys; ++i)
-				keysArray << ToBinary(pKeys[i]);
+		void StreamAddresses(bson_stream::document& builder, const std::string& name, const UnresolvedAddress* pAddresses, uint8_t count) {
+			auto addressesArray = builder << name << bson_stream::open_array;
+			for (auto i = 0u; i < count; ++i)
+				addressesArray << ToBinary(pAddresses[i]);
 
-			keysArray << bson_stream::close_array;
+			addressesArray << bson_stream::close_array;
 		}
 
 		template<typename TTransaction>
@@ -41,8 +42,8 @@ namespace catapult { namespace mongo { namespace plugins {
 			builder
 					<< "minRemovalDelta" << transaction.MinRemovalDelta
 					<< "minApprovalDelta" << transaction.MinApprovalDelta;
-			StreamKeys(builder, "publicKeyAdditions", transaction.PublicKeyAdditionsPtr(), transaction.PublicKeyAdditionsCount);
-			StreamKeys(builder, "publicKeyDeletions", transaction.PublicKeyDeletionsPtr(), transaction.PublicKeyDeletionsCount);
+			StreamAddresses(builder, "addressAdditions", transaction.AddressAdditionsPtr(), transaction.AddressAdditionsCount);
+			StreamAddresses(builder, "addressDeletions", transaction.AddressDeletionsPtr(), transaction.AddressDeletionsCount);
 		}
 	}
 

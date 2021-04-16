@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -91,7 +92,7 @@ namespace catapult { namespace ionet {
 		bool add(const Node& node, NodeSource source);
 
 		/// Adds connection states for the service identified by \a serviceId to all nodes with \a role.
-		void addConnectionStates(ServiceIdentifier serviceId, ionet::NodeRoles role);
+		void addConnectionStates(ServiceIdentifier serviceId, NodeRoles role);
 
 		/// Gets the connection state for the service identified by \a serviceId and the node with \a identity.
 		ConnectionState& provisionConnectionState(ServiceIdentifier serviceId, const model::NodeIdentity& identity);
@@ -135,12 +136,14 @@ namespace catapult { namespace ionet {
 		NodeContainer();
 
 		/// Creates a node container that can contain at most \a maxNodes nodes with specified equality strategy (\a equalityStrategy)
-		/// around a custom time supplier (\a timeSupplier). The container also supports banning nodes configured by \a banSettings.
+		/// around a custom time supplier (\a timeSupplier) and node version predicate (\a versionPredicate).
+		/// Node banning is supported and configured by \a banSettings.
 		NodeContainer(
 				size_t maxNodes,
 				model::NodeIdentityEqualityStrategy equalityStrategy,
 				const BanSettings& banSettings,
-				const supplier<Timestamp>& timeSupplier);
+				const supplier<Timestamp>& timeSupplier,
+				const predicate<NodeVersion>& versionPredicate);
 
 		/// Destroys a node container.
 		~NodeContainer();
@@ -157,6 +160,9 @@ namespace catapult { namespace ionet {
 		BannedNodes m_bannedNodes;
 		mutable utils::SpinReaderWriterLock m_lock;
 	};
+
+	/// Creates a node version predicate that returns \c true when version is within \a minVersion and \a maxVersion, inclusive.
+	predicate<NodeVersion> CreateRangeNodeVersionPredicate(NodeVersion minVersion, NodeVersion maxVersion);
 
 	/// Finds all active nodes in \a view.
 	NodeSet FindAllActiveNodes(const NodeContainerView& view);

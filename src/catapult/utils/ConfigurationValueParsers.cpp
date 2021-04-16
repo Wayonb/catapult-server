@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -29,15 +30,16 @@ namespace catapult { namespace utils {
 	// region enums / bool
 
 	namespace {
-		const std::array<std::pair<const char*, LogLevel>, 8> String_To_LogLevel_Pairs{{
-			{ std::make_pair("Trace", LogLevel::Trace) },
-			{ std::make_pair("Debug", LogLevel::Debug) },
-			{ std::make_pair("Info", LogLevel::Info) },
-			{ std::make_pair("Warning", LogLevel::Warning) },
-			{ std::make_pair("Error", LogLevel::Error) },
-			{ std::make_pair("Fatal", LogLevel::Fatal) },
-			{ std::make_pair("Min", LogLevel::Min) },
-			{ std::make_pair("Max", LogLevel::Max) }
+		const std::array<std::pair<const char*, LogLevel>, 9> String_To_LogLevel_Pairs{{
+			{ std::make_pair("Trace", LogLevel::trace) },
+			{ std::make_pair("Debug", LogLevel::debug) },
+			{ std::make_pair("Info", LogLevel::info) },
+			{ std::make_pair("Important", LogLevel::important) },
+			{ std::make_pair("Warning", LogLevel::warning) },
+			{ std::make_pair("Error", LogLevel::error) },
+			{ std::make_pair("Fatal", LogLevel::fatal) },
+			{ std::make_pair("Min", LogLevel::min) },
+			{ std::make_pair("Max", LogLevel::max) }
 		}};
 
 		const std::array<std::pair<const char*, LogSinkType>, 2> String_To_LogSinkType_Pairs{{
@@ -127,8 +129,7 @@ namespace catapult { namespace utils {
 				if (static_cast<T>(result * TTraits::Base + digit) < result)
 					return false;
 
-				result = static_cast<T>(result * TTraits::Base);
-				result += digit;
+				result = static_cast<T>(result * TTraits::Base + digit);
 			}
 
 			if (isLastCharSeparator)
@@ -306,7 +307,7 @@ namespace catapult { namespace utils {
 		return TryParseByteArray(str, parsedValue);
 	}
 
-	bool TryParseValue(const std::string& str, GenerationHash& parsedValue) {
+	bool TryParseValue(const std::string& str, GenerationHashSeed& parsedValue) {
 		return TryParseByteArray(str, parsedValue);
 	}
 

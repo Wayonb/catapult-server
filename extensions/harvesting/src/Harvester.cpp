@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,7 +23,6 @@
 #include "catapult/cache_core/ImportanceView.h"
 #include "catapult/chain/BlockDifficultyScorer.h"
 #include "catapult/chain/BlockScorer.h"
-#include "catapult/crypto/KeyPair.h"
 #include "catapult/model/BlockUtils.h"
 #include "catapult/utils/StackLogger.h"
 
@@ -55,21 +55,28 @@ namespace catapult { namespace harvesting {
 
 		std::unique_ptr<model::Block> CreateUnsignedBlockHeader(
 				const NextBlockContext& context,
+				model::EntityType blockType,
 				model::NetworkIdentifier networkIdentifier,
 				const Key& signer,
-				const Key& beneficiary) {
-			auto pBlock = model::CreateBlock(context.ParentContext, networkIdentifier, signer, {});
+				const Address& beneficiary) {
+			auto pBlock = model::CreateBlock(blockType, context.ParentContext, networkIdentifier, signer, {});
 			pBlock->Difficulty = context.Difficulty;
 			pBlock->Timestamp = context.Timestamp;
-			pBlock->BeneficiaryPublicKey = Key() == beneficiary ? signer : beneficiary;
+			if (Address() != beneficiary)
+				pBlock->BeneficiaryAddress = beneficiary;
+
 			return pBlock;
+		}
+
+		void AddGenerationHashProof(model::Block& block, const crypto::VrfProof& vrfProof) {
+			block.GenerationHashProof = { vrfProof.Gamma, vrfProof.VerificationHash, vrfProof.Scalar };
 		}
 	}
 
 	Harvester::Harvester(
 			const cache::CatapultCache& cache,
 			const model::BlockChainConfiguration& config,
-			const Key& beneficiary,
+			const Address& beneficiary,
 			const UnlockedAccounts& unlockedAccounts,
 			const BlockGenerator& blockGenerator)
 			: m_cache(cache)
@@ -101,12 +108,15 @@ namespace catapult { namespace harvesting {
 
 		auto unlockedAccountsView = m_unlockedAccounts.view();
 		const crypto::KeyPair* pHarvesterKeyPair = nullptr;
-		unlockedAccountsView.forEach([&context, &hitContext, &hitPredicate, &pHarvesterKeyPair](const auto& keyPair) {
-			hitContext.Signer = keyPair.publicKey();
-			hitContext.GenerationHash = model::CalculateGenerationHash(context.ParentContext.GenerationHash, hitContext.Signer);
+		crypto::VrfProof vrfProof;
 
+		unlockedAccountsView.forEach([&context, &hitContext, &hitPredicate, &pHarvesterKeyPair, &vrfProof](const auto& descriptor) {
+			hitContext.Signer = descriptor.signingKeyPair().publicKey();
+
+			vrfProof = crypto::GenerateVrfProof(context.ParentContext.GenerationHash, descriptor.vrfKeyPair());
+			hitContext.GenerationHash = model::CalculateGenerationHash(vrfProof.Gamma);
 			if (hitPredicate(hitContext)) {
-				pHarvesterKeyPair = &keyPair;
+				pHarvesterKeyPair = &descriptor.signingKeyPair();
 				return false;
 			}
 
@@ -116,9 +126,15 @@ namespace catapult { namespace harvesting {
 		if (!pHarvesterKeyPair)
 			return nullptr;
 
-		utils::StackLogger stackLogger("generating candidate block", utils::LogLevel::Debug);
-		auto networkIdentifier = m_config.Network.Identifier;
-		auto pBlockHeader = CreateUnsignedBlockHeader(context, networkIdentifier, pHarvesterKeyPair->publicKey(), m_beneficiary);
+		utils::StackLogger stackLogger("generating candidate block", utils::LogLevel::debug);
+		auto pBlockHeader = CreateUnsignedBlockHeader(
+				context,
+				model::CalculateBlockTypeFromHeight(context.Height, m_config.ImportanceGrouping),
+				m_config.Network.Identifier,
+				pHarvesterKeyPair->publicKey(),
+				m_beneficiary);
+
+		AddGenerationHashProof(*pBlockHeader, vrfProof);
 		auto pBlock = m_blockGenerator(*pBlockHeader, m_config.MaxTransactionsPerBlock);
 		if (pBlock)
 			SignBlockHeader(*pHarvesterKeyPair, *pBlock);

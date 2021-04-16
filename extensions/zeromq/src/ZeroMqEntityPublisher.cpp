@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,10 +20,11 @@
 **/
 
 #include "ZeroMqEntityPublisher.h"
+#include "PackedFinalizedBlockHeader.h"
 #include "PublisherUtils.h"
-#include "catapult/model/Address.h"
 #include "catapult/model/Cosignature.h"
 #include "catapult/model/Elements.h"
+#include "catapult/model/FinalizationRound.h"
 #include "catapult/model/NotificationSubscriber.h"
 #include "catapult/model/TransactionStatus.h"
 #include "catapult/model/TransactionUtils.h"
@@ -58,13 +60,18 @@ namespace catapult { namespace zeromq {
 
 	class ZeroMqEntityPublisher::SynchronizedPublisher {
 	public:
-		explicit SynchronizedPublisher(unsigned short port)
+		SynchronizedPublisher(const std::string& listenInterface, unsigned short port)
 				: m_zmqSocket(m_zmqContext, ZMQ_PUB)
 				, m_pPool(thread::CreateIoThreadPool(1, "ZeroMqEntityPublisher")) {
 			// note that we want closing the socket to be synchronous
 			// setting linger to 0 means that all pending messages are discarded and the socket is closed immediately
-			m_zmqSocket.setsockopt(ZMQ_LINGER, 0);
-			m_zmqSocket.bind("tcp://*:" + std::to_string(port));
+			m_zmqSocket.set(zmq::sockopt::linger, 0);
+			if (std::string::npos != listenInterface.find(':'))
+				m_zmqSocket.set(zmq::sockopt::ipv6, 1);
+
+			std::ostringstream out;
+			out << "tcp://[" << listenInterface << "]:" << port;
+			m_zmqSocket.bind(out.str());
 
 			m_pPool->start();
 		}
@@ -121,10 +128,11 @@ namespace catapult { namespace zeromq {
 	};
 
 	ZeroMqEntityPublisher::ZeroMqEntityPublisher(
+			const std::string& listenInterface,
 			unsigned short port,
-			std::unique_ptr<model::NotificationPublisher>&& pNotificationPublisher)
+			std::unique_ptr<const model::NotificationPublisher>&& pNotificationPublisher)
 			: m_pNotificationPublisher(std::move(pNotificationPublisher))
-			, m_pSynchronizedPublisher(std::make_unique<SynchronizedPublisher>(port))
+			, m_pSynchronizedPublisher(std::make_unique<SynchronizedPublisher>(listenInterface, port))
 	{}
 
 	ZeroMqEntityPublisher::~ZeroMqEntityPublisher() = default;
@@ -144,8 +152,8 @@ namespace catapult { namespace zeromq {
 
 		zmq::multipart_t multipart;
 		auto marker = BlockMarker::Block_Marker;
-		multipart.addmem(&marker, sizeof(marker));
-		multipart.addmem(static_cast<const void*>(&blockElement.Block), sizeof(model::BlockHeader));
+		multipart.addmem(&marker, sizeof(BlockMarker));
+		multipart.addmem(static_cast<const void*>(&blockElement.Block), model::GetBlockHeaderSize(blockElement.Block.Type));
 		multipart.addmem(static_cast<const void*>(&blockElement.EntityHash), Hash256::Size);
 		multipart.addmem(static_cast<const void*>(&blockElement.GenerationHash), Hash256::Size);
 		pMessageGroup->add(std::move(multipart));
@@ -157,8 +165,19 @@ namespace catapult { namespace zeromq {
 
 		zmq::multipart_t multipart;
 		auto marker = BlockMarker::Drop_Blocks_Marker;
-		multipart.addmem(&marker, sizeof(marker));
+		multipart.addmem(&marker, sizeof(BlockMarker));
 		multipart.addmem(static_cast<const void*>(&height), sizeof(Height));
+		pMessageGroup->add(std::move(multipart));
+		m_pSynchronizedPublisher->queue(std::move(pMessageGroup));
+	}
+
+	void ZeroMqEntityPublisher::publishFinalizedBlock(const PackedFinalizedBlockHeader& header) {
+		auto pMessageGroup = std::make_unique<MessageGroup>(CreateHeightMessageGenerator("finalized block", header.Height));
+
+		zmq::multipart_t multipart;
+		auto marker = BlockMarker::Finalized_Block_Marker;
+		multipart.addmem(&marker, sizeof(BlockMarker));
+		multipart.addmem(static_cast<const void*>(&header), sizeof(PackedFinalizedBlockHeader));
 		pMessageGroup->add(std::move(multipart));
 		m_pSynchronizedPublisher->queue(std::move(pMessageGroup));
 	}
@@ -209,20 +228,19 @@ namespace catapult { namespace zeromq {
 
 	void ZeroMqEntityPublisher::publishTransactionStatus(const model::Transaction& transaction, const Hash256& hash, uint32_t status) {
 		auto topicMarker = TransactionMarker::Transaction_Status_Marker;
-		model::TransactionStatus transactionStatus(hash, status, transaction.Deadline);
+		model::TransactionStatus transactionStatus(hash, transaction.Deadline, status);
 		publish("transaction status", topicMarker, WeakTransactionInfo(transaction, hash), [&transactionStatus](auto& multipart) {
-			multipart.addmem(static_cast<const void*>(&transactionStatus), sizeof(transactionStatus));
+			multipart.addmem(static_cast<const void*>(&transactionStatus), sizeof(model::TransactionStatus));
 		});
 	}
 
 	void ZeroMqEntityPublisher::publishCosignature(
 			const model::TransactionInfo& parentTransactionInfo,
-			const Key& signer,
-			const Signature& signature) {
+			const model::Cosignature& cosignature) {
 		auto topicMarker = TransactionMarker::Cosignature_Marker;
-		model::DetachedCosignature detachedCosignature(signer, signature, parentTransactionInfo.EntityHash);
+		model::DetachedCosignature detachedCosignature(cosignature, parentTransactionInfo.EntityHash);
 		publish("detached cosignature", topicMarker, WeakTransactionInfo(parentTransactionInfo), [&detachedCosignature](auto& multipart) {
-			multipart.addmem(static_cast<const void*>(&detachedCosignature), sizeof(detachedCosignature));
+			multipart.addmem(static_cast<const void*>(&detachedCosignature), sizeof(model::DetachedCosignature));
 		});
 	}
 

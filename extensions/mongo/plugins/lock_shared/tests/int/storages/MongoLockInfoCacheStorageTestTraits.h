@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,7 +22,6 @@
 #pragma once
 #include "mongo/src/mappers/MapperUtils.h"
 #include "plugins/txes/lock_shared/src/state/LockInfo.h"
-#include "catapult/model/Address.h"
 #include "tests/TestHarness.h"
 
 namespace catapult { namespace mongo { namespace plugins {
@@ -29,6 +29,7 @@ namespace catapult { namespace mongo { namespace plugins {
 	/// Mongo lock info cache storage test traits.
 	template<typename TLockInfoTraits>
 	struct MongoLockInfoCacheStorageTestTraits : public TLockInfoTraits {
+		static constexpr auto Primary_Document_Name = "lock";
 		static constexpr auto Network_Id = static_cast<model::NetworkIdentifier>(0x5A);
 
 		/// Adds \a lockInfo to \a delta.
@@ -50,21 +51,20 @@ namespace catapult { namespace mongo { namespace plugins {
 
 			// update cache
 			auto& lockInfoCacheDelta = delta.sub<typename TLockInfoTraits::CacheType>();
-			lockInfoCacheDelta.find(TLockInfoTraits::GetId(lockInfo)).get().Status = state::LockStatus::Used;
+			lockInfoCacheDelta.find(TLockInfoTraits::GetId(lockInfo)).get().back().Status = state::LockStatus::Used;
 		}
 
 		/// Gets a filter for finding \a lockInfo.
 		static auto GetFindFilter(const typename TLockInfoTraits::ModelType& lockInfo) {
 			return mappers::bson_stream::document()
-					<< std::string(TLockInfoTraits::Id_Property_Name)
+					<< std::string(Primary_Document_Name) + "." + std::string(TLockInfoTraits::Id_Property_Name)
 					<< mappers::ToBinary(TLockInfoTraits::GetId(lockInfo))
 					<< mappers::bson_stream::finalize;
 		}
 
 		/// Asserts that \a lockInfo and \a view are equal.
 		static void AssertEqual(const typename TLockInfoTraits::ModelType& lockInfo, const bsoncxx::document::view& view) {
-			auto address = model::PublicKeyToAddress(lockInfo.SenderPublicKey, Network_Id);
-			TLockInfoTraits::AssertEqualLockInfoData(lockInfo, address, view["lock"].get_document().view());
+			TLockInfoTraits::AssertEqualLockInfoData(lockInfo, view[Primary_Document_Name].get_document().view());
 		}
 	};
 }}}

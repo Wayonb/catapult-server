@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,6 +25,7 @@
 #include "catapult/io/IndexFile.h"
 #include "tests/test/core/BlockTestUtils.h"
 #include "tests/test/other/mocks/MockBlockChangeSubscriber.h"
+#include "tests/test/other/mocks/MockFinalizationSubscriber.h"
 #include "tests/test/other/mocks/MockStateChangeSubscriber.h"
 
 namespace catapult { namespace test {
@@ -52,15 +54,13 @@ namespace catapult { namespace test {
 
 			// - check nodes
 			EXPECT_EQ(1u, nodes.size());
-			auto expectedContents = BasicNodeDataContainer{ { LoadServerKeyPair().publicKey(), "LOCAL", ionet::NodeSource::Local } };
+			auto expectedContents = BasicNodeDataContainer{ { context.publicKey(), "LOCAL", ionet::NodeSource::Local } };
 			EXPECT_EQ(expectedContents, CollectAll(nodes));
 		}
 
 		static void AssertCanBootLocalNodeWithPeers() {
 			// Act: create the node with custom peers
-			TestContext context(NodeFlag::Custom_Peers | NodeFlag::With_Partner, {
-				CreateLocalPartnerNode()
-			});
+			TestContext context(NodeFlag::Custom_Peers | NodeFlag::With_Partner, {});
 
 			context.waitForNumActiveWriters(1);
 			auto stats = context.stats();
@@ -74,8 +74,8 @@ namespace catapult { namespace test {
 			// - check nodes
 			EXPECT_EQ(2u, nodes.size());
 			auto expectedContents = BasicNodeDataContainer{
-				{ LoadServerKeyPair().publicKey(), "LOCAL", ionet::NodeSource::Local },
-				{ CreateLocalPartnerNode().identity().PublicKey, "PARTNER", ionet::NodeSource::Static }
+				{ context.publicKey(), "LOCAL", ionet::NodeSource::Local },
+				{ context.partnerPublicKey(), "PARTNER", ionet::NodeSource::Static }
 			};
 			EXPECT_EQ(expectedContents, CollectAll(nodes));
 		}
@@ -129,29 +129,47 @@ namespace catapult { namespace test {
 
 		// region basic tests - nemesis subscriptions
 
+	private:
+		struct CapturedSubscribers {
+			const mocks::MockBlockChangeSubscriber* pBlockChangeSubscriber = nullptr;
+			const mocks::MockFinalizationSubscriber* pFinalizationSubscriber = nullptr;
+			const mocks::MockStateChangeSubscriber* pStateChangeSubscriber = nullptr;
+		};
+
+		static consumer<extensions::ProcessBootstrapper&> CreateRegisterAndCaptureSubscribersBootCallback(
+				CapturedSubscribers& subscribers) {
+			return [&subscribers](auto& bootstrapper) {
+				auto pBlockChangeSubscriber = std::make_unique<mocks::MockBlockChangeSubscriber>();
+				subscribers.pBlockChangeSubscriber = pBlockChangeSubscriber.get();
+				bootstrapper.subscriptionManager().addBlockChangeSubscriber(std::move(pBlockChangeSubscriber));
+
+				auto pFinalizationSubscriber = std::make_unique<mocks::MockFinalizationSubscriber>();
+				subscribers.pFinalizationSubscriber = pFinalizationSubscriber.get();
+				bootstrapper.subscriptionManager().addFinalizationSubscriber(std::move(pFinalizationSubscriber));
+
+				auto pStateChangeSubscriber = std::make_unique<mocks::MockStateChangeSubscriber>();
+				subscribers.pStateChangeSubscriber = pStateChangeSubscriber.get();
+				bootstrapper.subscriptionManager().addStateChangeSubscriber(std::move(pStateChangeSubscriber));
+			};
+		}
+
+	public:
 		static void AssertLocalNodeTriggersNemesisSubscribersAtHeightOne() {
 			// Arrange:
 			TestContext context(NodeFlag::Require_Explicit_Boot);
 
 			// Act:
-			const mocks::MockBlockChangeSubscriber* pBlockChangeSubscriberRaw = nullptr;
-			const mocks::MockStateChangeSubscriber* pStateChangeSubscriberRaw = nullptr;
-			auto pLocalNode = context.boot([&](auto& bootstrapper) {
-				auto pBlockChangeSubscriber = std::make_unique<mocks::MockBlockChangeSubscriber>();
-				pBlockChangeSubscriberRaw = pBlockChangeSubscriber.get();
-				bootstrapper.subscriptionManager().addBlockChangeSubscriber(std::move(pBlockChangeSubscriber));
-
-				auto pStateChangeSubscriber = std::make_unique<mocks::MockStateChangeSubscriber>();
-				pStateChangeSubscriberRaw = pStateChangeSubscriber.get();
-				bootstrapper.subscriptionManager().addStateChangeSubscriber(std::move(pStateChangeSubscriber));
-			});
+			CapturedSubscribers subscribers;
+			auto pLocalNode = context.boot(CreateRegisterAndCaptureSubscribersBootCallback(subscribers));
 
 			// Assert:
-			EXPECT_EQ(1u, pBlockChangeSubscriberRaw->blockElements().size());
-			EXPECT_EQ(0u, pBlockChangeSubscriberRaw->dropBlocksAfterHeights().size());
+			EXPECT_EQ(1u, subscribers.pBlockChangeSubscriber->blockElements().size());
+			EXPECT_EQ(0u, subscribers.pBlockChangeSubscriber->dropBlocksAfterHeights().size());
 
-			EXPECT_EQ(1u, pStateChangeSubscriberRaw->numScoreChanges());
-			EXPECT_EQ(1u, pStateChangeSubscriberRaw->numStateChanges());
+			EXPECT_EQ(1u, subscribers.pFinalizationSubscriber->finalizedBlockParams().params().size());
+
+			EXPECT_EQ(1u, subscribers.pStateChangeSubscriber->numScoreChanges());
+			EXPECT_EQ(1u, subscribers.pStateChangeSubscriber->numStateChanges());
 
 			auto dataDirectory = config::CatapultDataDirectory(context.dataDirectory());
 			EXPECT_EQ(2u, io::IndexFile(dataDirectory.spoolDir("state_change").file("index_server.dat")).get());
@@ -166,32 +184,25 @@ namespace catapult { namespace test {
 			context.reset();
 
 			// Act: reboot it
-			const mocks::MockBlockChangeSubscriber* pBlockChangeSubscriberRaw = nullptr;
-			const mocks::MockStateChangeSubscriber* pStateChangeSubscriberRaw = nullptr;
-			auto pLocalNode = context.boot([&](auto& bootstrapper) {
-				auto pBlockChangeSubscriber = std::make_unique<mocks::MockBlockChangeSubscriber>();
-				pBlockChangeSubscriberRaw = pBlockChangeSubscriber.get();
-				bootstrapper.subscriptionManager().addBlockChangeSubscriber(std::move(pBlockChangeSubscriber));
-
-				auto pStateChangeSubscriber = std::make_unique<mocks::MockStateChangeSubscriber>();
-				pStateChangeSubscriberRaw = pStateChangeSubscriber.get();
-				bootstrapper.subscriptionManager().addStateChangeSubscriber(std::move(pStateChangeSubscriber));
-			});
+			CapturedSubscribers subscribers;
+			auto pLocalNode = context.boot(CreateRegisterAndCaptureSubscribersBootCallback(subscribers));
 
 			// Sanity:
 			EXPECT_EQ(Height(1), pLocalNode->cache().createView().height());
 
 			// Assert:
-			EXPECT_EQ(0u, pBlockChangeSubscriberRaw->blockElements().size());
-			EXPECT_EQ(0u, pBlockChangeSubscriberRaw->dropBlocksAfterHeights().size());
+			EXPECT_EQ(0u, subscribers.pBlockChangeSubscriber->blockElements().size());
+			EXPECT_EQ(0u, subscribers.pBlockChangeSubscriber->dropBlocksAfterHeights().size());
 
-			EXPECT_EQ(0u, pStateChangeSubscriberRaw->numScoreChanges());
-			EXPECT_EQ(0u, pStateChangeSubscriberRaw->numStateChanges());
+			EXPECT_EQ(0u, subscribers.pFinalizationSubscriber->finalizedBlockParams().params().size());
+
+			EXPECT_EQ(0u, subscribers.pStateChangeSubscriber->numScoreChanges());
+			EXPECT_EQ(0u, subscribers.pStateChangeSubscriber->numStateChanges());
 		}
 
 		static void AssertLocalNodeCannotBootWhenCacheAndStorageHeightsAreInconsistent() {
 			// Arrange: boot with storage height (2) ahead of cache height (1)
-			TestContext context(NodeFlag::Require_Explicit_Boot);
+			TestContext context(NodeFlag::Require_Explicit_Boot | NodeFlag::Bypass_Seed);
 			auto boot = [&context]() {
 				context.boot([](auto& bootstrapper) {
 					auto pBlock = GenerateBlockWithTransactions(0, Height(2));

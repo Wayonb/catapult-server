@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -26,32 +27,38 @@
 namespace catapult { namespace test {
 
 	void AddMosaic(cache::CatapultCacheDelta& cache, MosaicId id, Height height, BlockDuration duration, Amount supply) {
-		AddMosaic(cache, id, height, duration, supply, Key());
+		AddMosaic(cache, id, height, duration, supply, Address());
 	}
 
-	void AddMosaic(cache::CatapultCacheDelta& cache, MosaicId id, Height height, BlockDuration duration, const Key& owner) {
+	void AddMosaic(cache::CatapultCacheDelta& cache, MosaicId id, Height height, BlockDuration duration, const Address& owner) {
 		AddMosaic(cache, id, height, duration, Amount(), owner);
 	}
 
-	void AddMosaic(cache::CatapultCacheDelta& cache, MosaicId id, Height height, BlockDuration duration, Amount supply, const Key& owner) {
+	void AddMosaic(
+			cache::CatapultCacheDelta& cache,
+			MosaicId id,
+			Height height,
+			BlockDuration duration,
+			Amount supply,
+			const Address& owner) {
 		auto& mosaicCacheDelta = cache.sub<cache::MosaicCache>();
 		auto definition = state::MosaicDefinition(height, owner, 1, test::CreateMosaicPropertiesWithDuration(duration));
-		auto entry = state::MosaicEntry(id, definition);
-		entry.increaseSupply(supply);
-		mosaicCacheDelta.insert(entry);
+		auto mosaicEntry = state::MosaicEntry(id, definition);
+		mosaicEntry.increaseSupply(supply);
+		mosaicCacheDelta.insert(mosaicEntry);
 	}
 
 	void AddEternalMosaic(cache::CatapultCacheDelta& cache, MosaicId id, Height height) {
-		AddEternalMosaic(cache, id, height, Key());
+		AddEternalMosaic(cache, id, height, Address());
 	}
 
-	void AddEternalMosaic(cache::CatapultCacheDelta& cache, MosaicId id, Height height, const Key& owner) {
+	void AddEternalMosaic(cache::CatapultCacheDelta& cache, MosaicId id, Height height, const Address& owner) {
 		auto& mosaicCacheDelta = cache.sub<cache::MosaicCache>();
 		auto definition = state::MosaicDefinition(height, owner, 1, model::MosaicProperties());
 		mosaicCacheDelta.insert(state::MosaicEntry(id, definition));
 	}
 
-	void AddMosaicOwner(cache::CatapultCacheDelta& cache, MosaicId id, const Key& owner, Amount amount) {
+	void AddMosaicOwner(cache::CatapultCacheDelta& cache, MosaicId id, const Address& owner, Amount amount) {
 		auto& accountStateCacheDelta = cache.sub<cache::AccountStateCache>();
 		accountStateCacheDelta.addAccount(owner, Height(1));
 		accountStateCacheDelta.find(owner).get().Balances.credit(id, amount);

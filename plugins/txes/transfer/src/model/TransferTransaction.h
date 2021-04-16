@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -40,14 +41,15 @@ namespace catapult { namespace model {
 		/// Recipient address.
 		UnresolvedAddress RecipientAddress;
 
-		/// Number of mosaics.
-		uint8_t MosaicsCount;
-
 		/// Message size in bytes.
 		uint16_t MessageSize;
 
+		/// Number of mosaics.
+		uint8_t MosaicsCount;
+
 		/// Reserved padding to align Mosaics on 8-byte boundary.
 		uint32_t TransferTransactionBody_Reserved1;
+		uint8_t TransferTransactionBody_Reserved2;
 
 		// followed by mosaics data if MosaicsCount != 0
 		DEFINE_TRANSACTION_VARIABLE_DATA_ACCESSORS(Mosaics, UnresolvedMosaic)

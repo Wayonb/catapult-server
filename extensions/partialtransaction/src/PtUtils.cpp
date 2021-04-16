@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -26,8 +27,8 @@
 namespace catapult { namespace partialtransaction {
 
 	std::unique_ptr<model::Transaction> StitchAggregate(const model::WeakCosignedTransactionInfo& transactionInfo) {
-		uint32_t size = transactionInfo.transaction().Size
-				+ sizeof(model::Cosignature) * static_cast<uint32_t>(transactionInfo.cosignatures().size());
+		auto numCosignatures = static_cast<uint32_t>(transactionInfo.cosignatures().size());
+		uint32_t size = transactionInfo.transaction().Size + SizeOf32<model::Cosignature>() * numCosignatures;
 		auto pTransactionWithCosignatures = utils::MakeUniqueWithSize<model::AggregateTransaction>(size);
 
 		// copy transaction data

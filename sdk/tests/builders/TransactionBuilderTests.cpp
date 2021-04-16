@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -56,7 +57,7 @@ namespace catapult { namespace builders {
 				pTransaction->Data.Size = Additional_Data_Size;
 
 				// 2. set data
-				auto pData = pTransaction->DataPtr();
+				auto* pData = pTransaction->DataPtr();
 				std::iota(pData, pData + Additional_Data_Size, static_cast<uint8_t>(0));
 				return pTransaction;
 			}
@@ -64,11 +65,11 @@ namespace catapult { namespace builders {
 
 		void AssertCanBuildTransaction(const TransactionProperties& expectedProperties, const consumer<MockBuilder&>& buildTransaction) {
 			// Arrange:
-			auto networkId = static_cast<model::NetworkIdentifier>(0x62);
+			auto networkIdentifier = static_cast<model::NetworkIdentifier>(0x62);
 			auto signer = test::GenerateRandomByteArray<Key>();
 
 			// Act:
-			MockBuilder builder(networkId, signer);
+			MockBuilder builder(networkIdentifier, signer);
 			buildTransaction(builder);
 			auto pTransaction = builder.build();
 
@@ -77,7 +78,7 @@ namespace catapult { namespace builders {
 			ASSERT_EQ(sizeof(mocks::MockTransaction) + Additional_Data_Size, pTransaction->Size);
 			EXPECT_EQ(Signature(), pTransaction->Signature);
 			EXPECT_EQ(signer, pTransaction->SignerPublicKey);
-			EXPECT_EQ(0xFFu, pTransaction->Version);
+			EXPECT_EQ(mocks::MockTransaction::Current_Version, pTransaction->Version);
 			EXPECT_EQ(static_cast<model::NetworkIdentifier>(0x62), pTransaction->Network);
 			EXPECT_EQ(static_cast<model::EntityType>(mocks::MockTransaction::Entity_Type), pTransaction->Type);
 

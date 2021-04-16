@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -33,7 +34,7 @@ namespace catapult { namespace observers {
 		auto& cache = context.Cache.template sub<typename TTraits::CacheType>();
 		const auto& key = TTraits::NotificationToKey(notification, context.Resolvers);
 		auto lockInfoIter = cache.find(key);
-		auto& lockInfo = lockInfoIter.get();
+		auto& lockInfo = lockInfoIter.get().back();
 
 		auto accountStateIter = accountStateCache.find(TTraits::DestinationAccount(lockInfo));
 		auto& accountState = accountStateIter.get();
@@ -47,7 +48,7 @@ namespace catapult { namespace observers {
 		lockInfo.Status = state::LockStatus::Used;
 		accountState.Balances.credit(lockInfo.MosaicId, lockInfo.Amount);
 
-		model::BalanceChangeReceipt receipt(TTraits::Receipt_Type, accountState.PublicKey, lockInfo.MosaicId, lockInfo.Amount);
+		model::BalanceChangeReceipt receipt(TTraits::Receipt_Type, accountState.Address, lockInfo.MosaicId, lockInfo.Amount);
 		context.StatementBuilder().addReceipt(receipt);
 	}
 }}

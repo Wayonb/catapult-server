@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,13 +29,10 @@ namespace catapult { namespace validators {
 
 	DEFINE_STATEFUL_VALIDATOR(RequiredMosaic, [](const Notification& notification, const ValidatorContext& context) {
 		auto view = ActiveMosaicView(context.Cache);
-
-		auto mosaicId = notification.MosaicId;
-		if (Notification::MosaicType::Unresolved == notification.ProvidedMosaicType)
-			mosaicId = context.Resolvers.resolve(notification.UnresolvedMosaicId);
+		auto mosaicId = notification.MosaicId.resolved(context.Resolvers);
 
 		ActiveMosaicView::FindIterator mosaicIter;
-		auto result = view.tryGet(mosaicId, context.Height, notification.Signer, mosaicIter);
+		auto result = view.tryGet(mosaicId, context.Height, notification.Owner.resolved(context.Resolvers), mosaicIter);
 		if (IsValidationResultFailure(result))
 			return result;
 
@@ -47,5 +45,5 @@ namespace catapult { namespace validators {
 		}
 
 		return ValidationResult::Success;
-	});
+	})
 }}

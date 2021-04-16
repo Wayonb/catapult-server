@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -107,22 +108,22 @@ namespace catapult { namespace validators {
 	namespace {
 		template<typename TRestrictionValueTraits, typename TOperationTraits>
 		auto CreateNotification(
-				const Key& key,
+				const Address& address,
 				const typename TRestrictionValueTraits::UnresolvedValueType& restrictionValue,
 				model::AccountRestrictionModificationAction action) {
 			return test::CreateAccountRestrictionValueNotification<TRestrictionValueTraits, TOperationTraits>(
-					key,
+					address,
 					restrictionValue,
 					action);
 		}
 
 		template<typename TRestrictionValueTraits, typename TOperationTraits>
-		auto CreateNotificationWithRandomKey(
-				const Key&,
+		auto CreateNotificationWithRandomAddress(
+				const Address&,
 				const typename TRestrictionValueTraits::UnresolvedValueType& restrictionValue,
 				model::AccountRestrictionModificationAction action) {
 			return CreateNotification<TRestrictionValueTraits, TOperationTraits>(
-					test::GenerateRandomByteArray<Key>(),
+					test::GenerateRandomByteArray<Address>(),
 					restrictionValue,
 					action);
 		}
@@ -135,18 +136,19 @@ namespace catapult { namespace validators {
 				TModificationFactory modificationFactory) {
 			// Arrange:
 			auto cache = test::AccountRestrictionCacheFactory::Create();
-			auto key = test::GenerateRandomByteArray<Key>();
+			auto address = test::GenerateRandomByteArray<Address>();
 			auto values = test::GenerateUniqueRandomDataVector<typename TRestrictionValueTraits::ValueType>(numValues);
-			test::PopulateCache<TRestrictionValueTraits, TOperationTraits>(cache, key, values);
+			test::PopulateCache<TRestrictionValueTraits, TOperationTraits>(cache, address, values);
 			auto modification = modificationFactory(values);
 
 			// Act:
-			RunValidator<TRestrictionValueTraits>(expectedResult, cache, createNotification(key, modification.second, modification.first));
+			auto notification = createNotification(address, modification.second, modification.first);
+			RunValidator<TRestrictionValueTraits>(expectedResult, cache, notification);
 		}
 	}
 
 	TRAITS_BASED_TEST(SuccessWhenAccountIsUnknown) {
-		auto createNotification = CreateNotificationWithRandomKey<TRestrictionValueTraits, TOperationTraits>;
+		auto createNotification = CreateNotificationWithRandomAddress<TRestrictionValueTraits, TOperationTraits>;
 		constexpr auto Success = ValidationResult::Success;
 		AssertValidationResult<TRestrictionValueTraits, TOperationTraits>(Success, 0, createNotification, [](const auto&) {
 			return std::make_pair(Add, TRestrictionValueTraits::RandomUnresolvedValue());
@@ -188,11 +190,11 @@ namespace catapult { namespace validators {
 	namespace {
 		template<typename TRestrictionValueTraits, typename TOperationTraits>
 		auto CreateOppositeOperationAccountRestrictionValueNotification(
-				const Key& key,
+				const Address& address,
 				const typename TRestrictionValueTraits::UnresolvedValueType& restrictionValue,
 				model::AccountRestrictionModificationAction action) {
 			return typename TRestrictionValueTraits::NotificationType(
-					key,
+					address,
 					TOperationTraits::OppositeCompleteAccountRestrictionFlags(TRestrictionValueTraits::Restriction_Flags),
 					restrictionValue,
 					action);

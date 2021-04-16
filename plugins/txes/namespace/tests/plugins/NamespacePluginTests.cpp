@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -41,7 +42,6 @@ namespace catapult { namespace plugins {
 				// Arrange:
 				auto config = model::BlockChainConfiguration::Uninitialized();
 				config.BlockGenerationTargetTime = utils::TimeSpan::FromSeconds(1);
-				config.BlockPruneInterval = 150;
 				config.Plugins.emplace("catapult.plugins.namespace", utils::ConfigurationBag({{
 					"",
 					{
@@ -54,7 +54,7 @@ namespace catapult { namespace plugins {
 						{ "namespaceGracePeriodDuration", "0h" },
 						{ "reservedRootNamespaceNames", "reserved" },
 
-						{ "namespaceRentalFeeSinkPublicKey", "0000000000000000000000000000000000000000000000000000000000000000" },
+						{ "namespaceRentalFeeSinkAddress", "SAXQUTQQNS6JEJG7PLC6FRVJ2USS44GLMXG4DOA" },
 						{ "rootNamespaceRentalFeePerBlock", "0" },
 						{ "childNamespaceRentalFee", "0" }
 					}
@@ -103,6 +103,7 @@ namespace catapult { namespace plugins {
 
 			static std::vector<std::string> GetStatefulValidatorNames() {
 				return {
+					"NamespaceReservedNameValidator",
 					"RootNamespaceAvailabilityValidator",
 					"NamespaceDurationOverflowValidator",
 					"ChildNamespaceAvailabilityValidator",
@@ -122,7 +123,6 @@ namespace catapult { namespace plugins {
 					"NamespaceRentalFeeObserver",
 					"NamespaceGracePeriodTouchObserver",
 					"NamespaceTouchObserver",
-					"NamespacePruningObserver",
 					"AliasedAddressObserver",
 					"AliasedMosaicIdObserver"
 				};
@@ -155,7 +155,7 @@ namespace catapult { namespace plugins {
 				auto readOnlyCache = cacheDelta.toReadOnly();
 				auto& namespaceCacheDelta = cacheDelta.template sub<cache::NamespaceCache>();
 
-				auto owner = test::GenerateRandomByteArray<Key>();
+				auto owner = test::CreateRandomOwner();
 				namespaceCacheDelta.insert(state::RootNamespace(NamespaceId(Unresolved_Flag | 123), owner, test::CreateLifetime(10, 20)));
 				namespaceCacheDelta.setAlias(NamespaceId(Unresolved_Flag | 123), state::NamespaceAlias(MosaicId(456)));
 

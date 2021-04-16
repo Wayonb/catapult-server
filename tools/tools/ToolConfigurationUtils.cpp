@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,24 +24,35 @@
 
 namespace catapult { namespace tools {
 
-	config::CatapultConfiguration LoadConfiguration(const std::string& resourcesPathStr) {
-		boost::filesystem::path resourcesPath = resourcesPathStr;
-		resourcesPath /= "resources";
-		std::cout << "loading resources from " << resourcesPath << std::endl;
-		return config::CatapultConfiguration::LoadFromPath(resourcesPath, "server");
+	void AddResourcesOption(OptionsBuilder& optionsBuilder) {
+		optionsBuilder("resources,r",
+				OptionsValue<std::string>()->default_value(".."),
+				"path to the resources directory");
 	}
 
-	std::vector<ionet::Node> LoadOptionalApiPeers(const std::string& resourcesPath, model::NetworkIdentifier networkIdentifier) {
+	std::string GetResourcesOptionValue(const Options& options) {
+		return options["resources"].as<std::string>();
+	}
+
+	config::CatapultConfiguration LoadConfiguration(const std::string& resourcesPath) {
+		auto configPath = std::filesystem::path(resourcesPath) / "resources";
+		std::cout << "loading resources from " << configPath << std::endl;
+		return config::CatapultConfiguration::LoadFromPath(configPath, "server");
+	}
+
+	std::vector<ionet::Node> LoadOptionalApiPeers(
+			const std::string& resourcesPath,
+			const model::UniqueNetworkFingerprint& networkFingerprint) {
 		std::vector<ionet::Node> apiNodes;
-		auto apiPeersFilename = boost::filesystem::path(resourcesPath) / "resources" / "peers-api.json";
-		if (boost::filesystem::exists(apiPeersFilename))
-			apiNodes = config::LoadPeersConfiguration(apiPeersFilename, networkIdentifier);
+		auto apiPeersFilename = std::filesystem::path(resourcesPath) / "resources" / "peers-api.json";
+		if (std::filesystem::exists(apiPeersFilename))
+			apiNodes = config::LoadPeersConfiguration(apiPeersFilename, networkFingerprint);
 
 		return apiNodes;
 	}
 
-	std::vector<ionet::Node> LoadPeers(const std::string& resourcesPath, model::NetworkIdentifier networkIdentifier) {
-		auto peersFilename = boost::filesystem::path(resourcesPath) / "resources" / "peers-p2p.json";
-		return config::LoadPeersConfiguration(peersFilename, networkIdentifier);
+	std::vector<ionet::Node> LoadPeers(const std::string& resourcesPath, const model::UniqueNetworkFingerprint& networkFingerprint) {
+		auto peersFilename = std::filesystem::path(resourcesPath) / "resources" / "peers-p2p.json";
+		return config::LoadPeersConfiguration(peersFilename, networkFingerprint);
 	}
 }}

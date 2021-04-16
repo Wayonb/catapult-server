@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -71,7 +72,7 @@ namespace catapult { namespace cache {
 			delta.insert(root);
 			delta.insert(state::Namespace(test::CreatePath({ 123, 127 })));
 			delta.insert(state::Namespace(test::CreatePath({ 123, 128 })));
-			state::RootNamespace renewedRoot(NamespaceId(123), owner, test::CreateLifetime(345, 456));
+			state::RootNamespace renewedRoot(NamespaceId(123), owner, test::CreateLifetime(320, 456));
 			delta.insert(renewedRoot);
 
 			std::vector<uint8_t> buffer;
@@ -100,6 +101,7 @@ namespace catapult { namespace cache {
 			mocks::MockMemoryStream stream(buffer);
 			io::Write64(stream, 7);
 			io::Write64(stream, 11);
+			stream.seek(0);
 
 			// Act:
 			storage.loadAll(stream, 0);

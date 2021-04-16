@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -62,7 +63,6 @@ namespace catapult { namespace net {
 		}
 
 		// expected sequences
-		// accept : insert -> remove
 		// connect: prepareConnect -> abortConnect
 		// connect: prepareConnect -> insert -> remove
 		class WriterContainer {
@@ -139,22 +139,14 @@ namespace catapult { namespace net {
 				return true;
 			}
 
-			bool insert(const WriterState& state) {
+			void insert(const WriterState& state) {
 				utils::SpinLockGuard guard(m_lock);
 
-				// if the state is for an already connected node, ignore it
-				// 1. required for filtering accepted connections
-				// 2. prepareConnect proactively filters connections
-				// 3. failsafe for mixed connect + accept use cases (currently unused, so not optimized)
-				if (!m_nodeIdentities.emplace(state.Node.identity()).second) {
-					CATAPULT_LOG(debug) << "ignoring connection to already connected peer " << state.Node;
-					return false;
-				}
+				m_nodeIdentities.emplace(state.Node.identity());
 
 				auto pNewState = std::make_shared<WriterStateWithAvailability>(state);
 				m_writers.push_back(pNewState);
 				addUnexpectedDataHook(pNewState);
-				return true;
 			}
 
 			void abortConnect(const ionet::Node& node) {
@@ -287,14 +279,10 @@ namespace catapult { namespace net {
 				: public PacketWriters
 				, public std::enable_shared_from_this<DefaultPacketWriters> {
 		public:
-			DefaultPacketWriters(
-					const std::shared_ptr<thread::IoThreadPool>& pPool,
-					const crypto::KeyPair& keyPair,
-					const ConnectionSettings& settings)
-					: m_pPool(pPool)
-					, m_pClientConnector(CreateClientConnector(m_pPool, keyPair, settings, "writers"))
-					, m_pServerConnector(CreateServerConnector(m_pPool, keyPair, settings, "writers"))
-					, m_networkIdentifier(settings.NetworkIdentifier)
+			DefaultPacketWriters(thread::IoThreadPool& pool, const Key& serverPublicKey, const ConnectionSettings& settings)
+					: m_ioContext(pool.ioContext())
+					, m_pClientConnector(CreateClientConnector(pool, serverPublicKey, settings, "writers"))
+					, m_pServerConnector(CreateServerConnector(pool, serverPublicKey, settings, "writers"))
 					, m_writers(settings.NodeIdentityEqualityStrategy)
 			{}
 
@@ -333,7 +321,7 @@ namespace catapult { namespace net {
 			ionet::NodePacketIoPair pickOne(const utils::TimeSpan& ioDuration) override {
 				WriterState state;
 				if (!m_writers.pickOne(state)) {
-					CATAPULT_LOG_THROTTLE(warning, 60'000) << "no packet io available for checkout";
+					CATAPULT_LOG_THROTTLE(warning, utils::TimeSpan::FromMinutes(1).millis()) << "no packet io available for checkout";
 					return ionet::NodePacketIoPair();
 				}
 
@@ -363,7 +351,7 @@ namespace catapult { namespace net {
 					pThis->makeWriterAvailable(pSocket);
 				};
 
-				auto pTimedCompletionHandler = thread::MakeTimedCallback(m_pPool->ioContext(), completionHandler, false);
+				auto pTimedCompletionHandler = thread::MakeTimedCallback(m_ioContext, completionHandler, false);
 				pTimedCompletionHandler->setTimeout(ioDuration);
 				pTimedCompletionHandler->setTimeoutHandler([errorHandler]() {
 					CATAPULT_LOG(warning) << "calling error handler due to timeout";
@@ -376,54 +364,31 @@ namespace catapult { namespace net {
 			}
 
 		public:
-			void accept(const ionet::PacketSocketInfo& socketInfo, const AcceptCallback& callback) override {
-				m_pClientConnector->accept(socketInfo.socket(), [pThis = shared_from_this(), host = socketInfo.host(), callback](
-						auto connectCode,
-						const auto& pVerifiedSocket,
-						const auto& remoteKey) {
-					auto identity = model::NodeIdentity{ remoteKey, host };
-					if (PeerConnectCode::Accepted == connectCode) {
-						if (!pThis->addWriter(identity, pVerifiedSocket))
-							connectCode = PeerConnectCode::Already_Connected;
-					}
-
-					callback({ connectCode, identity });
-				});
-			}
-
-			void connect(const ionet::Node& node, const AcceptCallback& callback) override {
+			void connect(const ionet::Node& node, const ConnectCallback& callback) override {
 				if (!m_writers.prepareConnect(node))
 					return callback(PeerConnectCode::Already_Connected);
 
 				m_pServerConnector->connect(node, [pThis = shared_from_this(), node, callback](
 						auto connectCode,
 						const auto& verifiedSocketInfo) {
-					// abort the connection if it failed or is redundant
-					if (PeerConnectCode::Accepted != connectCode || !pThis->addWriter(node, verifiedSocketInfo.socket())) {
+					// abort the connection if it failed
+					if (PeerConnectCode::Accepted != connectCode)
 						pThis->m_writers.abortConnect(node);
+					else
+						pThis->addWriter(node, verifiedSocketInfo.socket());
 
-						if (PeerConnectCode::Accepted == connectCode)
-							connectCode = PeerConnectCode::Already_Connected;
-					}
-
-					callback({ connectCode, node.identity() });
+					// PacketWritersTests require socket
+					callback({ connectCode, node.identity(), verifiedSocketInfo.socket() });
 				});
 			}
 
 		private:
-			bool addWriter(const model::NodeIdentity& identity, const SocketPointer& pSocket) {
-				// this is for supporting eventsource extension where api writers register to receive pushed data
-				// endpoint and metadata are unimportant because only key-based filtering is required
-				auto node = ionet::Node(identity, ionet::NodeEndpoint(), ionet::NodeMetadata(m_networkIdentifier));
-				return addWriter(node, pSocket);
-			}
-
-			bool addWriter(const ionet::Node& node, const SocketPointer& pSocket) {
+			void addWriter(const ionet::Node& node, const SocketPointer& pSocket) {
 				WriterState state;
 				state.Node = node;
 				state.pSocket = pSocket;
 				state.pBufferedIo = pSocket->buffered();
-				return m_writers.insert(state);
+				m_writers.insert(state);
 			}
 
 			void makeWriterAvailable(const SocketPointer& pSocket) {
@@ -449,18 +414,17 @@ namespace catapult { namespace net {
 			}
 
 		private:
-			std::shared_ptr<thread::IoThreadPool> m_pPool;
+			boost::asio::io_context& m_ioContext;
 			std::shared_ptr<ClientConnector> m_pClientConnector;
 			std::shared_ptr<ServerConnector> m_pServerConnector;
-			model::NetworkIdentifier m_networkIdentifier;
 			WriterContainer m_writers;
 		};
 	}
 
 	std::shared_ptr<PacketWriters> CreatePacketWriters(
-			const std::shared_ptr<thread::IoThreadPool>& pPool,
-			const crypto::KeyPair& keyPair,
+			thread::IoThreadPool& pool,
+			const Key& serverPublicKey,
 			const ConnectionSettings& settings) {
-		return std::make_shared<DefaultPacketWriters>(pPool, keyPair, settings);
+		return std::make_shared<DefaultPacketWriters>(pool, serverPublicKey, settings);
 	}
 }}

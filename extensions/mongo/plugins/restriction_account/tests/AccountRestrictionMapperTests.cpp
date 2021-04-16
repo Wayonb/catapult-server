@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -56,7 +57,7 @@ namespace catapult { namespace mongo { namespace plugins {
 		static auto CreateAccountRestrictionTransaction(uint8_t numAdditions, uint8_t numDeletions) {
 			using TransactionType = typename TTraits::TransactionType;
 			auto valueSize = TRestrictionValueTraits::Restriction_Value_Size;
-			auto entitySize = static_cast<uint32_t>(sizeof(TransactionType) + (numAdditions + numDeletions) * valueSize);
+			auto entitySize = SizeOf32<TransactionType>() + (numAdditions + numDeletions) * static_cast<uint32_t>(valueSize);
 			auto pTransaction = utils::MakeUniqueWithSize<TransactionType>(entitySize);
 			test::FillWithRandomData({ reinterpret_cast<uint8_t*>(pTransaction.get()), entitySize });
 			pTransaction->Size = entitySize;

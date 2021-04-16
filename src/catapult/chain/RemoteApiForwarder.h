@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -52,7 +53,8 @@ namespace catapult { namespace chain {
 		thread::future<ionet::NodeInteractionResult> processSync(TRemoteApiAction action, TRemoteApiFactory apiFactory) const {
 			auto packetIoPair = m_packetIoPicker.pickOne(m_timeout);
 			if (!packetIoPair) {
-				CATAPULT_LOG_THROTTLE(warning, 60'000) << "no packet io available for operation '" << m_operationName << "'";
+				CATAPULT_LOG_THROTTLE(warning, utils::TimeSpan::FromMinutes(1).millis())
+						<< "no packet io available for operation '" << m_operationName << "'";
 				return thread::make_ready_future(ionet::NodeInteractionResult());
 			}
 
@@ -64,7 +66,7 @@ namespace catapult { namespace chain {
 			// (pRemoteApi is a pointer so that the reference taken by action is valid throughout the entire asynchronous action)
 			return action(*pRemoteApi).then([pRemoteApi, packetIoPair, operationName = m_operationName](auto&& resultFuture) {
 				auto result = resultFuture.get();
-				CATAPULT_LOG_LEVEL(ionet::NodeInteractionResultCode::Neutral == result ? utils::LogLevel::Trace : utils::LogLevel::Info)
+				CATAPULT_LOG_LEVEL(ionet::NodeInteractionResultCode::Neutral == result ? utils::LogLevel::trace : utils::LogLevel::info)
 						<< "completed '" << operationName << "' (" << packetIoPair.node() << ") with result " << result;
 				return ionet::NodeInteractionResult(packetIoPair.node().identity(), result);
 			});

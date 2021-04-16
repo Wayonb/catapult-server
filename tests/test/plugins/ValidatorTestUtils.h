@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -33,7 +34,7 @@ namespace catapult { namespace test {
 			Height height,
 			const model::NetworkInfo& network,
 			const cache::ReadOnlyCatapultCache& cache) {
-		return validators::ValidatorContext(height, Timestamp(0), network, CreateResolverContextXor(), cache);
+		return validators::ValidatorContext(model::NotificationContext(height, CreateResolverContextXor()), Timestamp(0), network, cache);
 	}
 
 	/// Creates a validator context around \a height and \a cache.

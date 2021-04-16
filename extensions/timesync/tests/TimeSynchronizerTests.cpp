@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -34,7 +35,7 @@ namespace catapult { namespace timesync {
 	namespace {
 		constexpr int64_t Warning_Threshold_Millis = 5'000;
 		constexpr auto Total_Chain_Importance = Importance(1'000'000'000);
-		constexpr model::NetworkIdentifier Default_Network_Identifier = model::NetworkIdentifier::Mijin_Test;
+		constexpr model::NetworkIdentifier Default_Network_Identifier = model::NetworkIdentifier::Private_Test;
 		constexpr auto Harvesting_Mosaic_Id = MosaicId(9876);
 
 		filters::SynchronizationFilter CreateSynchronizationFilter(size_t& numFilterCalls) {
@@ -44,27 +45,28 @@ namespace catapult { namespace timesync {
 			};
 		}
 
-		template<typename TKey>
+		template<typename TAccountIdentifier>
 		void AddAccount(
 				cache::AccountStateCache& cache,
-				const TKey& key,
+				const TAccountIdentifier& accountIdentifier,
 				Importance importance,
 				model::ImportanceHeight importanceHeight) {
 			auto delta = cache.createDelta();
-			delta->addAccount(key, Height(100));
-			auto& accountState = delta->find(key).get();
+			delta->addAccount(accountIdentifier, Height(100));
+			auto& accountState = delta->find(accountIdentifier).get();
 			accountState.ImportanceSnapshots.set(importance, importanceHeight);
 			accountState.Balances.credit(Harvesting_Mosaic_Id, Amount(1000));
+			delta->updateHighValueAccounts(Height(1));
 			cache.commit();
 		}
 
-		template<typename TKey>
+		template<typename TAccountIdentifier>
 		void SeedAccountStateCache(
 				cache::AccountStateCache& cache,
-				const std::vector<TKey>& keys,
+				const std::vector<TAccountIdentifier>& accountIdentifiers,
 				const std::vector<Importance>& importances) {
-			for (auto i = 0u; i < keys.size(); ++i)
-				AddAccount(cache, keys[i], importances[i], model::ImportanceHeight(1));
+			for (auto i = 0u; i < accountIdentifiers.size(); ++i)
+				AddAccount(cache, accountIdentifiers[i], importances[i], model::ImportanceHeight(1));
 		}
 
 		std::vector<Address> ToAddresses(const std::vector<Key>& keys) {

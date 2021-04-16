@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -128,7 +129,8 @@ namespace catapult { namespace partialtransaction {
 		struct PtBootstrapperServiceTraits {
 			static auto CreateRegistrar() {
 				return CreatePtBootstrapperServiceRegistrar([]() {
-					return std::make_unique<cache::MemoryPtCacheProxy>(cache::MemoryCacheOptions(100, 100));
+					auto cacheOptions = cache::MemoryCacheOptions(utils::FileSize(), utils::FileSize::FromKilobytes(2));
+					return std::make_unique<cache::MemoryPtCacheProxy>(cacheOptions);
 				});
 			}
 		};
@@ -149,7 +151,7 @@ namespace catapult { namespace partialtransaction {
 
 		// Assert:
 		EXPECT_EQ(2u, context.locator().numServices());
-		EXPECT_EQ(1u, context.locator().counters().size());
+		EXPECT_EQ(2u, context.locator().counters().size());
 
 		// - service
 		const auto& ptCache = GetMemoryPtCache(context.locator());
@@ -157,6 +159,7 @@ namespace catapult { namespace partialtransaction {
 
 		// - counter
 		EXPECT_EQ(0u, context.counter("PT CACHE"));
+		EXPECT_EQ(0u, context.counter("PT CACHE MEM"));
 	}
 
 	TEST(TEST_CLASS, PtHooksServiceIsRegistered) {

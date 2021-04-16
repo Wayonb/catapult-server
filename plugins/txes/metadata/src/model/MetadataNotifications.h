@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -76,7 +77,7 @@ namespace catapult { namespace model {
 	public:
 		/// Creates a notification around \a partialMetadataKey, \a metadataTarget, \a valueSizeDelta, \a valueSize and \a pValue.
 		MetadataValueNotification(
-				const model::PartialMetadataKey& partialMetadataKey,
+				const UnresolvedPartialMetadataKey& partialMetadataKey,
 				const model::MetadataTarget& metadataTarget,
 				int16_t valueSizeDelta,
 				uint16_t valueSize,
@@ -91,7 +92,7 @@ namespace catapult { namespace model {
 
 	public:
 		/// Partial metadata key.
-		model::PartialMetadataKey PartialMetadataKey;
+		UnresolvedPartialMetadataKey PartialMetadataKey;
 
 		/// Metadata target.
 		model::MetadataTarget MetadataTarget;

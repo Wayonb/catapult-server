@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,6 +20,7 @@
 **/
 
 #include "catapult/extensions/DispatcherUtils.h"
+#include "catapult/config/CatapultKeys.h"
 #include "catapult/config/NodeConfiguration.h"
 #include "catapult/disruptor/ConsumerDispatcher.h"
 #include "catapult/extensions/ServiceLocator.h"
@@ -101,8 +103,8 @@ namespace catapult { namespace extensions {
 		isExecutingBlockedElementCallback.state()->wait();
 
 		// - create a locator and register the service
-		auto keyPair = test::GenerateKeyPair();
-		ServiceLocator locator(keyPair);
+		config::CatapultKeys keys;
+		ServiceLocator locator(keys);
 		locator.registerRootedService("foo", pDispatcher);
 
 		// Act: register the counters
@@ -112,9 +114,10 @@ namespace catapult { namespace extensions {
 			counters[counter.id().name()] = counter.value();
 
 		// Assert:
-		ASSERT_EQ(2u, counters.size());
+		ASSERT_EQ(3u, counters.size());
 		EXPECT_EQ(3u, counters.at("XYZ ELEM TOT"));
 		EXPECT_EQ(2u, counters.at("XYZ ELEM ACT"));
+		EXPECT_EQ(0u, counters.at("XYZ ELEM MEM")); // total size is less than 1MB
 
 		// Cleanup:
 		isElementCallbackUnblocked.state()->set();

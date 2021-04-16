@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,6 +23,7 @@
 #include "HashCheckOptions.h"
 #include "catapult/chain/ChainFunctions.h"
 #include "catapult/utils/Hashers.h"
+#include "catapult/utils/SpinLock.h"
 #include "catapult/types.h"
 #include <unordered_map>
 
@@ -57,5 +59,21 @@ namespace catapult { namespace consumers {
 		HashCheckOptions m_options;
 		Timestamp m_lastPruneTime;
 		std::unordered_map<Hash256, Timestamp, utils::ArrayHasher<Hash256>> m_cache;
+	};
+
+	/// Synchronized wrapper around a RecentHashCache.
+	class SynchronizedRecentHashCache {
+	public:
+		/// Creates a recent hash cache around \a timeSupplier and \a options.
+		SynchronizedRecentHashCache(const chain::TimeSupplier& timeSupplier, const HashCheckOptions& options);
+
+	public:
+		/// Checks if \a hash is already in the cache and adds it to the cache if it is unknown.
+		/// \note This also prunes the hash cache.
+		bool add(const Hash256& hash);
+
+	private:
+		RecentHashCache m_recentHashCache;
+		utils::SpinLock m_lock;
 	};
 }}

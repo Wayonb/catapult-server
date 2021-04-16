@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,6 +21,8 @@
 
 #pragma once
 #include "BlockStorage.h"
+#include "FileDatabase.h"
+#include "FixedSizeValueStorage.h"
 #include "IndexFile.h"
 #include "RawFile.h"
 #include <string>
@@ -39,8 +42,11 @@ namespace catapult { namespace io {
 	class FileBlockStorage final : public PrunableBlockStorage {
 	public:
 		/// Creates a file-based block storage, where blocks will be stored inside \a dataDirectory
-		/// with specified storage \a mode.
-		explicit FileBlockStorage(const std::string& dataDirectory, FileBlockStorageMode mode = FileBlockStorageMode::Hash_Index);
+		/// with a file database batch size of \a fileDatabaseBatchSize and specified storage \a mode.
+		FileBlockStorage(
+				const std::string& dataDirectory,
+				uint32_t fileDatabaseBatchSize,
+				FileBlockStorageMode mode = FileBlockStorageMode::Hash_Index);
 
 	public:
 		// LightBlockStorage
@@ -61,24 +67,10 @@ namespace catapult { namespace io {
 		void requireHeight(Height height, const char* description) const;
 
 	private:
-		class HashFile final {
-		public:
-			explicit HashFile(const std::string& dataDirectory);
-
-			model::HashRange loadHashesFrom(Height height, size_t numHashes) const;
-			void save(Height height, const Hash256& hash);
-			void reset();
-
-		private:
-			const std::string& m_dataDirectory;
-
-			// used for caching inside save()
-			uint64_t m_cachedDirectoryId;
-			std::unique_ptr<RawFile> m_pCachedHashFile;
-		};
-
 		std::string m_dataDirectory;
 		FileBlockStorageMode m_mode;
+		FileDatabase m_blockDatabase;
+		FileDatabase m_statementDatabase;
 
 		HashFile m_hashFile;
 		IndexFile m_indexFile;

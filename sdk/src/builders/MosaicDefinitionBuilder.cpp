@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -73,7 +74,7 @@ namespace catapult { namespace builders {
 		auto pTransaction = createTransaction<TransactionType>(sizeImpl<TransactionType>());
 
 		// 2. set fixed transaction fields
-		pTransaction->Id = model::GenerateMosaicId(signerPublicKey(), m_nonce);
+		pTransaction->Id = model::GenerateMosaicId(model::GetSignerAddress(*pTransaction), m_nonce);
 		pTransaction->Duration = m_duration;
 		pTransaction->Nonce = m_nonce;
 		pTransaction->Flags = m_flags;

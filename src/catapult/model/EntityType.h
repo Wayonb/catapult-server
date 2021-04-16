@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -58,13 +59,22 @@ namespace catapult { namespace model {
 			CODE)
 
 	/// Nemesis block.
-	DEFINE_ENTITY_TYPE(Block, Core, Nemesis_Block, 0);
+	DEFINE_ENTITY_TYPE(Block, Core, Block_Nemesis, 0);
 
-	/// Block.
-	DEFINE_ENTITY_TYPE(Block, Core, Block, 1);
+	/// Normal block.
+	DEFINE_ENTITY_TYPE(Block, Core, Block_Normal, 1);
+
+	/// Importance block.
+	DEFINE_ENTITY_TYPE(Block, Core, Block_Importance, 2);
 
 /// Defines transaction type given \a FACILITY, \a DESCRIPTION and \a CODE.
 #define DEFINE_TRANSACTION_TYPE(FACILITY, DESCRIPTION, CODE) DEFINE_ENTITY_TYPE(Transaction, FACILITY, DESCRIPTION, CODE)
+
+	/// Voting key link transaction.
+	DEFINE_TRANSACTION_TYPE(Core, Voting_Key_Link, 0x01);
+
+	/// Vrf key link transaction.
+	DEFINE_TRANSACTION_TYPE(Core, Vrf_Key_Link, 0x02);
 
 	/// Converts an entity \a type into a basic entity type.
 	constexpr BasicEntityType ToBasicEntityType(EntityType type) {

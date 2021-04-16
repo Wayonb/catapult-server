@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -91,9 +92,9 @@ namespace catapult { namespace builders {
 	}
 
 	AggregateCosignatureAppender::AggregateCosignatureAppender(
-			const GenerationHash& generationHash,
+			const GenerationHashSeed& generationHashSeed,
 			std::unique_ptr<TransactionType>&& pAggregateTransaction)
-			: m_generationHash(generationHash)
+			: m_generationHashSeed(generationHashSeed)
 			, m_pAggregateTransaction(std::move(pAggregateTransaction))
 	{}
 
@@ -102,7 +103,7 @@ namespace catapult { namespace builders {
 			m_pAggregateTransaction->Type = model::Entity_Type_Aggregate_Complete;
 			m_transactionHash = model::CalculateHash(
 					*m_pAggregateTransaction,
-					m_generationHash,
+					m_generationHashSeed,
 					TransactionDataBuffer(*m_pAggregateTransaction));
 		}
 

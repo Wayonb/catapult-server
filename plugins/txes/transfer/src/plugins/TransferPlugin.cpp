@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,7 +25,8 @@
 #include "src/observers/Observers.h"
 #include "src/validators/Validators.h"
 #include "catapult/config/CatapultDataDirectory.h"
-#include "catapult/crypto/KeyPair.h"
+#include "catapult/config/CatapultKeys.h"
+#include "catapult/crypto/OpensslKeyUtils.h"
 #include "catapult/model/Address.h"
 #include "catapult/plugins/PluginManager.h"
 
@@ -42,11 +44,12 @@ namespace catapult { namespace plugins {
 		if (!manager.userConfig().EnableDelegatedHarvestersAutoDetection)
 			return;
 
-		auto bootKeyPair = crypto::KeyPair::FromString(manager.userConfig().BootPrivateKey);
-		auto recipient = model::PublicKeyToAddress(bootKeyPair.publicKey(), manager.config().Network.Identifier);
+		auto encryptionPrivateKeyPemFilename = config::GetNodePrivateKeyPemFilename(manager.userConfig().CertificateDirectory);
+		auto encryptionPublicKey = crypto::ReadPublicKeyFromPrivateKeyPemFile(encryptionPrivateKeyPemFilename);
+		auto recipient = model::PublicKeyToAddress(encryptionPublicKey, manager.config().Network.Identifier);
 		auto dataDirectory = config::CatapultDataDirectory(manager.userConfig().DataDirectory);
 		manager.addObserverHook([recipient, dataDirectory](auto& builder) {
-			builder.add(observers::CreateTransferMessageObserver(0x98E5BF64C771CCFE, recipient, dataDirectory.dir("transfer_message")));
+			builder.add(observers::CreateTransferMessageObserver(0xE201735761802AFE, recipient, dataDirectory.dir("transfer_message")));
 		});
 	}
 }}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,14 +22,11 @@
 #include "BlockGenerator.h"
 #include "NemesisConfiguration.h"
 #include "NemesisExecutionHasher.h"
-#include "TransactionRegistryFactory.h"
 #include "catapult/builders/MosaicAliasBuilder.h"
 #include "catapult/builders/MosaicDefinitionBuilder.h"
 #include "catapult/builders/MosaicSupplyChangeBuilder.h"
 #include "catapult/builders/NamespaceRegistrationBuilder.h"
 #include "catapult/builders/TransferBuilder.h"
-#include "catapult/crypto/KeyPair.h"
-#include "catapult/crypto/KeyUtils.h"
 #include "catapult/extensions/BlockExtensions.h"
 #include "catapult/extensions/ConversionExtensions.h"
 #include "catapult/extensions/IdGenerator.h"
@@ -36,7 +34,6 @@
 #include "catapult/model/Address.h"
 #include "catapult/model/BlockUtils.h"
 #include "catapult/model/EntityHasher.h"
-#include "catapult/utils/HexParser.h"
 
 namespace catapult { namespace tools { namespace nemgen {
 
@@ -59,10 +56,10 @@ namespace catapult { namespace tools { namespace nemgen {
 		public:
 			NemesisTransactions(
 					model::NetworkIdentifier networkIdentifier,
-					const GenerationHash& generationHash,
+					const GenerationHashSeed& generationHashSeed,
 					const crypto::KeyPair& signer)
 					: m_networkIdentifier(networkIdentifier)
-					, m_generationHash(generationHash)
+					, m_generationHashSeed(generationHashSeed)
 					, m_signer(signer)
 			{}
 
@@ -135,6 +132,11 @@ namespace catapult { namespace tools { namespace nemgen {
 				signAndAdd(builder.build());
 			}
 
+			void addTransactions(model::Transactions&& transactions) {
+				for (auto&& pTransaction : transactions)
+					m_transactions.push_back(std::move(pTransaction));
+			}
+
 		public:
 			const model::Transactions& transactions() const {
 				return m_transactions;
@@ -143,21 +145,26 @@ namespace catapult { namespace tools { namespace nemgen {
 		private:
 			void signAndAdd(std::unique_ptr<model::Transaction>&& pTransaction) {
 				pTransaction->Deadline = Timestamp(1);
-				extensions::TransactionExtensions(m_generationHash).sign(m_signer, *pTransaction);
+				extensions::TransactionExtensions(m_generationHashSeed).sign(m_signer, *pTransaction);
 				m_transactions.push_back(std::move(pTransaction));
 			}
 
 		private:
 			model::NetworkIdentifier m_networkIdentifier;
-			const GenerationHash& m_generationHash;
+			const GenerationHashSeed& m_generationHashSeed;
 			const crypto::KeyPair& m_signer;
 			model::Transactions m_transactions;
 		};
+
+		void AddGenerationHashProof(model::Block& block, const GenerationHashSeed& generationHashSeed, const crypto::KeyPair& vrfKeyPair) {
+			auto vrfProof = crypto::GenerateVrfProof(generationHashSeed, vrfKeyPair);
+			block.GenerationHashProof = { vrfProof.Gamma, vrfProof.VerificationHash, vrfProof.Scalar };
+		}
 	}
 
-	std::unique_ptr<model::Block> CreateNemesisBlock(const NemesisConfiguration& config) {
+	std::unique_ptr<model::Block> CreateNemesisBlock(const NemesisConfiguration& config, model::Transactions&& additionalTransactions) {
 		auto signer = crypto::KeyPair::FromString(config.NemesisSignerPrivateKey);
-		NemesisTransactions transactions(config.NetworkIdentifier, config.NemesisGenerationHash, signer);
+		NemesisTransactions transactions(config.NetworkIdentifier, config.NemesisGenerationHashSeed, signer);
 
 		// - namespace creation
 		for (const auto& rootPair : config.RootNamespaces) {
@@ -210,10 +217,19 @@ namespace catapult { namespace tools { namespace nemgen {
 			transactions.addTransfer(nameToMosaicIdMap, recipient, addressMosaicSeedsPair.second);
 		}
 
-		model::PreviousBlockContext context;
-		auto pBlock = model::CreateBlock(context, config.NetworkIdentifier, signer.publicKey(), transactions.transactions());
-		pBlock->Type = model::Entity_Type_Nemesis_Block;
-		extensions::BlockExtensions(config.NemesisGenerationHash).signFullBlock(signer, *pBlock);
+		// - add additional transactions
+		transactions.addTransactions(std::move(additionalTransactions));
+
+		auto pBlock = model::CreateBlock(
+				model::Entity_Type_Block_Nemesis,
+				model::PreviousBlockContext(),
+				config.NetworkIdentifier,
+				signer.publicKey(),
+				transactions.transactions());
+
+		// - add generation hash proof using signer as vrf key pair
+		AddGenerationHashProof(*pBlock, config.NemesisGenerationHashSeed, signer);
+		extensions::BlockExtensions(config.NemesisGenerationHashSeed).signFullBlock(signer, *pBlock);
 		return pBlock;
 	}
 
@@ -221,17 +237,25 @@ namespace catapult { namespace tools { namespace nemgen {
 			const NemesisConfiguration& config,
 			model::Block& block,
 			NemesisExecutionHashesDescriptor& executionHashesDescriptor) {
+		auto& blockFooter = model::GetBlockFooter<model::ImportanceBlockFooter>(block);
+		blockFooter.VotingEligibleAccountsCount = executionHashesDescriptor.VotingEligibleAccountsCount;
+		blockFooter.HarvestingEligibleAccountsCount = executionHashesDescriptor.HarvestingEligibleAccountsCount;
+		blockFooter.TotalVotingBalance = executionHashesDescriptor.TotalVotingBalance;
+
 		block.ReceiptsHash = executionHashesDescriptor.ReceiptsHash;
 		block.StateHash = executionHashesDescriptor.StateHash;
 
 		auto signer = crypto::KeyPair::FromString(config.NemesisSignerPrivateKey);
-		extensions::BlockExtensions(config.NemesisGenerationHash).signFullBlock(signer, block);
+		extensions::BlockExtensions(config.NemesisGenerationHashSeed).signFullBlock(signer, block);
 		return model::CalculateHash(block);
 	}
 
-	model::BlockElement CreateNemesisBlockElement(const NemesisConfiguration& config, const model::Block& block) {
-		auto registry = CreateTransactionRegistry();
-		auto generationHash = config.NemesisGenerationHash;
-		return extensions::BlockExtensions(generationHash, registry).convertBlockToBlockElement(block, generationHash);
+	model::BlockElement CreateNemesisBlockElement(
+			const NemesisConfiguration& config,
+			const model::TransactionRegistry& transactionRegistry,
+			const model::Block& block) {
+		auto proofHash = crypto::GenerateVrfProofHash(block.GenerationHashProof.Gamma);
+		return extensions::BlockExtensions(config.NemesisGenerationHashSeed, transactionRegistry)
+				.convertBlockToBlockElement(block, proofHash.copyTo<GenerationHash>());
 	}
 }}}

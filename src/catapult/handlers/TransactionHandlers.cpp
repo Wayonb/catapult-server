@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,9 +21,6 @@
 
 #include "TransactionHandlers.h"
 #include "HandlerUtils.h"
-#include "catapult/ionet/PacketPayloadFactory.h"
-#include "catapult/utils/ShortHash.h"
-#include "catapult/types.h"
 
 namespace catapult { namespace handlers {
 
@@ -36,56 +34,22 @@ namespace catapult { namespace handlers {
 	}
 
 	namespace {
-		struct PullTransactionsInfo {
-		public:
-			PullTransactionsInfo() : IsValid(false)
-			{}
+#pragma pack(push, 1)
 
-		public:
-			bool IsValid;
-			BlockFeeMultiplier MinFeeMultiplier;
-			utils::ShortHashesSet ShortHashes;
-		};
+	struct TransactionsFilter {
+		Timestamp Deadline;
+		BlockFeeMultiplier FeeMultiplier;
+	};
 
-		auto ProcessPullTransactionsRequest(const ionet::Packet& packet) {
-			// packet is guaranteed to have correct type because this function is only called for matching packets by ServerPacketHandlers
-			auto dataSize = ionet::CalculatePacketDataSize(packet);
-			if (dataSize < sizeof(BlockFeeMultiplier))
-				return PullTransactionsInfo();
-
-			// data is prepended with min fee multiplier
-			PullTransactionsInfo info;
-			info.MinFeeMultiplier = BlockFeeMultiplier(reinterpret_cast<const BlockFeeMultiplier::ValueType&>(*packet.Data()));
-			dataSize -= sizeof(BlockFeeMultiplier);
-
-			// followed by short hashes
-			const auto* pShortHashDataStart = packet.Data() + sizeof(BlockFeeMultiplier);
-			auto numShortHashes = ionet::CountFixedSizeStructures<utils::ShortHash>({ pShortHashDataStart, dataSize });
-			if (0 == numShortHashes && 0 != dataSize)
-				return PullTransactionsInfo();
-
-			const auto* pShortHash = reinterpret_cast<const utils::ShortHash*>(pShortHashDataStart);
-			info.ShortHashes.reserve(numShortHashes);
-			for (auto i = 0u; i < numShortHashes; ++i, ++pShortHash)
-				info.ShortHashes.insert(*pShortHash);
-
-			info.IsValid = true;
-			return info;
-		}
-
-		auto CreatePullTransactionsHandler(const UtRetriever& utRetriever) {
-			return [utRetriever](const auto& packet, auto& context) {
-				auto info = ProcessPullTransactionsRequest(packet);
-				if (!info.IsValid)
-					return;
-
-				auto transactions = utRetriever(info.MinFeeMultiplier, info.ShortHashes);
-				context.response(ionet::PacketPayloadFactory::FromEntities(ionet::PacketType::Pull_Transactions, transactions));
-			};
-		}
+#pragma pack(pop)
 	}
 
 	void RegisterPullTransactionsHandler(ionet::ServerPacketHandlers& handlers, const UtRetriever& utRetriever) {
-		handlers.registerHandler(ionet::PacketType::Pull_Transactions, CreatePullTransactionsHandler(utRetriever));
+		constexpr auto Packet_Type = ionet::PacketType::Pull_Transactions;
+		handlers.registerHandler(Packet_Type, PullEntitiesHandler<TransactionsFilter>::Create(Packet_Type, [utRetriever](
+				const auto& filter,
+				const auto& shortHashes) {
+			return utRetriever(filter.Deadline, filter.FeeMultiplier, shortHashes);
+		}));
 	}
 }}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -35,12 +36,15 @@ namespace catapult { namespace test {
 	}
 
 	void AssertEqualNamespaceMetadata(const mongo::plugins::NamespaceDescriptor& descriptor, const bsoncxx::document::view& dbMetadata) {
-		EXPECT_EQ(descriptor.IsActive, dbMetadata["active"].get_bool().value);
+		EXPECT_EQ(descriptor.IsLatest, dbMetadata["latest"].get_bool().value);
 		EXPECT_EQ(descriptor.Index, GetUint32(dbMetadata, "index"));
 	}
 
 	void AssertEqualNamespaceData(const mongo::plugins::NamespaceDescriptor& descriptor, const bsoncxx::document::view& dbNamespace) {
 		auto depth = descriptor.Path.size();
+		EXPECT_EQ(8u + depth, GetFieldCount(dbNamespace));
+		EXPECT_EQ(1u, GetUint32(dbNamespace, "version"));
+
 		auto isRoot = 1 == depth;
 		EXPECT_EQ(isRoot ? Root_Type : Child_Type, GetUint32(dbNamespace, "registrationType"));
 		EXPECT_EQ(depth, GetUint32(dbNamespace, "depth"));
@@ -50,7 +54,6 @@ namespace catapult { namespace test {
 
 		EXPECT_EQ(isRoot ? Namespace_Base_Id : descriptor.Path[depth - 2], NamespaceId(GetUint64(dbNamespace, "parentId")));
 		EXPECT_EQ(descriptor.OwnerAddress, GetAddressValue(dbNamespace, "ownerAddress"));
-		EXPECT_EQ(descriptor.pRoot->ownerPublicKey(), GetKeyValue(dbNamespace, "ownerPublicKey"));
 		EXPECT_EQ(descriptor.pRoot->lifetime().Start, Height(GetUint64(dbNamespace, "startHeight")));
 		EXPECT_EQ(descriptor.pRoot->lifetime().End, Height(GetUint64(dbNamespace, "endHeight")));
 

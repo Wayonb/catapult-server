@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,8 +37,8 @@ namespace catapult { namespace mongo { namespace plugins {
 		DEFINE_MONGO_TRANSACTION_PLUGIN_TEST_TRAITS(MosaicDefinition)
 
 		auto CreateMosaicDefinitionTransactionBuilder(const Key& signer, MosaicNonce nonce, const model::MosaicProperties& properties) {
-			auto networkId = model::NetworkIdentifier::Mijin_Test;
-			builders::MosaicDefinitionBuilder builder(networkId, signer);
+			auto networkIdentifier = model::NetworkIdentifier::Private_Test;
+			builders::MosaicDefinitionBuilder builder(networkIdentifier, signer);
 			builder.setNonce(nonce);
 			builder.setFlags(properties.flags());
 			builder.setDivisibility(properties.divisibility());

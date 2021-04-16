@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,6 +20,7 @@
 **/
 
 #include "catapult/extensions/ServiceLocator.h"
+#include "catapult/config/CatapultKeys.h"
 #include "tests/test/nodeps/KeyTestUtils.h"
 #include "tests/TestHarness.h"
 
@@ -30,8 +32,8 @@ namespace catapult { namespace extensions {
 		template<typename TAction>
 		void RunLocatorTest(TAction action) {
 			// Arrange:
-			auto keyPair = test::GenerateKeyPair();
-			ServiceLocator locator(keyPair);
+			config::CatapultKeys keys;
+			ServiceLocator locator(keys);
 
 			// Act + Assert:
 			action(locator);
@@ -42,11 +44,11 @@ namespace catapult { namespace extensions {
 
 	TEST(TEST_CLASS, CanCreateLocator) {
 		// Act:
-		auto keyPair = test::GenerateKeyPair();
-		ServiceLocator locator(keyPair);
+		config::CatapultKeys keys;
+		ServiceLocator locator(keys);
 
 		// Assert:
-		EXPECT_EQ(&keyPair, &locator.keyPair());
+		EXPECT_EQ(&keys, &locator.keys());
 		EXPECT_TRUE(locator.counters().empty());
 		EXPECT_EQ(0u, locator.numServices());
 	}
@@ -218,8 +220,8 @@ namespace catapult { namespace extensions {
 		// Arrange:
 		std::vector<std::string> breadcrumbs;
 		{
-			auto keyPair = test::GenerateKeyPair();
-			ServiceLocator locator(keyPair);
+			config::CatapultKeys keys;
+			ServiceLocator locator(keys);
 
 			locator.registerRootedService("foo", std::make_shared<BreadcrumbService>("foo", breadcrumbs));
 			locator.registerRootedService("bar", std::make_shared<BreadcrumbService>("bar", breadcrumbs));

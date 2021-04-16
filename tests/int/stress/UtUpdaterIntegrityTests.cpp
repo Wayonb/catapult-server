@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,6 +23,7 @@
 #include "catapult/cache_tx/MemoryUtCache.h"
 #include "catapult/chain/UtUpdater.h"
 #include "catapult/extensions/ExecutionConfigurationFactory.h"
+#include "catapult/thread/ThreadGroup.h"
 #include "tests/test/cache/CacheTestUtils.h"
 #include "tests/test/core/TransactionInfoTestUtils.h"
 #include "tests/test/local/LocalTestUtils.h"
@@ -29,7 +31,6 @@
 #include "tests/test/nodeps/KeyTestUtils.h"
 #include "tests/test/nodeps/TestConstants.h"
 #include "tests/TestHarness.h"
-#include <boost/thread.hpp>
 
 namespace catapult { namespace chain {
 
@@ -48,7 +49,9 @@ namespace catapult { namespace chain {
 		public:
 			UpdaterTestContext()
 					: m_pPluginManager(CreatePluginManager())
-					, m_transactionsCache(cache::MemoryCacheOptions(1024, GetNumIterations() * 2))
+					, m_transactionsCache(cache::MemoryCacheOptions(
+							utils::FileSize::FromKilobytes(1),
+							utils::FileSize::FromBytes(test::GetTransferTransactionSize() * GetNumIterations() * 2)))
 					, m_cache(CreateCatapultCache())
 					, m_updater(
 							m_transactionsCache,
@@ -113,8 +116,8 @@ namespace catapult { namespace chain {
 
 		// Act:
 		// - simulate tx dispatcher processing N elements of 1 tx transfering 1 unit each
-		boost::thread_group threads;
-		threads.create_thread([&senderKeyPair, &updater = context.updater()] {
+		thread::ThreadGroup threads;
+		threads.spawn([&senderKeyPair, &updater = context.updater()] {
 			auto recipient = test::GenerateRandomByteArray<Key>();
 			for (auto i = 0u; i < GetNumIterations(); ++i) {
 				auto pTransaction = test::CreateTransferTransaction(senderKeyPair, recipient, Amount(1));
@@ -129,14 +132,14 @@ namespace catapult { namespace chain {
 		});
 
 		// - simulate block dispatcher processing N block elements with single confirmed tx
-		threads.create_thread([&updater = context.updater()] {
+		threads.spawn([&updater = context.updater()] {
 			auto hash = test::GenerateRandomByteArray<Hash256>();
 			for (auto i = 0u; i < GetNumIterations(); ++i)
 				updater.update({ &hash }, {});
 		});
 
 		// - wait for all threads
-		threads.join_all();
+		threads.join();
 
 		// Assert: all transactions are in the UT cache
 		EXPECT_EQ(GetNumIterations(), context.transactionsCache().view().size());

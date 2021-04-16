@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,7 +20,7 @@
 **/
 
 #pragma once
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 #include <string>
 
 namespace catapult { namespace test {
@@ -40,7 +41,7 @@ namespace catapult { namespace test {
 
 	private:
 		// add a second parameter to disambiguate construction around string literal
-		TempDirectoryGuard(const boost::filesystem::path& directoryPath, bool);
+		TempDirectoryGuard(const std::filesystem::path& directoryPath, bool);
 
 	public:
 		/// Gets the name of the guarded directory.
@@ -54,7 +55,7 @@ namespace catapult { namespace test {
 		static std::string DefaultName();
 
 	private:
-		boost::filesystem::path m_directoryPath;
+		std::filesystem::path m_directoryPath;
 	};
 
 	// endregion
@@ -82,5 +83,5 @@ namespace catapult { namespace test {
 	std::string GetExplicitPluginsDirectory();
 
 	/// Counts the number of files and directories in \a directoryPath.
-	size_t CountFilesAndDirectories(const boost::filesystem::path& directoryPath);
+	size_t CountFilesAndDirectories(const std::filesystem::path& directoryPath);
 }}

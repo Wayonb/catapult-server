@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -44,8 +45,8 @@ namespace catapult { namespace diagnostics {
 		test::AssertNoServicesOrCountersAreRegistered<TestContext>();
 	}
 
-	TEST(TEST_CLASS, LoggingTaskIsScheduled) {
-		test::AssertRegisteredTask(TestContext(), 1, "logging task");
+	TEST(TEST_CLASS, TasksAreRegistered) {
+		test::AssertRegisteredTasks(TestContext(), { "logging task" });
 	}
 
 	TEST(TEST_CLASS, PacketHandlersAreRegistered) {
@@ -61,7 +62,7 @@ namespace catapult { namespace diagnostics {
 			// - capture params and register a handler
 			capture.pHandlers = &handlers;
 			capture.pCache = &cache;
-			handlers.registerHandler(ionet::PacketType::Chain_Info, [](const auto&, const auto&) {});
+			handlers.registerHandler(ionet::PacketType::Chain_Statistics, [](const auto&, const auto&) {});
 		});
 
 		// Act:
@@ -73,7 +74,7 @@ namespace catapult { namespace diagnostics {
 		EXPECT_TRUE(packetHandlers.canProcess(ionet::PacketType::Diagnostic_Counters)); // the default (counters) diagnostic handler
 		EXPECT_TRUE(packetHandlers.canProcess(ionet::PacketType::Active_Node_Infos)); // the default (nodes) diagnostic handler
 		EXPECT_TRUE(packetHandlers.canProcess(ionet::PacketType::Block_Statement)); // the default (statements) diagnostic handler
-		EXPECT_TRUE(packetHandlers.canProcess(ionet::PacketType::Chain_Info)); // the diagnostic handler hook registered above
+		EXPECT_TRUE(packetHandlers.canProcess(ionet::PacketType::Chain_Statistics)); // the diagnostic handler hook registered above
 
 		// - correct params were forwarded to callback
 		EXPECT_EQ(&packetHandlers, capture.pHandlers);

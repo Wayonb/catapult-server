@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -79,8 +80,13 @@ namespace catapult { namespace model {
 
 	TEST(TEST_CLASS, CanConvertKnownEntityTypeToBasicEntityType) {
 		// Assert: blocks
-		EXPECT_EQ(BasicEntityType::Block, ToBasicEntityType(Entity_Type_Nemesis_Block));
-		EXPECT_EQ(BasicEntityType::Block, ToBasicEntityType(Entity_Type_Block));
+		EXPECT_EQ(BasicEntityType::Block, ToBasicEntityType(Entity_Type_Block_Nemesis));
+		EXPECT_EQ(BasicEntityType::Block, ToBasicEntityType(Entity_Type_Block_Normal));
+		EXPECT_EQ(BasicEntityType::Block, ToBasicEntityType(Entity_Type_Block_Importance));
+
+		// - transactions
+		EXPECT_EQ(BasicEntityType::Transaction, ToBasicEntityType(Entity_Type_Vrf_Key_Link));
+		EXPECT_EQ(BasicEntityType::Transaction, ToBasicEntityType(Entity_Type_Voting_Key_Link));
 	}
 
 	TEST(TEST_CLASS, CanConvertUnknownEntityTypeToBasicEntityType) {
@@ -118,8 +124,14 @@ namespace catapult { namespace model {
 	}
 
 	TEST(TEST_CLASS, CanOutputBlockEnumValues) {
-		EXPECT_EQ("Nemesis_Block", test::ToString(Entity_Type_Nemesis_Block));
-		EXPECT_EQ("Block", test::ToString(Entity_Type_Block));
+		EXPECT_EQ("Block_Nemesis", test::ToString(Entity_Type_Block_Nemesis));
+		EXPECT_EQ("Block_Normal", test::ToString(Entity_Type_Block_Normal));
+		EXPECT_EQ("Block_Importance", test::ToString(Entity_Type_Block_Importance));
+	}
+
+	TEST(TEST_CLASS, CanOutputCoreTransactionEnumValues) {
+		EXPECT_EQ("Vrf_Key_Link", test::ToString(Entity_Type_Vrf_Key_Link));
+		EXPECT_EQ("Voting_Key_Link", test::ToString(Entity_Type_Voting_Key_Link));
 	}
 
 	TEST(TEST_CLASS, CanOutputPluginEnumValues) {
@@ -127,7 +139,7 @@ namespace catapult { namespace model {
 		EXPECT_EQ("Aggregate_Complete", test::ToString(ToEntityType(0x4141)));
 		EXPECT_EQ("Mosaic_Metadata", test::ToString(ToEntityType(0x4244)));
 		EXPECT_EQ("Hash_Lock", test::ToString(ToEntityType(0x4148)));
-		EXPECT_EQ("Account_Link", test::ToString(ToEntityType(0x414C)));
+		EXPECT_EQ("Account_Key_Link", test::ToString(ToEntityType(0x414C)));
 		EXPECT_EQ("Mosaic_Supply_Change", test::ToString(ToEntityType(0x424D)));
 		EXPECT_EQ("Namespace_Registration", test::ToString(ToEntityType(0x414E)));
 		EXPECT_EQ("Account_Mosaic_Restriction", test::ToString(ToEntityType(0x4250)));

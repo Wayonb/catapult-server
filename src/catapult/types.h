@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -34,6 +35,9 @@ namespace catapult {
 	struct Key_tag { static constexpr size_t Size = 32; };
 	using Key = utils::ByteArray<Key_tag>;
 
+	struct VotingKey_tag { static constexpr size_t Size = 32; };
+	using VotingKey = utils::ByteArray<VotingKey_tag>;
+
 	struct Hash512_tag { static constexpr size_t Size = 64; };
 	using Hash512 = utils::ByteArray<Hash512_tag>;
 
@@ -46,14 +50,17 @@ namespace catapult {
 	struct GenerationHash_tag { static constexpr size_t Size = 32; };
 	using GenerationHash = utils::ByteArray<GenerationHash_tag>;
 
+	struct GenerationHashSeed_tag { static constexpr size_t Size = 32; };
+	using GenerationHashSeed = utils::ByteArray<GenerationHashSeed_tag>;
+
 	// endregion
 
 	// region byte arrays (address)
 
-	struct Address_tag { static constexpr size_t Size = 25; };
+	struct Address_tag { static constexpr size_t Size = 24; };
 	using Address = utils::ByteArray<Address_tag>;
 
-	struct UnresolvedAddress_tag { static constexpr size_t Size = 25; };
+	struct UnresolvedAddress_tag { static constexpr size_t Size = 24; };
 	using UnresolvedAddress = utils::ByteArray<UnresolvedAddress_tag>;
 
 	// endregion
@@ -74,6 +81,12 @@ namespace catapult {
 
 	struct Height_tag {};
 	using Height = utils::BaseValue<uint64_t, Height_tag>;
+
+	struct FinalizationEpoch_tag {};
+	using FinalizationEpoch = utils::BaseValue<uint32_t, FinalizationEpoch_tag>;
+
+	struct FinalizationPoint_tag {};
+	using FinalizationPoint = utils::BaseValue<uint32_t, FinalizationPoint_tag>;
 
 	struct BlockDuration_tag {};
 	using BlockDuration = utils::BaseValue<uint64_t, BlockDuration_tag>;
@@ -103,5 +116,11 @@ namespace catapult {
 	template<typename T, size_t N>
 	constexpr size_t CountOf(T const (&)[N]) noexcept {
 		return N;
+	}
+
+	/// Gets the size of the specified type as an unsigned 32 bit value.
+	template<typename T>
+	constexpr uint32_t SizeOf32() {
+		return static_cast<uint32_t>(sizeof(T));
 	}
 }

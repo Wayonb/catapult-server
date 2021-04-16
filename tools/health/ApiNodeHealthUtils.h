@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -29,7 +30,7 @@ namespace catapult {
 
 namespace catapult { namespace tools { namespace health {
 
-	/// Creates a future for retrieving the chain info of the specified api \a node over REST API using \a pool.
+	/// Creates a future for retrieving the chain statistics of the specified api \a node over REST API using \a pool.
 	/// \note Default REST API port is assumed.
-	thread::future<api::ChainInfo> CreateApiNodeChainInfoFuture(thread::IoThreadPool& pool, const ionet::Node& node);
+	thread::future<api::ChainStatistics> CreateApiNodeChainStatisticsFuture(thread::IoThreadPool& pool, const ionet::Node& node);
 }}}

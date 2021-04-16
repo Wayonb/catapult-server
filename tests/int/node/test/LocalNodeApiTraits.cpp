@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -29,15 +30,15 @@ namespace catapult { namespace test {
 		constexpr Height Invalid_Height(123456);
 	}
 
-	// region ChainInfoApiTraits
+	// region ChainStatisticsApiTraits
 
-	ChainInfoApiTraits::RequestType ChainInfoApiTraits::InitiateValidRequest(const api::RemoteChainApi& remoteChainApi) {
-		return remoteChainApi.chainInfo();
+	ChainStatisticsApiTraits::RequestType ChainStatisticsApiTraits::InitiateValidRequest(const api::RemoteChainApi& remoteChainApi) {
+		return remoteChainApi.chainStatistics();
 	}
 
-	void ChainInfoApiTraits::VerifyResult(const ResultType& info) {
-		EXPECT_EQ(Height(1), info.Height);
-		EXPECT_EQ(model::ChainScore(1), info.Score);
+	void ChainStatisticsApiTraits::VerifyResult(const ResultType& chainStatistics) {
+		EXPECT_EQ(Height(1), chainStatistics.Height);
+		EXPECT_EQ(model::ChainScore(1), chainStatistics.Score);
 	}
 
 	// endregion

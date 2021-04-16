@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -52,10 +53,12 @@ namespace catapult { namespace extensions {
 			Importance totalChainImportance,
 			ionet::NodeContainer& nodes,
 			ionet::ServiceIdentifier serviceId,
+			ionet::IpProtocol supportedProtocols,
 			ionet::NodeRoles requiredRole,
 			const config::NodeConfiguration::ConnectionsSubConfiguration& config)
 			: Nodes(nodes)
 			, ServiceId(serviceId)
+			, SupportedProtocols(supportedProtocols)
 			, RequiredRole(requiredRole)
 			, Config(config)
 			, ImportanceRetriever([totalChainImportance, &cache](const auto& publicKey) {
@@ -76,7 +79,7 @@ namespace catapult { namespace extensions {
 			ionet::NodeContainer& nodes,
 			ionet::ServiceIdentifier serviceId,
 			const config::NodeConfiguration::ConnectionsSubConfiguration& config)
-			: SelectorSettings(cache, totalChainImportance, nodes, serviceId, ionet::NodeRoles::None, config)
+			: SelectorSettings(cache, totalChainImportance, nodes, serviceId, ionet::IpProtocol::All, ionet::NodeRoles::None, config)
 	{}
 
 	// endregion
@@ -87,10 +90,10 @@ namespace catapult { namespace extensions {
 		constexpr utils::LogLevel MapToLogLevel(net::PeerConnectCode connectCode) {
 			switch (connectCode) {
 			case net::PeerConnectCode::Accepted:
-				return utils::LogLevel::Info;
+				return utils::LogLevel::info;
 
 			default:
-				return utils::LogLevel::Warning;
+				return utils::LogLevel::warning;
 			}
 		}
 
@@ -113,7 +116,7 @@ namespace catapult { namespace extensions {
 		public:
 			thread::future<thread::TaskResult> process(const ionet::NodeSet& addCandidates) {
 				if (addCandidates.empty()) {
-					CATAPULT_LOG(debug) << "no add candidates for service " << m_state.ServiceId;
+					CATAPULT_LOG(debug) << "no add candidates for service " << utils::HexFormat(m_state.ServiceId);
 					return thread::make_ready_future(thread::TaskResult::Continue);
 				}
 
@@ -137,6 +140,7 @@ namespace catapult { namespace extensions {
 						CATAPULT_LOG_LEVEL(MapToLogLevel(connectResult.Code))
 								<< "connection attempt to " << node << " completed with " << connectResult.Code;
 						pPromise->set_value(std::make_pair(node.identity(), connectResult.Code));
+						return true;
 					});
 				}
 
@@ -159,7 +163,7 @@ namespace catapult { namespace extensions {
 				}
 
 				if (0 == state.PacketWriters.numActiveWriters())
-					CATAPULT_LOG(warning) << "unable to connect to any nodes for service " << state.ServiceId;
+					CATAPULT_LOG(warning) << "unable to connect to any nodes for service " << utils::HexFormat(state.ServiceId);
 			}
 
 		private:
@@ -174,6 +178,7 @@ namespace catapult { namespace extensions {
 		// 2. create a selector around the nodes and configuration
 		extensions::NodeSelectionConfiguration selectionConfig{
 			settings.ServiceId,
+			settings.SupportedProtocols,
 			settings.RequiredRole,
 			settings.Config.MaxConnections,
 			settings.Config.MaxConnectionAge

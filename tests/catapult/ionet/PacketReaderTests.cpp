@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -55,7 +56,7 @@ namespace catapult { namespace ionet {
 
 	TEST(TEST_CLASS, CannotCreateReaderAroundPacketWithSizeTooSmall) {
 		// Arrange:
-		for (auto size : { static_cast<uint32_t>(0), static_cast<uint32_t>(sizeof(PacketHeader) - 1) }) {
+		for (auto size : { static_cast<uint32_t>(0), SizeOf32<PacketHeader>() - 1 }) {
 			auto pPacket = test::CreateRandomPacket(0, PacketType::Undefined);
 			pPacket->Size = size;
 

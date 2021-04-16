@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -27,7 +28,7 @@ namespace catapult { namespace observers {
 
 	namespace {
 		bool IsRenewal(const state::RootNamespace& root, const model::RootNamespaceNotification& notification, Height height) {
-			return root.lifetime().isActive(height) && root.ownerPublicKey() == notification.Signer;
+			return root.lifetime().isActive(height) && root.ownerAddress() == notification.Owner;
 		}
 
 		state::NamespaceLifetime CalculateNewLifetime(
@@ -70,7 +71,7 @@ namespace catapult { namespace observers {
 		}
 
 		auto lifetime = CalculateLifetime(cache, notification, context.Height);
-		auto root = state::RootNamespace(notification.NamespaceId, notification.Signer, lifetime);
+		auto root = state::RootNamespace(notification.NamespaceId, notification.Owner, lifetime);
 		cache.insert(root);
-	});
+	})
 }}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,6 +29,7 @@
 #include "catapult/io/BlockStorageCache.h"
 #include "catapult/model/ChainScore.h"
 #include "catapult/plugins/PluginManager.h"
+#include "catapult/subscribers/FinalizationSubscriber.h"
 #include "catapult/subscribers/StateChangeInfo.h"
 #include "catapult/subscribers/StateChangeSubscriber.h"
 
@@ -61,6 +63,12 @@ namespace catapult { namespace local {
 		});
 	}
 
+	void NemesisBlockNotifier::raise(subscribers::FinalizationSubscriber& subscriber) {
+		raise([&subscriber](const auto& nemesisBlockElement) {
+			subscriber.notifyFinalizedBlock({ FinalizationEpoch(1), FinalizationPoint(1) }, Height(1), nemesisBlockElement.EntityHash);
+		});
+	}
+
 	void NemesisBlockNotifier::raise(subscribers::StateChangeSubscriber& subscriber) {
 		raise([&subscriber, &config = m_config, &cache = m_cache, &pluginManager = m_pluginManager](const auto& nemesisBlockElement) {
 			// execute the nemesis block
@@ -72,16 +80,19 @@ namespace catapult { namespace local {
 			loader.execute(config, nemesisBlockElement);
 
 			// notify nemesis cache state
-			auto nemesisChainScore = model::ChainScore(Nemesis_Chain_Score);
-			subscriber.notifyScoreChange(nemesisChainScore);
-			subscriber.notifyStateChange({ cache::CacheChanges(*pCacheDelta), nemesisChainScore, Nemesis_Height });
+			subscriber.notifyScoreChange(model::ChainScore(Nemesis_Chain_Score));
+			subscriber.notifyStateChange({
+				cache::CacheChanges(*pCacheDelta),
+				model::ChainScore::Delta(Nemesis_Chain_Score),
+				Nemesis_Height
+			});
 		});
 	}
 
 	void NemesisBlockNotifier::raise(const consumer<model::BlockElement>& action) {
-		// bypass if chain has advanced past nemesis and/or appears to have been previously executed
+		// bypass if chain appears to have been previously executed
 		auto storageView = m_storage.view();
-		if (Nemesis_Height != storageView.chainHeight() || HasPreviousExecution(m_cache))
+		if (HasPreviousExecution(m_cache))
 			CATAPULT_THROW_RUNTIME_ERROR("NemesisBlockNotifier can only be called during first boot");
 
 		auto pNemesisBlockElement = storageView.loadBlockElement(Nemesis_Height);

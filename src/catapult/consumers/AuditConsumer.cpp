@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,7 +24,7 @@
 #include "InputUtils.h"
 #include "catapult/io/PodIoUtils.h"
 #include "catapult/io/RawFile.h"
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 
 namespace catapult { namespace consumers {
 
@@ -61,7 +62,7 @@ namespace catapult { namespace consumers {
 			}
 
 		private:
-			boost::filesystem::path m_auditDirectory;
+			std::filesystem::path m_auditDirectory;
 			mutable size_t m_id;
 		};
 	}

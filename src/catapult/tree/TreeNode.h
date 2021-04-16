@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,6 +37,9 @@ namespace catapult { namespace tree {
 		/// Creates a leaf node with \a path and \a value.
 		LeafTreeNode(const TreeNodePath& path, const Hash256& value);
 
+	private:
+		LeafTreeNode();
+
 	public:
 		/// Gets the node path.
 		const TreeNodePath& path() const;
@@ -50,6 +54,9 @@ namespace catapult { namespace tree {
 		TreeNodePath m_path;
 		Hash256 m_value;
 		Hash256 m_hash;
+
+	private:
+		friend class TreeNode;
 	};
 
 	// endregion
@@ -66,6 +73,9 @@ namespace catapult { namespace tree {
 		/// Creates a branch node with \a path.
 		explicit BranchTreeNode(const TreeNodePath& path);
 
+	private:
+		BranchTreeNode();
+
 	public:
 		/// Gets the node path.
 		const TreeNodePath& path() const;
@@ -76,11 +86,15 @@ namespace catapult { namespace tree {
 		/// Returns \c true if this branch has a link at \a index.
 		bool hasLink(size_t index) const;
 
+		/// Returns \c true if this branch has a linked node at \a index.
+		/// \note Linked nodes are loaded on demand. Accordingly, if a node has a link, it might not have a linked node.
+		bool hasLinkedNode(size_t index) const;
+
 		/// Gets the branch link at \a index.
 		const Hash256& link(size_t index) const;
 
 		/// Gets a copy of the linked node at \a index or \c nullptr if no linked node is present.
-		std::unique_ptr<const TreeNode> linkedNode(size_t index) const;
+		TreeNode linkedNode(size_t index) const;
 
 		/// Gets the index of the highest set link.
 		uint8_t highestLinkIndex() const;
@@ -114,6 +128,9 @@ namespace catapult { namespace tree {
 		std::bitset<BranchTreeNode::Max_Links> m_linkSet;
 		mutable Hash256 m_hash;
 		mutable bool m_isDirty;
+
+	private:
+		friend class TreeNode;
 	};
 
 	// endregion
@@ -121,7 +138,7 @@ namespace catapult { namespace tree {
 	// region TreeNode
 
 	/// Represents a tree node.
-	class TreeNode {
+	class TreeNode : public utils::MoveOnly {
 	public:
 		/// Creates an empty tree node.
 		TreeNode();
@@ -165,10 +182,16 @@ namespace catapult { namespace tree {
 		TreeNode copy() const;
 
 	private:
+		enum class TreeNodeType { Empty, Leaf, Branch };
+
+	private:
+		LeafTreeNode m_leafNode;
+		BranchTreeNode m_branchNode;
+		TreeNodeType m_treeNodeType;
+
+		// used to return references from path() and hash() when type is Empty
 		TreeNodePath m_emptyPath;
 		Hash256 m_emptyHash;
-		std::unique_ptr<LeafTreeNode> m_pLeafNode;
-		std::unique_ptr<BranchTreeNode> m_pBranchNode;
 	};
 
 	// endregion

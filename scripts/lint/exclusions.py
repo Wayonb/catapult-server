@@ -27,7 +27,6 @@ NAMESPACES_FALSEPOSITIVES = (
     re.compile(r'src.catapult.plugins.h'),
     re.compile(r'src.catapult.preprocessor.h'),
     re.compile(r'src.catapult.cache_db.RocksInclude.h'),
-    re.compile(r'src.catapult.crypto.KeccakHash.h'),
     re.compile(r'src.catapult.utils.BitwiseEnum.h'),
     re.compile(r'src.catapult.utils.ExceptionLogging.h'),
     re.compile(r'src.catapult.utils.MacroBasedEnumIncludes.h'),
@@ -50,6 +49,7 @@ NAMESPACES_FALSEPOSITIVES = (
 
     # main entry points
     re.compile(r'src.catapult.process.broker.main.cpp'),
+    re.compile(r'src.catapult.process.importer.main.cpp'),
     re.compile(r'src.catapult.process.recovery.main.cpp'),
     re.compile(r'src.catapult.process.server.main.cpp'),
     re.compile(r'tests.bench.nodeps.BenchMain.cpp'),
@@ -62,8 +62,6 @@ EMPTYLINES_FALSEPOSITIVES = (
 )
 
 LONGLINES_FALSEPOSITIVES = (
-    # 64-byte hex strings
-    re.compile(r'SignerTests.cpp'),
 )
 
 SPECIAL_INCLUDES = (
@@ -98,9 +96,10 @@ CORE_FIRSTINCLUDES = {
     'src/catapult/consumers/NewTransactionsConsumer.cpp': 'TransactionConsumers.h',
     'src/catapult/consumers/StatelessValidationConsumer.cpp': 'BlockConsumers.h',
 
-    'src/catapult/ionet/IoEnums.cpp': 'ConnectionSecurityMode.h',
+    'src/catapult/ionet/IoEnums.cpp': 'ConnectResult.h',
     'src/catapult/net/NetEnums.cpp': 'NodeRequestResult.h',
     'src/catapult/process/broker/main.cpp': 'catapult/extensions/ProcessBootstrapper.h',
+    'src/catapult/process/importer/main.cpp': 'catapult/extensions/ProcessBootstrapper.h',
     'src/catapult/process/recovery/main.cpp': 'catapult/extensions/ProcessBootstrapper.h',
     'src/catapult/process/server/main.cpp': 'catapult/extensions/ProcessBootstrapper.h',
     'src/catapult/version/nix/what_version.cpp': 'catapult/version/version.h',
@@ -137,17 +136,23 @@ PLUGINS_FIRSTINCLUDES = {
     # plugins
     'plugins/coresystem/src/importance/PosImportanceCalculator.cpp': 'ImportanceCalculator.h',
     'plugins/coresystem/src/importance/RestoreImportanceCalculator.cpp': 'ImportanceCalculator.h',
+    'plugins/coresystem/src/validators/KeyLinkActionValidator.cpp': 'KeyLinkValidators.h',
+    'plugins/coresystem/src/validators/VotingKeyLinkRangeValidator.cpp': 'KeyLinkValidators.h',
 
     'plugins/coresystem/tests/importance/PosImportanceCalculatorTests.cpp': 'src/importance/ImportanceCalculator.h',
     'plugins/coresystem/tests/importance/RestoreImportanceCalculatorTests.cpp': 'src/importance/ImportanceCalculator.h',
+    'plugins/coresystem/tests/validators/KeyLinkActionValidatorTests.cpp': 'src/validators/KeyLinkValidators.h',
+    'plugins/coresystem/tests/validators/VotingKeyLinkRangeValidatorTests.cpp': 'src/validators/KeyLinkValidators.h',
 
     'plugins/txes/metadata/tests/model/MetadataTransactionTests.cpp': 'src/model/AccountMetadataTransaction.h',
+
     'plugins/txes/restriction_account/tests/model/AccountRestrictionTransactionTests.cpp':
         'src/model/AccountAddressRestrictionTransaction.h',
 
     # sdk
     'sdk/tests/builders/AliasBuilderTests.cpp': 'src/builders/AddressAliasBuilder.h',
     'sdk/tests/builders/AccountRestrictionBuilderTests.cpp': 'src/builders/AccountAddressRestrictionBuilder.h',
+    'sdk/tests/builders/KeyLinkBuilderTests.cpp': 'src/builders/AccountKeyLinkBuilder.h',
     'sdk/tests/builders/MetadataBuilderTests.cpp': 'src/builders/AccountMetadataBuilder.h'
 }
 

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -25,7 +26,6 @@
 #include <memory>
 
 namespace catapult {
-	namespace crypto { class KeyPair; }
 	namespace ionet {
 		class Node;
 		class PacketSocket;
@@ -60,11 +60,11 @@ namespace catapult { namespace net {
 		virtual void shutdown() = 0;
 	};
 
-	/// Creates a server connector for a server with a key pair of \a keyPair using \a pPool and configured with \a settings.
+	/// Creates a server connector for a server with specified \a serverPublicKey using \a pool and configured with \a settings.
 	/// Optional friendly \a name can be provided to tag logs.
 	std::shared_ptr<ServerConnector> CreateServerConnector(
-			const std::shared_ptr<thread::IoThreadPool>& pPool,
-			const crypto::KeyPair& keyPair,
+			thread::IoThreadPool& pool,
+			const Key& serverPublicKey,
 			const ConnectionSettings& settings,
 			const char* name = nullptr);
 }}

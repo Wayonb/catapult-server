@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,31 +32,31 @@ namespace catapult { namespace plugins {
 	namespace {
 		template<typename TTransaction>
 		auto CreatePublisher(const MosaicRentalFeeConfiguration& config) {
-			return [config](const TTransaction& transaction, NotificationSubscriber& sub) {
+			return [config](const TTransaction& transaction, const PublishContext& context, NotificationSubscriber& sub) {
 				// 1. sink account notification
-				sub.notify(AccountPublicKeyNotification(config.SinkPublicKey));
+				sub.notify(AccountAddressNotification(config.SinkAddress));
 
 				// 2. rental fee charge
 				// a. exempt the nemesis account
-				if (config.NemesisPublicKey != transaction.SignerPublicKey) {
+				if (config.NemesisSignerPublicKey != transaction.SignerPublicKey) {
 					sub.notify(BalanceTransferNotification(
-							transaction.SignerPublicKey,
+							context.SignerAddress,
 							config.SinkAddress,
 							config.CurrencyMosaicId,
 							config.Fee,
 							BalanceTransferNotification::AmountType::Dynamic));
 					sub.notify(MosaicRentalFeeNotification(
-							transaction.SignerPublicKey,
+							context.SignerAddress,
 							config.SinkAddress,
 							config.CurrencyMosaicId,
 							config.Fee));
 				}
 
 				// 3. registration
-				auto properties = model::MosaicProperties(transaction.Flags, transaction.Divisibility, transaction.Duration);
-				sub.notify(MosaicNonceNotification(transaction.SignerPublicKey, transaction.Nonce, transaction.Id));
+				auto properties = MosaicProperties(transaction.Flags, transaction.Divisibility, transaction.Duration);
+				sub.notify(MosaicNonceNotification(context.SignerAddress, transaction.Nonce, transaction.Id));
 				sub.notify(MosaicPropertiesNotification(properties));
-				sub.notify(MosaicDefinitionNotification(transaction.SignerPublicKey, transaction.Id, properties));
+				sub.notify(MosaicDefinitionNotification(context.SignerAddress, transaction.Id, properties));
 			};
 		}
 	}

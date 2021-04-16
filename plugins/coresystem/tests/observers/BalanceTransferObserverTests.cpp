@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -40,7 +41,7 @@ namespace catapult { namespace observers {
 			context.state().DynamicFeeMultiplier = Dynamic_Fee_Multiplier;
 			auto pObserver = CreateBalanceTransferObserver();
 
-			auto sender = test::GenerateRandomByteArray<Key>();
+			auto sender = test::GenerateRandomByteArray<Address>();
 			auto recipient = test::GenerateRandomByteArray<Address>();
 			auto notification = TTraits::CreateNotification(sender, test::UnresolveXor(recipient));
 
@@ -62,7 +63,7 @@ namespace catapult { namespace observers {
 			context.state().DynamicFeeMultiplier = Dynamic_Fee_Multiplier;
 			auto pObserver = CreateBalanceTransferObserver();
 
-			auto sender = test::GenerateRandomByteArray<Key>();
+			auto sender = test::GenerateRandomByteArray<Address>();
 			auto recipient = test::GenerateRandomByteArray<Address>();
 			auto notification = TTraits::CreateNotification(sender, test::UnresolveXor(recipient));
 
@@ -88,7 +89,7 @@ namespace catapult { namespace observers {
 		constexpr auto Currency_Mosaic_Id = MosaicId(1234);
 
 		struct SingleMosaicStaticTraits {
-			static auto CreateNotification(const Key& sender, const UnresolvedAddress& recipient) {
+			static auto CreateNotification(const Address& sender, const UnresolvedAddress& recipient) {
 				return model::BalanceTransferNotification(sender, recipient, test::UnresolveXor(Currency_Mosaic_Id), Amount(234));
 			}
 
@@ -110,7 +111,7 @@ namespace catapult { namespace observers {
 		};
 
 		struct SingleMosaicDynamicTraits : public SingleMosaicStaticTraits {
-			static auto CreateNotification(const Key& sender, const UnresolvedAddress& recipient) {
+			static auto CreateNotification(const Address& sender, const UnresolvedAddress& recipient) {
 				return model::BalanceTransferNotification(
 						sender,
 						recipient,
@@ -130,7 +131,7 @@ namespace catapult { namespace observers {
 
 	namespace {
 		struct MultipleMosaicStaticTraits {
-			static auto CreateNotification(const Key& sender, const UnresolvedAddress& recipient) {
+			static auto CreateNotification(const Address& sender, const UnresolvedAddress& recipient) {
 				return model::BalanceTransferNotification(sender, recipient, test::UnresolveXor(MosaicId(12)), Amount(234));
 			}
 
@@ -153,7 +154,7 @@ namespace catapult { namespace observers {
 	}
 
 	struct MultipleMosaicDynamicTraits : public MultipleMosaicStaticTraits {
-		static auto CreateNotification(const Key& sender, const UnresolvedAddress& recipient) {
+		static auto CreateNotification(const Address& sender, const UnresolvedAddress& recipient) {
 			return model::BalanceTransferNotification(
 					sender,
 					recipient,

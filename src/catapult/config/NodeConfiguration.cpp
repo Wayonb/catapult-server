@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,7 +37,6 @@ namespace catapult { namespace config {
 #define LOAD_NODE_PROPERTY(NAME) LOAD_PROPERTY("node", NAME)
 
 		LOAD_NODE_PROPERTY(Port);
-		LOAD_NODE_PROPERTY(ApiPort);
 		LOAD_NODE_PROPERTY(MaxIncomingConnectionsPerIdentity);
 
 		LOAD_NODE_PROPERTY(EnableAddressReuse);
@@ -44,9 +44,12 @@ namespace catapult { namespace config {
 		LOAD_NODE_PROPERTY(EnableCacheDatabaseStorage);
 		LOAD_NODE_PROPERTY(EnableAutoSyncCleanup);
 
+		LOAD_NODE_PROPERTY(FileDatabaseBatchSize);
+
 		LOAD_NODE_PROPERTY(EnableTransactionSpamThrottling);
 		LOAD_NODE_PROPERTY(TransactionSpamThrottlingMaxBoostFee);
 
+		LOAD_NODE_PROPERTY(MaxHashesPerSyncAttempt);
 		LOAD_NODE_PROPERTY(MaxBlocksPerSyncAttempt);
 		LOAD_NODE_PROPERTY(MaxChainBytesPerSyncAttempt);
 
@@ -56,6 +59,7 @@ namespace catapult { namespace config {
 		LOAD_NODE_PROPERTY(ShortLivedCacheMaxSize);
 
 		LOAD_NODE_PROPERTY(MinFeeMultiplier);
+		LOAD_NODE_PROPERTY(MaxTimeBehindPullTransactionsStart);
 		LOAD_NODE_PROPERTY(TransactionSelectionStrategy);
 		LOAD_NODE_PROPERTY(UnconfirmedTransactionsCacheMaxResponseSize);
 		LOAD_NODE_PROPERTY(UnconfirmedTransactionsCacheMaxSize);
@@ -67,24 +71,40 @@ namespace catapult { namespace config {
 		LOAD_NODE_PROPERTY(SocketWorkingBufferSensitivity);
 		LOAD_NODE_PROPERTY(MaxPacketDataSize);
 
-		LOAD_NODE_PROPERTY(BlockDisruptorSize);
+		LOAD_NODE_PROPERTY(BlockDisruptorSlotCount);
+		LOAD_NODE_PROPERTY(BlockDisruptorMaxMemorySize);
 		LOAD_NODE_PROPERTY(BlockElementTraceInterval);
-		LOAD_NODE_PROPERTY(TransactionDisruptorSize);
+
+		LOAD_NODE_PROPERTY(TransactionDisruptorSlotCount);
+		LOAD_NODE_PROPERTY(TransactionDisruptorMaxMemorySize);
 		LOAD_NODE_PROPERTY(TransactionElementTraceInterval);
 
 		LOAD_NODE_PROPERTY(EnableDispatcherAbortWhenFull);
 		LOAD_NODE_PROPERTY(EnableDispatcherInputAuditing);
 
-		LOAD_NODE_PROPERTY(OutgoingSecurityMode);
-		LOAD_NODE_PROPERTY(IncomingSecurityModes);
-
-		LOAD_NODE_PROPERTY(MaxCacheDatabaseWriteBatchSize);
 		LOAD_NODE_PROPERTY(MaxTrackedNodes);
+
+		LOAD_NODE_PROPERTY(MinPartnerNodeVersion);
+		LOAD_NODE_PROPERTY(MaxPartnerNodeVersion);
 
 		LOAD_NODE_PROPERTY(TrustedHosts);
 		LOAD_NODE_PROPERTY(LocalNetworks);
+		LOAD_NODE_PROPERTY(ListenInterface);
 
 #undef LOAD_NODE_PROPERTY
+
+#define LOAD_CACHE_DATABASE_PROPERTY(NAME) utils::LoadIniProperty(bag, "cache_database", #NAME, config.CacheDatabase.NAME)
+
+		LOAD_CACHE_DATABASE_PROPERTY(EnableStatistics);
+		LOAD_CACHE_DATABASE_PROPERTY(MaxOpenFiles);
+		LOAD_CACHE_DATABASE_PROPERTY(MaxBackgroundThreads);
+		LOAD_CACHE_DATABASE_PROPERTY(MaxSubcompactionThreads);
+		LOAD_CACHE_DATABASE_PROPERTY(BlockCacheSize);
+		LOAD_CACHE_DATABASE_PROPERTY(MemtableMemoryBudget);
+
+		LOAD_CACHE_DATABASE_PROPERTY(MaxWriteBatchSize);
+
+#undef LOAD_CACHE_DATABASE_PROPERTY
 
 #define LOAD_LOCALNODE_PROPERTY(NAME) utils::LoadIniProperty(bag, "localnode", #NAME, config.Local.NAME)
 
@@ -125,9 +145,12 @@ namespace catapult { namespace config {
 		LOAD_BANNING_PROPERTY(ReadRateMonitoringBucketDuration);
 		LOAD_BANNING_PROPERTY(MaxReadRateMonitoringTotalSize);
 
+		LOAD_BANNING_PROPERTY(MinTransactionFailuresCountForBan);
+		LOAD_BANNING_PROPERTY(MinTransactionFailuresPercentForBan);
+
 #undef LOAD_BANNING_PROPERTY
 
-		utils::VerifyBagSizeLte(bag, 36 + 4 + 4 + 5 + 7);
+		utils::VerifyBagSizeExact(bag, 40 + 7 + 4 + 4 + 5 + 9);
 		return config;
 	}
 

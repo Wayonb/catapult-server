@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -30,17 +31,22 @@ namespace catapult { namespace api {
 
 		class LocalChainApi : public ChainApi {
 		public:
-			LocalChainApi(const io::BlockStorageCache& storage, const model::ChainScoreSupplier& chainScoreSupplier)
+			LocalChainApi(
+					const io::BlockStorageCache& storage,
+					const model::ChainScoreSupplier& chainScoreSupplier,
+					const supplier<Height>& finalizedHeightSupplier)
 					: m_storage(storage)
 					, m_chainScoreSupplier(chainScoreSupplier)
+					, m_finalizedHeightSupplier(finalizedHeightSupplier)
 			{}
 
 		public:
-			thread::future<ChainInfo> chainInfo() const override {
-				auto info = ChainInfo();
-				info.Height = m_storage.view().chainHeight();
-				info.Score = m_chainScoreSupplier();
-				return thread::make_ready_future(std::move(info));
+			thread::future<ChainStatistics> chainStatistics() const override {
+				auto chainStatistics = ChainStatistics();
+				chainStatistics.Height = m_storage.view().chainHeight();
+				chainStatistics.FinalizedHeight = m_finalizedHeightSupplier();
+				chainStatistics.Score = m_chainScoreSupplier();
+				return thread::make_ready_future(std::move(chainStatistics));
 			}
 
 			thread::future<model::HashRange> hashesFrom(Height height, uint32_t maxHashes) const override {
@@ -56,12 +62,14 @@ namespace catapult { namespace api {
 		private:
 			const io::BlockStorageCache& m_storage;
 			model::ChainScoreSupplier m_chainScoreSupplier;
+			supplier<Height> m_finalizedHeightSupplier;
 		};
 	}
 
 	std::unique_ptr<ChainApi> CreateLocalChainApi(
 			const io::BlockStorageCache& storage,
-			const model::ChainScoreSupplier& chainScoreSupplier) {
-		return std::make_unique<LocalChainApi>(storage, chainScoreSupplier);
+			const model::ChainScoreSupplier& chainScoreSupplier,
+			const supplier<Height>& finalizedHeightSupplier) {
+		return std::make_unique<LocalChainApi>(storage, chainScoreSupplier, finalizedHeightSupplier);
 	}
 }}

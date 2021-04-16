@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,6 +23,7 @@
 #include "nodediscovery/src/api/RemoteNodeApi.h"
 #include "catapult/thread/FutureUtils.h"
 #include "catapult/utils/ThrottleLogger.h"
+#include "catapult/utils/TimeSpan.h"
 
 namespace catapult { namespace nodediscovery {
 
@@ -33,7 +35,7 @@ namespace catapult { namespace nodediscovery {
 	thread::future<BatchPeersRequestor::RemoteApiResults> BatchPeersRequestor::findPeersOfPeers(const utils::TimeSpan& timeout) const {
 		auto packetIoPairs = m_packetIoPickers.pickMatching(timeout, ionet::NodeRoles::None);
 		if (packetIoPairs.empty()) {
-			CATAPULT_LOG_THROTTLE(warning, 60'000) << "no packet io available for requesting peers";
+			CATAPULT_LOG_THROTTLE(warning, utils::TimeSpan::FromMinutes(1).millis()) << "no packet io available for requesting peers";
 			return thread::make_ready_future(std::vector<ionet::NodeInteractionResult>());
 		}
 

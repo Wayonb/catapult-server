@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,6 +25,7 @@
 #include "ToolKeys.h"
 #include "ToolNetworkUtils.h"
 #include "catapult/ionet/Node.h"
+#include "catapult/ionet/PacketSocket.h"
 #include "catapult/thread/FutureUtils.h"
 
 namespace catapult { namespace tools {
@@ -49,26 +51,26 @@ namespace catapult { namespace tools {
 		}
 
 		void prepareOptions(OptionsBuilder& optionsBuilder, OptionsPositional& positional) override final {
-			optionsBuilder("resources,r",
-					OptionsValue<std::string>(m_resourcesPath)->default_value(".."),
-					"the path to the resources directory");
-			optionsBuilder("clientPrivateKey",
-					OptionsValue<std::string>(m_clientPrivateKey)->default_value(""),
-					"client private key to use when connecting to the network");
+			AddResourcesOption(optionsBuilder);
+			prepareAdditionalOptions(optionsBuilder);
 			positional.add("resources", -1);
 		}
 
-		int run(const Options&) override final {
-			auto config = LoadConfiguration(m_resourcesPath);
-			auto p2pNodes = LoadPeers(m_resourcesPath, config.BlockChain.Network.Identifier);
-			auto apiNodes = LoadOptionalApiPeers(m_resourcesPath, config.BlockChain.Network.Identifier);
+		int run(const Options& options) override final {
+			auto resourcesPath = GetResourcesOptionValue(options);
+			auto config = LoadConfiguration(resourcesPath);
+			auto networkFingerprint = model::UniqueNetworkFingerprint(
+					config.BlockChain.Network.Identifier,
+					config.BlockChain.Network.GenerationHashSeed);
+			auto p2pNodes = LoadPeers(resourcesPath, networkFingerprint);
+			auto apiNodes = LoadOptionalApiPeers(resourcesPath, networkFingerprint);
 
-			MultiNodeConnector connector(ExtractKeyPair(m_clientPrivateKey));
+			MultiNodeConnector connector(config.User.CertificateDirectory);
 			std::vector<NodeInfoFuture> nodeInfoFutures;
-			auto addNodeInfoFutures = [this, &connector, &nodeInfoFutures](const auto& nodes) {
+			auto addNodeInfoFutures = [this, &options, &connector, &nodeInfoFutures](const auto& nodes) {
 				for (const auto& node : nodes) {
 					CATAPULT_LOG(debug) << "preparing to get stats from node " << node;
-					nodeInfoFutures.push_back(this->createNodeInfoFuture(connector, node));
+					nodeInfoFutures.push_back(this->createNodeInfoFuture(options, connector, node));
 				}
 			};
 
@@ -88,12 +90,14 @@ namespace catapult { namespace tools {
 		}
 
 	private:
-		NodeInfoFuture createNodeInfoFuture(MultiNodeConnector& connector, const ionet::Node& node) {
+		NodeInfoFuture createNodeInfoFuture(const Options& options, MultiNodeConnector& connector, const ionet::Node& node) {
 			auto pNodeInfo = std::make_shared<TNodeInfo>(node);
-			return thread::compose(connector.connect(node), [this, node, pNodeInfo, &connector](auto&& ioFuture) {
+			return thread::compose(connector.connect(node), [this, &options, node, pNodeInfo, &connector](auto&& socketInfoFuture) {
 				try {
-					auto pIo = ioFuture.get();
-					auto infoFutures = this->getNodeInfoFutures(connector.pool(), *pIo, *pNodeInfo);
+					auto socketInfo = socketInfoFuture.get();
+					auto pIo = socketInfo.socket()->buffered();
+					auto nodeIdentity = model::NodeIdentity{ socketInfo.publicKey(), socketInfo.host() };
+					auto infoFutures = this->getNodeInfoFutures(options, connector.pool(), *pIo, nodeIdentity, *pNodeInfo);
 
 					// capture pIo so that it stays alive until all dependent futures are complete
 					return thread::when_all(std::move(infoFutures)).then([pIo, pNodeInfo](auto&&) {
@@ -108,10 +112,15 @@ namespace catapult { namespace tools {
 		}
 
 	private:
-		/// Gets all futures to fill \a nodeInfo using \a pool and \a io.
+		/// Prepare additional named (\a optionsBuilder) options of the tool.
+		virtual void prepareAdditionalOptions(OptionsBuilder& optionsBuilder) = 0;
+
+		/// Gets all futures to fill \a nodeInfo for \a nodeIdentity using \a pool and \a io given \a options.
 		virtual std::vector<thread::future<bool>> getNodeInfoFutures(
+				const Options& options,
 				thread::IoThreadPool& pool,
 				ionet::PacketIo& io,
+				const model::NodeIdentity& nodeIdentity,
 				TNodeInfo& nodeInfo) = 0;
 
 		/// Processes \a nodeInfos after all futures complete.
@@ -119,7 +128,5 @@ namespace catapult { namespace tools {
 
 	private:
 		std::string m_censusName;
-		std::string m_resourcesPath;
-		std::string m_clientPrivateKey;
 	};
 }}

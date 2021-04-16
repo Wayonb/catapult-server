@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,8 +37,8 @@ namespace catapult { namespace builders {
 		AccountMetadataBuilder(model::NetworkIdentifier networkIdentifier, const Key& signer);
 
 	public:
-		/// Sets the metadata target public key to \a targetPublicKey.
-		void setTargetPublicKey(const Key& targetPublicKey);
+		/// Sets the metadata target address to \a targetAddress.
+		void setTargetAddress(const UnresolvedAddress& targetAddress);
 
 		/// Sets the metadata key scoped to source, target and type to \a scopedMetadataKey.
 		void setScopedMetadataKey(uint64_t scopedMetadataKey);
@@ -69,7 +70,7 @@ namespace catapult { namespace builders {
 		std::unique_ptr<TTransaction> buildImpl() const;
 
 	private:
-		Key m_targetPublicKey;
+		UnresolvedAddress m_targetAddress;
 		uint64_t m_scopedMetadataKey;
 		int16_t m_valueSizeDelta;
 		std::vector<uint8_t> m_value;

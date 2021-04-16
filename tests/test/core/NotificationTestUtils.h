@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -29,21 +30,19 @@ namespace catapult { namespace test {
 		return model::Notification(type, sizeof(model::Notification));
 	}
 
+	/// Creates a block notification around \a harvester and \a beneficiary.
+	inline model::BlockNotification CreateBlockNotification(const Address& harvester, const Address& beneficiary) {
+		return model::BlockNotification(model::EntityType(), harvester, beneficiary, Timestamp(), Difficulty(), BlockFeeMultiplier());
+	}
+
+	/// Creates a block notification around \a harvester.
+	inline model::BlockNotification CreateBlockNotification(const Address& harvester) {
+		return CreateBlockNotification(harvester, Address());
+	}
+
 	/// Creates a placeholder block notification.
 	inline model::BlockNotification CreateBlockNotification() {
-		// notice that notification Signer and Beneficiary will be garbage after this returns
-		return model::BlockNotification(Key(), Key(), Timestamp(), Difficulty(), BlockFeeMultiplier());
-	}
-
-	/// Creates a block notification around \a signer.
-	inline model::BlockNotification CreateBlockNotification(const Key& signer) {
-		// notice that notification Beneficiary will be garbage after this returns
-		return model::BlockNotification(signer, Key(), Timestamp(), Difficulty(), BlockFeeMultiplier());
-	}
-
-	/// Creates a block notification around \a signer and \a beneficiary.
-	inline model::BlockNotification CreateBlockNotification(const Key& signer, const Key& beneficiary) {
-		return model::BlockNotification(signer, beneficiary, Timestamp(), Difficulty(), BlockFeeMultiplier());
+		return CreateBlockNotification(Address());
 	}
 
 	/// Casts \a notification to a derived notification type.

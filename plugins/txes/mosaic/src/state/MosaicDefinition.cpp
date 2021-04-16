@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,6 +24,22 @@
 #include "catapult/constants.h"
 
 namespace catapult { namespace state {
+
+	Height MosaicDefinition::startHeight() const {
+		return m_startHeight;
+	}
+
+	const Address& MosaicDefinition::ownerAddress() const {
+		return m_ownerAddress;
+	}
+
+	uint32_t MosaicDefinition::revision() const {
+		return m_revision;
+	}
+
+	const model::MosaicProperties& MosaicDefinition::properties() const {
+		return m_properties;
+	}
 
 	bool MosaicDefinition::isEternal() const {
 		return Eternal_Artifact_Duration == m_properties.duration();

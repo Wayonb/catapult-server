@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -33,8 +34,6 @@ namespace catapult { namespace handlers {
 	// region RegisterNodeDiscoveryPushPingHandler
 
 	namespace {
-		constexpr auto Network_Identifier = model::NetworkIdentifier::Mijin_Test;
-
 		auto CreateNodePushPingPacket(const Key& identityKey, const std::string& host) {
 			return test::CreateNodePushPingPacket(identityKey, ionet::NodeVersion(1234), host, "");
 		}
@@ -43,9 +42,11 @@ namespace catapult { namespace handlers {
 				const ionet::Packet& packet,
 				ionet::ServerPacketHandlerContext& handlerContext) {
 			ionet::ServerPacketHandlers handlers;
+			auto networkFingerprint = test::CreateNodeDiscoveryNetworkFingerprint();
+
 			ionet::Node capturedNode;
 			auto numConsumerCalls = 0u;
-			RegisterNodeDiscoveryPushPingHandler(handlers, Network_Identifier, [&capturedNode, &numConsumerCalls](const auto& node) {
+			RegisterNodeDiscoveryPushPingHandler(handlers, networkFingerprint, [&capturedNode, &numConsumerCalls](const auto& node) {
 				capturedNode = node;
 				++numConsumerCalls;
 			});

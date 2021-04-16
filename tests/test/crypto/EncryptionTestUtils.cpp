@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,16 +20,25 @@
 **/
 
 #include "EncryptionTestUtils.h"
+#include "catapult/crypto/OpensslContexts.h"
 #include "catapult/utils/MemoryUtils.h"
+#include "tests/test/nodeps/KeyTestUtils.h"
 #include "tests/test/nodeps/Random.h"
-#include <tiny-aes-c/aes.hpp>
 #include <cstring>
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wreserved-id-macro"
+#endif
+#include <openssl/evp.h>
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 namespace catapult { namespace test {
 
 	namespace {
-		constexpr auto Aes_Pkcs7_Padding_Size = 16u;
-
 		void Prepend(std::vector<uint8_t>& buffer, RawBuffer prefix) {
 			buffer.resize(buffer.size() + prefix.Size);
 			std::memmove(buffer.data() + prefix.Size, buffer.data(), buffer.size() - prefix.Size);
@@ -37,48 +47,44 @@ namespace catapult { namespace test {
 		}
 	}
 
-	void AesPkcs7PaddingScheme(std::vector<uint8_t>& buffer) {
-		auto size = buffer.size();
-		auto paddingSize = Aes_Pkcs7_Padding_Size;
-		if (size % Aes_Pkcs7_Padding_Size)
-			paddingSize = Aes_Pkcs7_Padding_Size - (size % Aes_Pkcs7_Padding_Size);
-
-		buffer.resize(size + paddingSize);
-		for (auto i = 0u; i < paddingSize; ++i)
-			buffer[buffer.size() - paddingSize + i] = static_cast<uint8_t>(paddingSize);
-	}
-
-	void AesCbcEncrypt(
+	void AesGcmEncrypt(
 			const crypto::SharedKey& encryptionKey,
-			const crypto::AesInitializationVector& initializationVector,
+			const crypto::AesGcm256::IV& iv,
 			const RawBuffer& input,
-			std::vector<uint8_t>& output,
-			const consumer<std::vector<uint8_t>&>& applyPaddingScheme) {
-		// initializationVector || data || padding
+			std::vector<uint8_t>& output) {
+		// encrypt input into output
 		output.resize(input.Size);
-		applyPaddingScheme(output);
-		auto encryptedDataSize = output.size();
+		auto outputSize = static_cast<int>(output.size());
+		utils::memcpy_cond(output.data(), input.pData, input.Size);
 
-		Prepend(output, initializationVector);
-		utils::memcpy_cond(output.data() + initializationVector.size(), input.pData, input.Size);
+		crypto::OpensslCipherContext cipherContext;
+		cipherContext.dispatch(EVP_EncryptInit_ex, EVP_aes_256_gcm(), nullptr, encryptionKey.data(), iv.data());
 
-		AES_ctx ctx;
-		AES_init_ctx_iv(&ctx, encryptionKey.data(), initializationVector.data());
-		AES_CBC_encrypt_buffer(&ctx, output.data() + initializationVector.size(), static_cast<uint32_t>(encryptedDataSize));
+		if (0 != outputSize)
+			cipherContext.dispatch(EVP_EncryptUpdate, output.data(), &outputSize, output.data(), outputSize);
+
+		cipherContext.dispatch(EVP_EncryptFinal_ex, output.data() + outputSize, &outputSize);
+
+		// get tag
+		crypto::AesGcm256::Tag tag;
+		cipherContext.dispatch(EVP_CIPHER_CTX_ctrl, EVP_CTRL_GCM_GET_TAG, 16, tag.data());
+
+		// tag || iv || data
+		Prepend(output, iv);
+		Prepend(output, tag);
 	}
 
-	std::vector<uint8_t> SaltAndEncrypt(const RawBuffer& clearText, const crypto::KeyPair& keyPair, const Key& publicKey) {
-		auto salt = GenerateRandomByteArray<crypto::Salt>();
-		auto sharedKey = DeriveSharedKey(keyPair, publicKey, salt);
-		auto initializationVector = GenerateRandomByteArray<crypto::AesInitializationVector>();
+	std::vector<uint8_t> GenerateEphemeralAndEncrypt(const RawBuffer& clearText, const Key& recipientPublicKey) {
+		auto ephemeralKeyPair = test::GenerateKeyPair();
+		auto sharedKey = DeriveSharedKey(ephemeralKeyPair, recipientPublicKey);
+		auto iv = GenerateRandomByteArray<crypto::AesGcm256::IV>();
 
 		std::vector<uint8_t> encrypted;
-		AesCbcEncrypt(sharedKey, initializationVector, clearText, encrypted);
+		AesGcmEncrypt(sharedKey, iv, clearText, encrypted);
 
-		std::vector<uint8_t> saltedEncrypted(crypto::Salt::Size + encrypted.size());
-		std::memcpy(saltedEncrypted.data(), salt.data(), crypto::Salt::Size);
-		std::memcpy(saltedEncrypted.data() + crypto::Salt::Size, encrypted.data(), encrypted.size());
-
-		return saltedEncrypted;
+		std::vector<uint8_t> publicKeyPrefixedEncryptedPayload(Key::Size + encrypted.size());
+		std::memcpy(publicKeyPrefixedEncryptedPayload.data(), ephemeralKeyPair.publicKey().data(), Key::Size);
+		std::memcpy(publicKeyPrefixedEncryptedPayload.data() + Key::Size, encrypted.data(), encrypted.size());
+		return publicKeyPrefixedEncryptedPayload;
 	}
 }}

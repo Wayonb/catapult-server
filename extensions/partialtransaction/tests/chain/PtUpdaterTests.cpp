@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -41,11 +42,13 @@ namespace catapult { namespace chain {
 
 #define EXPECT_EQ_TRANSACTION_UPDATE_RESULT(RESULT, UPDATE_TYPE, NUM_COSIGNATURES_ADDED) \
 	do { \
-		EXPECT_EQ(TransactionUpdateResult::UpdateType::UPDATE_TYPE, RESULT.Type); \
+		EXPECT_EQ(PtUpdateResult::UpdateType::UPDATE_TYPE, RESULT.Type); \
 		EXPECT_EQ(static_cast<size_t>(NUM_COSIGNATURES_ADDED), RESULT.NumCosignaturesAdded); \
 	} while (false)
 
 	namespace {
+		// region transaction factories
+
 		model::TransactionInfo CreateRandomTransactionInfo(const std::shared_ptr<const model::Transaction>& pTransaction) {
 			auto transactionInfo = test::CreateRandomTransactionInfo();
 			transactionInfo.pEntity = pTransaction;
@@ -55,6 +58,8 @@ namespace catapult { namespace chain {
 		std::shared_ptr<model::AggregateTransaction> CreateRandomAggregateTransaction(uint32_t numCosignatures) {
 			return test::CreateRandomAggregateTransactionWithCosignatures(numCosignatures);
 		}
+
+		// endregion
 
 		// region ExpectedValidatorCalls
 
@@ -328,7 +333,7 @@ namespace catapult { namespace chain {
 		class UpdaterTestContext {
 		public:
 			UpdaterTestContext()
-					: m_transactionsCache(cache::MemoryCacheOptions(1024, 1000))
+					: m_transactionsCache(cache::MemoryCacheOptions(utils::FileSize(), utils::FileSize::FromKilobytes(1)))
 					, m_pUniqueValidator(std::make_unique<MockPtValidator>())
 					, m_pValidator(m_pUniqueValidator.get())
 					, m_pPool(test::CreateStartedIoThreadPool())
@@ -340,9 +345,9 @@ namespace catapult { namespace chain {
 							}),
 							[this](const auto& transaction, const auto& hash, auto result) {
 								// notice that transaction.Deadline is used as transaction marker
-								m_failedTransactionStatuses.emplace_back(hash, utils::to_underlying_type(result), transaction.Deadline);
+								m_failedTransactionStatuses.emplace_back(hash, transaction.Deadline, utils::to_underlying_type(result));
 							},
-							m_pPool))
+							*m_pPool))
 			{}
 
 			~UpdaterTestContext() {
@@ -350,7 +355,7 @@ namespace catapult { namespace chain {
 			}
 
 		public:
-			const auto& transactionsCache() const {
+			auto& transactionsCache() {
 				return m_transactionsCache;
 			}
 
@@ -459,13 +464,15 @@ namespace catapult { namespace chain {
 			MockPtValidator* m_pValidator;
 			std::vector<std::unique_ptr<model::Transaction>> m_completedTransactions;
 
-			std::shared_ptr<thread::IoThreadPool> m_pPool;
+			std::unique_ptr<thread::IoThreadPool> m_pPool;
 			std::unique_ptr<PtUpdater> m_pUpdater; // unique_ptr for destroyUpdater
 
 			std::vector<model::TransactionStatus> m_failedTransactionStatuses;
 		};
 
 		// endregion
+
+		// region tests
 
 		template<typename TAction>
 		void RunTestWithTransactionInCache(uint32_t numCosignatures, TAction action) {
@@ -482,6 +489,8 @@ namespace catapult { namespace chain {
 			// Act:
 			action(context, transactionInfo, *pTransaction);
 		}
+
+		// endregion
 	}
 
 	// region update transaction - invalid aggregate
@@ -513,6 +522,31 @@ namespace catapult { namespace chain {
 
 		EXPECT_TRUE(context.completedTransactions().empty());
 		context.assertSingleFailedTransaction(transactionInfo, Validate_Partial_Raw_Result);
+		context.validator().assertCalls(*pTransaction, transactionInfo.EntityHash, { 1, 0, 0 });
+	}
+
+	TEST(TEST_CLASS, CannotAddAggregateWithoutCosignaturesWhenCacheIsFull) {
+		// Arrange:
+		UpdaterTestContext context;
+
+		// - fill up the cache
+		while (context.transactionsCache().modifier().add(CreateRandomTransactionInfo(CreateRandomAggregateTransaction(0))))
+		{}
+
+		auto originalCacheSize = context.transactionsCache().view().size();
+
+		auto pTransaction = CreateRandomAggregateTransaction(0);
+		auto transactionInfo = CreateRandomTransactionInfo(pTransaction);
+
+		// Act:
+		auto result = context.updater().update(transactionInfo).get();
+
+		// Assert:
+		EXPECT_EQ_TRANSACTION_UPDATE_RESULT(result, Neutral, 0);
+		EXPECT_EQ(originalCacheSize, context.transactionsCache().view().size());
+
+		EXPECT_TRUE(context.completedTransactions().empty());
+		EXPECT_TRUE(context.failedTransactionStatuses().empty());
 		context.validator().assertCalls(*pTransaction, transactionInfo.EntityHash, { 1, 0, 0 });
 	}
 

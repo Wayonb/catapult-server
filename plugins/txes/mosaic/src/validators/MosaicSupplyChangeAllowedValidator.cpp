@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -35,23 +36,23 @@ namespace catapult { namespace validators {
 			auto mosaicId = context.Resolvers.resolve(notification.MosaicId);
 			const auto& cache = context.Cache.sub<cache::MosaicCache>();
 			auto mosaicIter = cache.find(mosaicId);
-			const auto& entry = mosaicIter.get();
+			const auto& mosaicEntry = mosaicIter.get();
 
 			const auto& accountStateCache = context.Cache.sub<cache::AccountStateCache>();
-			auto accountStateIter = accountStateCache.find(notification.Signer);
+			auto accountStateIter = accountStateCache.find(notification.Owner);
 			auto ownerAmount = accountStateIter.get().Balances.get(mosaicId);
 
 			// only allow an "immutable" supply to change if the owner owns full supply
-			const auto& properties = entry.definition().properties();
-			if (!properties.is(model::MosaicFlags::Supply_Mutable) && ownerAmount != entry.supply())
+			const auto& properties = mosaicEntry.definition().properties();
+			if (!properties.is(model::MosaicFlags::Supply_Mutable) && ownerAmount != mosaicEntry.supply())
 				return Failure_Mosaic_Supply_Immutable;
 
 			if (model::MosaicSupplyChangeAction::Decrease == notification.Action)
 				return ownerAmount < notification.Delta ? Failure_Mosaic_Supply_Negative : ValidationResult::Success;
 
 			// check that new supply does not overflow and is not too large
-			auto initialSupply = entry.supply();
-			auto newSupply = entry.supply() + notification.Delta;
+			auto initialSupply = mosaicEntry.supply();
+			auto newSupply = mosaicEntry.supply() + notification.Delta;
 			return newSupply < initialSupply || newSupply > maxAtomicUnits
 					? Failure_Mosaic_Supply_Exceeded
 					: ValidationResult::Success;

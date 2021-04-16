@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,10 +21,11 @@
 
 #include "zeromq/src/ZeroMqEntityPublisher.h"
 #include "sdk/src/extensions/ConversionExtensions.h"
+#include "zeromq/src/PackedFinalizedBlockHeader.h"
 #include "zeromq/src/PublisherUtils.h"
-#include "catapult/model/Address.h"
 #include "catapult/model/Cosignature.h"
 #include "catapult/model/Elements.h"
+#include "catapult/model/FinalizationRound.h"
 #include "catapult/model/NotificationSubscriber.h"
 #include "catapult/model/TransactionStatus.h"
 #include "zeromq/tests/test/ZeroMqTestUtils.h"
@@ -53,12 +55,19 @@ namespace catapult { namespace zeromq {
 
 		class EntityPublisherContext : public test::MqContext {
 		public:
+			using test::MqContext::MqContext;
+
+		public:
 			void publishBlockHeader(const model::BlockElement& blockElement) {
 				publisher().publishBlockHeader(blockElement);
 			}
 
 			void publishDropBlocks(Height height) {
 				publisher().publishDropBlocks(height);
+			}
+
+			void publishFinalizedBlock(const model::FinalizationRound& round, Height height, const Hash256& hash) {
+				publisher().publishFinalizedBlock({ round, height, hash });
 			}
 
 			void publishTransaction(TransactionMarker topicMarker, const model::TransactionInfo& transactionInfo, Height height) {
@@ -77,13 +86,12 @@ namespace catapult { namespace zeromq {
 				publisher().publishTransactionStatus(transaction, hash, status);
 			}
 
-			void publishCosignature(const model::TransactionInfo& parentTransactionInfo, const Key& signer, const Signature& signature) {
-				publisher().publishCosignature(parentTransactionInfo, signer, signature);
+			void publishCosignature(const model::TransactionInfo& parentTransactionInfo, const model::Cosignature& cosignature) {
+				publisher().publishCosignature(parentTransactionInfo, cosignature);
 			}
 		};
 
 		std::shared_ptr<model::UnresolvedAddressSet> GenerateRandomExtractedAddresses() {
-			// Arrange: generate three random addresses
 			return test::GenerateRandomUnresolvedAddressSetPointer(3);
 		}
 	}
@@ -94,32 +102,68 @@ namespace catapult { namespace zeromq {
 		// Arrange:
 		EntityPublisherContext context;
 		context.subscribe(BlockMarker::Drop_Blocks_Marker);
-		Height height(123);
 
 		// Act + Assert:
-		context.publishDropBlocks(height);
+		context.publishDropBlocks(Height(123));
 		context.destroyPublisher();
+	}
+
+	namespace {
+		void AssertCanUseCustomListenInterface(const std::string& listenInterface) {
+			// Arrange:
+			EntityPublisherContext context(listenInterface);
+			context.subscribe(BlockMarker::Drop_Blocks_Marker);
+
+			// Act:
+			context.publishDropBlocks(Height(123));
+
+			// Assert:
+			zmq::multipart_t message;
+			test::ZmqReceive(message, context.zmqSocket());
+
+			test::AssertDropBlocksMessage(message, Height(123));
+		}
+	}
+
+	TEST(TEST_CLASS, CanUseCustomListenInterface_IPv4) {
+		AssertCanUseCustomListenInterface("0.0.0.0");
+		AssertCanUseCustomListenInterface("127.0.0.1");
+	}
+
+	TEST(TEST_CLASS, CanUseCustomListenInterface_IPv6) {
+		AssertCanUseCustomListenInterface("::");
+		AssertCanUseCustomListenInterface("::1");
 	}
 
 	// endregion
 
 	// region publishBlockHeader
 
+	namespace {
+		void AssertCanPublishBlockHeader(std::unique_ptr<model::Block>&& pBlock) {
+			// Arrange:
+			EntityPublisherContext context;
+			context.subscribe(BlockMarker::Block_Marker);
+
+			auto blockElement = test::BlockToBlockElement(*pBlock);
+
+			// Act:
+			context.publishBlockHeader(blockElement);
+
+			// Assert:
+			zmq::multipart_t message;
+			test::ZmqReceive(message, context.zmqSocket());
+
+			test::AssertBlockHeaderMessage(message, blockElement);
+		}
+	}
+
 	TEST(TEST_CLASS, CanPublishBlockHeader) {
-		// Arrange:
-		EntityPublisherContext context;
-		context.subscribe(BlockMarker::Block_Marker);
-		auto pBlock = test::GenerateEmptyRandomBlock();
-		auto blockElement = test::BlockToBlockElement(*pBlock);
+		AssertCanPublishBlockHeader(test::GenerateEmptyRandomBlock());
+	}
 
-		// Act:
-		context.publishBlockHeader(blockElement);
-
-		// Assert:
-		zmq::multipart_t message;
-		test::ZmqReceive(message, context.zmqSocket());
-
-		test::AssertBlockHeaderMessage(message, blockElement);
+	TEST(TEST_CLASS, CanPublishImportanceBlockHeader) {
+		AssertCanPublishBlockHeader(test::GenerateImportanceBlockWithTransactions(test::ConstTransactions()));
 	}
 
 	// endregion
@@ -130,16 +174,36 @@ namespace catapult { namespace zeromq {
 		// Arrange:
 		EntityPublisherContext context;
 		context.subscribe(BlockMarker::Drop_Blocks_Marker);
-		Height height(123);
 
 		// Act:
-		context.publishDropBlocks(height);
+		context.publishDropBlocks(Height(123));
 
 		// Assert:
 		zmq::multipart_t message;
 		test::ZmqReceive(message, context.zmqSocket());
 
-		test::AssertDropBlocksMessage(message, height);
+		test::AssertDropBlocksMessage(message, Height(123));
+	}
+
+	// endregion
+
+	// region publishFinalizedBlock
+
+	TEST(TEST_CLASS, CanPublishFinalizedBlock) {
+		// Arrange:
+		EntityPublisherContext context;
+		context.subscribe(BlockMarker::Finalized_Block_Marker);
+
+		auto hash = test::GenerateRandomByteArray<Hash256>();
+
+		// Act:
+		context.publishFinalizedBlock({ FinalizationEpoch(24), FinalizationPoint(55) }, Height(123), hash);
+
+		// Assert:
+		zmq::multipart_t message;
+		test::ZmqReceive(message, context.zmqSocket());
+
+		test::AssertFinalizedBlockMessage(message, { FinalizationEpoch(24), FinalizationPoint(55) }, Height(123), hash);
 	}
 
 	// endregion
@@ -219,7 +283,7 @@ namespace catapult { namespace zeromq {
 		// Arrange:
 		EntityPublisherContext context;
 		auto pTransaction = mocks::CreateMockTransaction(0);
-		auto recipientAddress = model::PublicKeyToAddress(pTransaction->RecipientPublicKey, pTransaction->Network);
+		auto recipientAddress = mocks::GetRecipientAddress(*pTransaction);
 		auto unresolvedRecipientAddress = extensions::CopyToUnresolvedAddress(recipientAddress);
 		auto transactionInfo = ToTransactionInfo(std::move(pTransaction));
 		Height height(123);
@@ -315,7 +379,7 @@ namespace catapult { namespace zeromq {
 		context.publishTransactionStatus(*pTransaction, hash, 123);
 
 		// Assert:
-		model::TransactionStatus expectedTransactionStatus(hash, 123, pTransaction->Deadline);
+		model::TransactionStatus expectedTransactionStatus(hash, pTransaction->Deadline, 123);
 		test::AssertMessages(context.zmqSocket(), marker, addresses, [&expectedTransactionStatus](const auto& message, const auto& topic) {
 			test::AssertTransactionStatusMessage(message, topic, expectedTransactionStatus);
 		});
@@ -329,17 +393,16 @@ namespace catapult { namespace zeromq {
 		// Arrange:
 		EntityPublisherContext context;
 		auto transactionInfo = ToTransactionInfo(mocks::CreateMockTransaction(0));
-		auto signer = test::GenerateRandomByteArray<Key>();
-		auto signature = test::GenerateRandomByteArray<Signature>();
+		auto cosignature = test::CreateRandomDetachedCosignature();
 		auto addresses = test::ExtractAddresses(test::ToMockTransaction(*transactionInfo.pEntity));
 		TransactionMarker marker = TransactionMarker::Cosignature_Marker;
 		context.subscribeAll(marker, addresses);
 
 		// Act:
-		context.publishCosignature(transactionInfo, signer, signature);
+		context.publishCosignature(transactionInfo, cosignature);
 
 		// Assert:
-		model::DetachedCosignature expectedDetachedCosignature(signer, signature, transactionInfo.EntityHash);
+		model::DetachedCosignature expectedDetachedCosignature(cosignature, transactionInfo.EntityHash);
 		auto& zmqSocket = context.zmqSocket();
 		test::AssertMessages(zmqSocket, marker, addresses, [&expectedDetachedCosignature](const auto& message, const auto& topic) {
 			test::AssertDetachedCosignatureMessage(message, topic, expectedDetachedCosignature);

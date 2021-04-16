@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,6 +23,12 @@
 #include "catapult/state/CatapultState.h"
 
 namespace catapult { namespace test {
+
+	/// Creates random catapult state.
+	state::CatapultState CreateRandomCatapultState();
+
+	/// Creates deterministic catapult state.
+	state::CatapultState CreateDeterministicCatapultState();
 
 	/// Asserts that catapult state \a actual is equal to \a expected with optional \a message.
 	void AssertEqual(const state::CatapultState& expected, const state::CatapultState& actual, const std::string& message = "");

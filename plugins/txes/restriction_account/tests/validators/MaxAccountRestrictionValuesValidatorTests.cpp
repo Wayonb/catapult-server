@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -77,8 +78,8 @@ namespace catapult { namespace validators {
 			// Arrange:
 			auto initialValues = test::GenerateUniqueRandomDataVector<typename TRestrictionValueTraits::ValueType>(numInitialValues);
 			auto cache = test::AccountRestrictionCacheFactory::Create();
-			auto key = test::GenerateRandomByteArray<Key>();
-			test::PopulateCache<TRestrictionValueTraits>(cache, key, initialValues);
+			auto address = test::GenerateRandomByteArray<Address>();
+			test::PopulateCache<TRestrictionValueTraits>(cache, address, initialValues);
 
 			std::vector<typename TRestrictionValueTraits::UnresolvedValueType> restrictionAdditions;
 			for (auto i = 0u; i < numAdditions; ++i)
@@ -90,7 +91,7 @@ namespace catapult { namespace validators {
 
 			auto pValidator = TRestrictionValueTraits::CreateValidator(maxAccountRestrictionValues);
 			auto notification = test::CreateAccountRestrictionsNotification<TRestrictionValueTraits>(
-					key,
+					address,
 					restrictionAdditions,
 					restrictionDeletions);
 

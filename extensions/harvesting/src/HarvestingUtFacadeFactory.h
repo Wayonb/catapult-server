@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -26,15 +27,19 @@
 
 namespace catapult { namespace harvesting {
 
+	/// Importance block hash supplier.
+	using ImportanceBlockHashSupplier = std::function<Hash256 (Height)>;
+
 	/// Facade around unconfirmed transactions cache and updater.
 	class HarvestingUtFacade {
 	public:
-		/// Creates a facade around \a blockTime, \a cache, \a blockChainConfig and \a executionConfig.
+		/// Creates a facade around \a blockTime, \a cache, \a blockChainConfig, \a executionConfig and \a importanceBlockHashSupplier.
 		HarvestingUtFacade(
 				Timestamp blockTime,
 				const cache::CatapultCache& cache,
 				const model::BlockChainConfiguration& blockChainConfig,
-				const chain::ExecutionConfiguration& executionConfig);
+				const chain::ExecutionConfiguration& executionConfig,
+				const ImportanceBlockHashSupplier& importanceBlockHashSupplier);
 
 		/// Destroys the facade.
 		~HarvestingUtFacade();
@@ -70,11 +75,12 @@ namespace catapult { namespace harvesting {
 	/// Factory for creating unconfirmed transactions facades.
 	class HarvestingUtFacadeFactory {
 	public:
-		/// Creates a factory around \a cache, \a blockChainConfig and \a executionConfig.
+		/// Creates a factory around \a cache, \a blockChainConfig, \a executionConfig and \a importanceBlockHashSupplier.
 		HarvestingUtFacadeFactory(
 				const cache::CatapultCache& cache,
 				const model::BlockChainConfiguration& blockChainConfig,
-				const chain::ExecutionConfiguration& executionConfig);
+				const chain::ExecutionConfiguration& executionConfig,
+				const ImportanceBlockHashSupplier& importanceBlockHashSupplier);
 
 	public:
 		/// Creates a facade for applying transactions at a given block time (\a blockTime).
@@ -84,5 +90,6 @@ namespace catapult { namespace harvesting {
 		const cache::CatapultCache& m_cache;
 		model::BlockChainConfiguration m_blockChainConfig;
 		chain::ExecutionConfiguration m_executionConfig;
+		ImportanceBlockHashSupplier m_importanceBlockHashSupplier;
 	};
 }}

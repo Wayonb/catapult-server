@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,7 +20,8 @@
 **/
 
 #pragma once
-#include <boost/filesystem/path.hpp>
+#include "catapult/utils/TimeSpan.h"
+#include <filesystem>
 #include <string>
 #include <unordered_set>
 
@@ -39,6 +41,12 @@ namespace catapult { namespace mongo {
 		/// Maximum number of database writer threads.
 		uint32_t MaxWriterThreads;
 
+		/// Maximum number of heights to drop at once.
+		uint32_t MaxDropBatchSize;
+
+		/// Write timeout.
+		utils::TimeSpan WriteTimeout;
+
 		/// Named database plugins to enable.
 		std::unordered_set<std::string> Plugins;
 
@@ -54,6 +62,6 @@ namespace catapult { namespace mongo {
 		static DatabaseConfiguration LoadFromBag(const utils::ConfigurationBag& bag);
 
 		/// Loads a database configuration from \a resourcesPath.
-		static DatabaseConfiguration LoadFromPath(const boost::filesystem::path& resourcesPath);
+		static DatabaseConfiguration LoadFromPath(const std::filesystem::path& resourcesPath);
 	};
 }}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -27,23 +28,26 @@
 
 namespace catapult { namespace api {
 
-	/// Information about a chain.
-	struct ChainInfo {
+	/// Chain statistics.
+	struct ChainStatistics {
 		/// Chain height.
 		catapult::Height Height;
+
+		/// Finalized chain height.
+		catapult::Height FinalizedHeight;
 
 		/// Chain score.
 		model::ChainScore Score;
 	};
 
-	/// Api for retrieving chain information from a node.
+	/// Api for retrieving chain statistics from a node.
 	class ChainApi : public utils::NonCopyable {
 	public:
 		virtual ~ChainApi() = default;
 
 	public:
-		/// Gets information about the chain.
-		virtual thread::future<ChainInfo> chainInfo() const = 0;
+		/// Gets the chain statistics.
+		virtual thread::future<ChainStatistics> chainStatistics() const = 0;
 
 		/// Gets the hashes starting at \a height but no more than \a maxHashes.
 		virtual thread::future<model::HashRange> hashesFrom(Height height, uint32_t maxHashes) const = 0;

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,7 +23,6 @@
 #include "EntityTestUtils.h"
 #include "sdk/src/extensions/TransactionExtensions.h"
 #include "mocks/MockTransaction.h"
-#include "catapult/crypto/KeyUtils.h"
 #include "catapult/crypto/Signer.h"
 #include "catapult/model/VerifiableEntity.h"
 #include "catapult/utils/HexParser.h"
@@ -33,18 +33,22 @@
 
 namespace catapult { namespace test {
 
-	GenerationHash GetDefaultGenerationHash() {
-		return utils::ParseByteArray<GenerationHash>("AAAABBBBCCCCDDDDEEEEFFFFAAAABBBBCCCCDDDDEEEEFFFFAAAABBBBCCCCDDDD");
+	GenerationHashSeed GetDefaultGenerationHashSeed() {
+		return utils::ParseByteArray<GenerationHashSeed>("AAAABBBBCCCCDDDDEEEEFFFFAAAABBBBCCCCDDDDEEEEFFFFAAAABBBBCCCCDDDD");
+	}
+
+	size_t GetDefaultRandomTransactionSize() {
+		return GenerateRandomTransaction()->Size;
 	}
 
 	std::unique_ptr<model::Transaction> GenerateRandomTransaction() {
-		return GenerateRandomTransaction(GetDefaultGenerationHash());
+		return GenerateRandomTransaction(GetDefaultGenerationHashSeed());
 	}
 
-	std::unique_ptr<model::Transaction> GenerateRandomTransaction(const GenerationHash& generationHash) {
+	std::unique_ptr<model::Transaction> GenerateRandomTransaction(const GenerationHashSeed& generationHashSeed) {
 		auto signer = GenerateKeyPair();
 		auto pTransaction = GenerateRandomTransaction(signer.publicKey());
-		extensions::TransactionExtensions(generationHash).sign(signer, *pTransaction);
+		extensions::TransactionExtensions(generationHashSeed).sign(signer, *pTransaction);
 		return pTransaction;
 	}
 
@@ -52,7 +56,7 @@ namespace catapult { namespace test {
 		auto pTransaction = mocks::CreateMockTransaction(12);
 		pTransaction->SignerPublicKey = signer;
 		pTransaction->Version = 1;
-		pTransaction->Network = model::NetworkIdentifier::Mijin_Test;
+		pTransaction->Network = model::NetworkIdentifier::Private_Test;
 		return PORTABLE_MOVE(pTransaction);
 	}
 
@@ -72,10 +76,10 @@ namespace catapult { namespace test {
 		return constTransactions;
 	}
 
-	std::unique_ptr<model::Transaction> GenerateRandomTransactionWithSize(size_t entitySize) {
+	std::unique_ptr<model::Transaction> GenerateRandomTransactionWithSize(uint32_t entitySize) {
 		auto pEntity = utils::MakeUniqueWithSize<model::Transaction>(entitySize);
 		FillWithRandomData(MutableRawBuffer{ reinterpret_cast<uint8_t*>(pEntity.get()), entitySize });
-		pEntity->Size = static_cast<uint32_t>(entitySize);
+		pEntity->Size = entitySize;
 		pEntity->Type = static_cast<model::EntityType>(0x4000 | (0x0FFF & utils::to_underlying_type(pEntity->Type)));
 		return pEntity;
 	}
@@ -95,11 +99,11 @@ namespace catapult { namespace test {
 		pTransaction->Network = model::NetworkIdentifier::Zero;
 		pTransaction->MaxFee = Amount(2468);
 		pTransaction->Deadline = Timestamp(45678);
-		pTransaction->RecipientPublicKey = crypto::ParseKey("72B69A64B20AF34C3815073647C8A2354800E8E83B718303909ABDC0F38E7ED7");
+		pTransaction->RecipientPublicKey = utils::ParseByteArray<Key>("72B69A64B20AF34C3815073647C8A2354800E8E83B718303909ABDC0F38E7ED7");
 		reinterpret_cast<uint64_t&>(*pTransaction->DataPtr()) = 12345;
 
-		auto generationHash = utils::ParseByteArray<GenerationHash>(test::Deterministic_Network_Generation_Hash_String);
-		extensions::TransactionExtensions(generationHash).sign(keyPair, *pTransaction);
+		auto generationHashSeed = utils::ParseByteArray<GenerationHashSeed>(test::Deterministic_Network_Generation_Hash_Seed_String);
+		extensions::TransactionExtensions(generationHashSeed).sign(keyPair, *pTransaction);
 		return PORTABLE_MOVE(pTransaction);
 	}
 
@@ -126,11 +130,31 @@ namespace catapult { namespace test {
 		return CreateEntityRange<model::Transaction>(transactions);
 	}
 
-	model::DetachedCosignature CreateRandomCosignature() {
-		return model::DetachedCosignature{
-			test::GenerateRandomByteArray<Key>(),
-			test::GenerateRandomByteArray<Signature>(),
-			test::GenerateRandomByteArray<Hash256>()
-		};
+	model::DetachedCosignature CreateRandomDetachedCosignature() {
+		auto cosignature = model::DetachedCosignature(
+				test::GenerateRandomByteArray<Key>(),
+				test::GenerateRandomByteArray<Signature>(),
+				test::GenerateRandomByteArray<Hash256>());
+		cosignature.Version = Random();
+		return cosignature;
+	}
+
+	void AssertCosignature(
+			const model::Cosignature& expectedCosignature,
+			const model::Cosignature& actualCosignature,
+			const std::string& message) {
+		EXPECT_EQ(expectedCosignature.Version, actualCosignature.Version) << message;
+		EXPECT_EQ(expectedCosignature.SignerPublicKey, actualCosignature.SignerPublicKey) << message;
+		EXPECT_EQ(expectedCosignature.Signature, actualCosignature.Signature) << message;
+	}
+
+	void AssertCosignatures(
+			const std::vector<model::Cosignature>& expectedCosignatures,
+			const std::vector<model::Cosignature>& actualCosignatures,
+			const std::string& message) {
+		ASSERT_EQ(expectedCosignatures.size(), actualCosignatures.size()) << message;
+
+		for (auto i = 0u; i < expectedCosignatures.size(); ++i)
+			AssertCosignature(expectedCosignatures[i], actualCosignatures[i], message + ", cosignature at " + std::to_string(i));
 	}
 }}

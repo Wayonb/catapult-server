@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,17 +32,17 @@ namespace catapult { namespace mongo { namespace plugins {
 			using LockInfoType = state::SecretLockInfo;
 
 		public:
-			static void StreamLockInfo(bson_stream::document& builder, const state::SecretLockInfo& secretLockInfo) {
+			static void StreamLockInfo(bson_stream::document& builder, const state::SecretLockInfo& lockInfo) {
 				builder
-						<< "hashAlgorithm" << utils::to_underlying_type(secretLockInfo.HashAlgorithm)
-						<< "secret" << ToBinary(secretLockInfo.Secret)
-						<< "recipientAddress" << ToBinary(secretLockInfo.RecipientAddress)
-						<< "compositeHash" << ToBinary(secretLockInfo.CompositeHash);
+						<< "hashAlgorithm" << utils::to_underlying_type(lockInfo.HashAlgorithm)
+						<< "secret" << ToBinary(lockInfo.Secret)
+						<< "recipientAddress" << ToBinary(lockInfo.RecipientAddress)
+						<< "compositeHash" << ToBinary(lockInfo.CompositeHash);
 			}
 		};
 	}
 
-	bsoncxx::document::value ToDbModel(const state::SecretLockInfo& secretLockInfo, const Address& senderAddress) {
-		return LockInfoMapper<SecretLockInfoMapperTraits>::ToDbModel(secretLockInfo, senderAddress);
+	bsoncxx::document::value ToDbModel(const state::SecretLockInfoHistory& history) {
+		return LockInfoMapper<SecretLockInfoMapperTraits>::ToDbModel(history.back());
 	}
 }}}

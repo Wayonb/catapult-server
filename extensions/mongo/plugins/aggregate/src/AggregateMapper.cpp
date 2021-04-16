@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,6 +37,7 @@ namespace catapult { namespace mongo { namespace plugins {
 			for (auto i = 0u; i < numCosignatures; ++i) {
 				cosignaturesArray
 						<< bson_stream::open_document
+							<< "version" << static_cast<int64_t>(pCosignature->Version)
 							<< "signerPublicKey" << ToBinary(pCosignature->SignerPublicKey)
 							<< "signature" << ToBinary(pCosignature->Signature)
 						<< bson_stream::close_document;

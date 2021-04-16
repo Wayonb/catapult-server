@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -50,8 +51,8 @@ namespace catapult { namespace config {
 		/// Reserved root namespaces that cannot be claimed.
 		std::unordered_set<std::string> ReservedRootNamespaceNames;
 
-		/// Public key of the namespace rental fee sink account.
-		Key NamespaceRentalFeeSinkPublicKey;
+		/// Address of the namespace rental fee sink account.
+		Address NamespaceRentalFeeSinkAddress;
 
 		/// Root namespace rental fee per block.
 		Amount RootNamespaceRentalFeePerBlock;

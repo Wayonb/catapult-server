@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,6 +25,11 @@
 
 namespace catapult { namespace model {
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow" // MetadataType::Mosaic shadows model::Mosaic
+#endif
+
 	/// Metadata type.
 	enum class MetadataType : uint8_t {
 		/// Account metadata.
@@ -36,17 +42,28 @@ namespace catapult { namespace model {
 		Namespace
 	};
 
-	/// Partial metadata key shared by all types of metadata.
-	struct PartialMetadataKey {
-		/// Public key of the metadata source (provider).
-		Key SourcePublicKey;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
-		/// Public key of the metadata target.
-		Key TargetPublicKey;
+	/// Partial metadata key shared by all types of metadata.
+	template<typename TTargetAddress>
+	struct PartialMetadataKeyT {
+		/// Address of the metadata source (provider).
+		Address SourceAddress;
+
+		/// Address of the metadata target.
+		TTargetAddress TargetAddress;
 
 		/// Metadata key scoped to source, target and type.
 		uint64_t ScopedMetadataKey;
 	};
+
+	/// Partial metadata key shared by all types of metadata.
+	using PartialMetadataKey = PartialMetadataKeyT<Address>;
+
+	/// Unresolved partial metadata key shared by all types of metadata.
+	using UnresolvedPartialMetadataKey = PartialMetadataKeyT<UnresolvedAddress>;
 
 	/// Metadata target.
 	struct MetadataTarget {

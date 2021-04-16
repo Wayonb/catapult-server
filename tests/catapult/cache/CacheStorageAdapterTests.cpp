@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,8 +23,8 @@
 #include "catapult/cache/CatapultCache.h"
 #include "catapult/cache/SubCachePluginAdapter.h"
 #include "tests/catapult/cache/test/CacheSerializationTestUtils.h"
-#include "tests/catapult/cache/test/UnsupportedSubCachePlugin.h"
 #include "tests/test/cache/SimpleCache.h"
+#include "tests/test/cache/UnsupportedSubCachePlugin.h"
 #include "tests/test/core/mocks/MockMemoryStream.h"
 #include "tests/TestHarness.h"
 

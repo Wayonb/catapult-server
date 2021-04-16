@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -39,16 +40,19 @@ namespace catapult { namespace builders {
 		public:
 			int8_t MinRemovalDelta;
 			int8_t MinApprovalDelta;
-			std::vector<Key> PublicKeyAdditions;
-			std::vector<Key> PublicKeyDeletions;
+			std::vector<UnresolvedAddress> AddressAdditions;
+			std::vector<UnresolvedAddress> AddressDeletions;
 		};
 
-		void AssertKeys(const std::vector<Key>& expectedKeys, const Key* pKeys, uint16_t numKeys) {
-			ASSERT_EQ(expectedKeys.size(), numKeys);
+		void AssertAddresses(
+				const std::vector<UnresolvedAddress>& expectedAddresses,
+				const UnresolvedAddress* pAddresses,
+				uint16_t count) {
+			ASSERT_EQ(expectedAddresses.size(), count);
 
 			auto i = 0u;
-			for (const auto& expectedKey : expectedKeys) {
-				EXPECT_EQ(expectedKey, pKeys[i]) << "key " << expectedKey << " at index " << i;
+			for (const auto& expectedAddress : expectedAddresses) {
+				EXPECT_EQ(expectedAddress, pAddresses[i]) << "address " << expectedAddress << " at index " << i;
 				++i;
 			}
 		}
@@ -58,8 +62,8 @@ namespace catapult { namespace builders {
 			EXPECT_EQ(expectedProperties.MinRemovalDelta, transaction.MinRemovalDelta);
 			EXPECT_EQ(expectedProperties.MinApprovalDelta, transaction.MinApprovalDelta);
 
-			AssertKeys(expectedProperties.PublicKeyAdditions, transaction.PublicKeyAdditionsPtr(), transaction.PublicKeyAdditionsCount);
-			AssertKeys(expectedProperties.PublicKeyDeletions, transaction.PublicKeyDeletionsPtr(), transaction.PublicKeyDeletionsCount);
+			AssertAddresses(expectedProperties.AddressAdditions, transaction.AddressAdditionsPtr(), transaction.AddressAdditionsCount);
+			AssertAddresses(expectedProperties.AddressDeletions, transaction.AddressDeletionsPtr(), transaction.AddressDeletionsCount);
 		}
 
 		template<typename TTraits>
@@ -68,11 +72,11 @@ namespace catapult { namespace builders {
 				const TransactionProperties& expectedProperties,
 				const consumer<MultisigAccountModificationBuilder&>& buildTransaction) {
 			// Arrange:
-			auto networkId = static_cast<model::NetworkIdentifier>(0x62);
+			auto networkIdentifier = static_cast<model::NetworkIdentifier>(0x62);
 			auto signer = test::GenerateRandomByteArray<Key>();
 
 			// Act:
-			MultisigAccountModificationBuilder builder(networkId, signer);
+			MultisigAccountModificationBuilder builder(networkIdentifier, signer);
 			buildTransaction(builder);
 			auto pTransaction = TTraits::InvokeBuilder(builder);
 
@@ -130,29 +134,29 @@ namespace catapult { namespace builders {
 
 	// region modifications
 
-	TRAITS_BASED_TEST(CanAddSingleKeyAddition) {
+	TRAITS_BASED_TEST(CanAddSingleAddressAddition) {
 		// Arrange:
 		auto expectedProperties = TransactionProperties();
-		expectedProperties.PublicKeyAdditions = test::GenerateRandomDataVector<Key>(1);
-		const auto& publicKeyAdditions = expectedProperties.PublicKeyAdditions;
+		expectedProperties.AddressAdditions = test::GenerateRandomDataVector<UnresolvedAddress>(1);
+		const auto& addressAdditions = expectedProperties.AddressAdditions;
 
 		// Assert:
-		AssertCanBuildTransaction<TTraits>(Key::Size, expectedProperties, [&publicKeyAdditions](auto& builder) {
-			for (const auto& key : publicKeyAdditions)
-				builder.addPublicKeyAddition(key);
+		AssertCanBuildTransaction<TTraits>(UnresolvedAddress::Size, expectedProperties, [&addressAdditions](auto& builder) {
+			for (const auto& address : addressAdditions)
+				builder.addAddressAddition(address);
 		});
 	}
 
-	TRAITS_BASED_TEST(CanAddSingleKeyDeletion) {
+	TRAITS_BASED_TEST(CanAddSingleAddressDeletion) {
 		// Arrange:
 		auto expectedProperties = TransactionProperties();
-		expectedProperties.PublicKeyDeletions = test::GenerateRandomDataVector<Key>(1);
-		const auto& publicKeyDeletions = expectedProperties.PublicKeyDeletions;
+		expectedProperties.AddressDeletions = test::GenerateRandomDataVector<UnresolvedAddress>(1);
+		const auto& addressDeletions = expectedProperties.AddressDeletions;
 
 		// Assert:
-		AssertCanBuildTransaction<TTraits>(Key::Size, expectedProperties, [&publicKeyDeletions](auto& builder) {
-			for (const auto& key : publicKeyDeletions)
-				builder.addPublicKeyDeletion(key);
+		AssertCanBuildTransaction<TTraits>(UnresolvedAddress::Size, expectedProperties, [&addressDeletions](auto& builder) {
+			for (const auto& address : addressDeletions)
+				builder.addAddressDeletion(address);
 		});
 	}
 
@@ -161,21 +165,22 @@ namespace catapult { namespace builders {
 		auto expectedProperties = TransactionProperties();
 		expectedProperties.MinRemovalDelta = -3;
 		expectedProperties.MinApprovalDelta = 3;
-		expectedProperties.PublicKeyAdditions = test::GenerateRandomDataVector<Key>(4);
-		expectedProperties.PublicKeyDeletions = test::GenerateRandomDataVector<Key>(2);
-		const auto& publicKeyAdditions = expectedProperties.PublicKeyAdditions;
-		const auto& publicKeyDeletions = expectedProperties.PublicKeyDeletions;
+		expectedProperties.AddressAdditions = test::GenerateRandomDataVector<UnresolvedAddress>(4);
+		expectedProperties.AddressDeletions = test::GenerateRandomDataVector<UnresolvedAddress>(2);
+		const auto& addressAdditions = expectedProperties.AddressAdditions;
+		const auto& addressDeletions = expectedProperties.AddressDeletions;
 
 		// Assert:
-		AssertCanBuildTransaction<TTraits>(6 * Key::Size, expectedProperties, [&publicKeyAdditions, publicKeyDeletions](auto& builder) {
+		AssertCanBuildTransaction<TTraits>(6 * UnresolvedAddress::Size, expectedProperties, [&addressAdditions, addressDeletions](
+				auto& builder) {
 			builder.setMinRemovalDelta(-3);
 			builder.setMinApprovalDelta(3);
 
-			for (const auto& key : publicKeyAdditions)
-				builder.addPublicKeyAddition(key);
+			for (const auto& address : addressAdditions)
+				builder.addAddressAddition(address);
 
-			for (const auto& key : publicKeyDeletions)
-				builder.addPublicKeyDeletion(key);
+			for (const auto& address : addressDeletions)
+				builder.addAddressDeletion(address);
 		});
 	}
 

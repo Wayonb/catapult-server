@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,30 +29,33 @@
 namespace catapult { namespace api {
 
 	namespace {
+		constexpr auto Block_Header_Size = SizeOf32<model::BlockHeader>() + SizeOf32<model::PaddedBlockFooter>();
+
 		std::shared_ptr<ionet::Packet> CreatePacketWithBlocks(uint32_t numBlocks, Height startHeight) {
-			uint32_t payloadSize = numBlocks * sizeof(model::BlockHeader);
+			uint32_t payloadSize = numBlocks * Block_Header_Size;
 			auto pPacket = ionet::CreateSharedPacket<ionet::Packet>(payloadSize);
 			test::FillWithRandomData({ pPacket->Data(), payloadSize });
 
-			auto pData = pPacket->Data();
-			for (auto i = 0u; i < numBlocks; ++i, pData += sizeof(model::BlockHeader)) {
+			auto* pData = pPacket->Data();
+			for (auto i = 0u; i < numBlocks; ++i, pData += Block_Header_Size) {
 				auto& block = reinterpret_cast<model::Block&>(*pData);
-				block.Size = sizeof(model::BlockHeader);
-				block.Type = model::Entity_Type_Block;
+				block.Size = Block_Header_Size;
+				block.Type = model::Entity_Type_Block_Normal;
 				block.Height = startHeight + Height(i);
 			}
 
 			return pPacket;
 		}
 
-		struct ChainInfoTraits {
+		struct ChainStatisticsTraits {
 			static auto Invoke(const ChainApi& api) {
-				return api.chainInfo();
+				return api.chainStatistics();
 			}
 
 			static auto CreateValidResponsePacket() {
-				auto pResponsePacket = ionet::CreateSharedPacket<ChainInfoResponse>();
+				auto pResponsePacket = ionet::CreateSharedPacket<ChainStatisticsResponse>();
 				pResponsePacket->Height = Height(625);
+				pResponsePacket->FinalizedHeight = Height(256);
 				pResponsePacket->ScoreHigh = 0x1234567812345678;
 				pResponsePacket->ScoreLow = 0xABCDABCDABCDABCD;
 				return pResponsePacket;
@@ -65,13 +69,14 @@ namespace catapult { namespace api {
 			}
 
 			static void ValidateRequest(const ionet::Packet& packet) {
-				EXPECT_TRUE(ionet::IsPacketValid(packet, ChainInfoResponse::Packet_Type));
+				EXPECT_TRUE(ionet::IsPacketValid(packet, ChainStatisticsResponse::Packet_Type));
 			}
 
-			static void ValidateResponse(const ionet::Packet&, const ChainInfo& info) {
-				EXPECT_EQ(Height(625), info.Height);
+			static void ValidateResponse(const ionet::Packet&, const ChainStatistics& chainStatistics) {
+				EXPECT_EQ(Height(625), chainStatistics.Height);
+				EXPECT_EQ(Height(256), chainStatistics.FinalizedHeight);
 
-				auto scoreArray = info.Score.toArray();
+				auto scoreArray = chainStatistics.Score.toArray();
 				EXPECT_EQ(0x1234567812345678u, scoreArray[0]);
 				EXPECT_EQ(0xABCDABCDABCDABCDu, scoreArray[1]);
 			}
@@ -153,7 +158,7 @@ namespace catapult { namespace api {
 
 			static void ValidateResponse(const ionet::Packet& response, const std::shared_ptr<const model::Block>& pBlock) {
 				ASSERT_EQ(response.Size - sizeof(ionet::Packet), pBlock->Size);
-				ASSERT_EQ(sizeof(model::BlockHeader), pBlock->Size);
+				ASSERT_EQ(Block_Header_Size, pBlock->Size);
 				EXPECT_EQ(TInvoker::Request_Height, pBlock->Height);
 				EXPECT_EQ_MEMORY(response.Data(), pBlock.get(), pBlock->Size);
 			}
@@ -193,7 +198,7 @@ namespace catapult { namespace api {
 			static void ValidateResponse(const ionet::Packet& response, const model::BlockRange& blocks) {
 				ASSERT_EQ(3u, blocks.size());
 
-				auto pData = response.Data();
+				const auto* pData = response.Data();
 				auto iter = blocks.cbegin();
 				for (auto i = 0u; i < blocks.size(); ++i) {
 					std::string message = "comparing blocks at " + std::to_string(i);
@@ -225,11 +230,11 @@ namespace catapult { namespace api {
 		};
 	}
 
-	DEFINE_REMOTE_API_TESTS_EMPTY_RESPONSE_INVALID(RemoteChainApiBlockless, ChainInfo)
+	DEFINE_REMOTE_API_TESTS_EMPTY_RESPONSE_INVALID(RemoteChainApiBlockless, ChainStatistics)
 	DEFINE_REMOTE_API_TESTS_EMPTY_RESPONSE_INVALID(RemoteChainApiBlockless, HashesFrom)
 
 	DEFINE_REMOTE_API_TESTS(RemoteChainApi)
-	DEFINE_REMOTE_API_TESTS_EMPTY_RESPONSE_INVALID(RemoteChainApi, ChainInfo)
+	DEFINE_REMOTE_API_TESTS_EMPTY_RESPONSE_INVALID(RemoteChainApi, ChainStatistics)
 	DEFINE_REMOTE_API_TESTS_EMPTY_RESPONSE_INVALID(RemoteChainApi, HashesFrom)
 	DEFINE_REMOTE_API_TESTS_EMPTY_RESPONSE_INVALID(RemoteChainApi, BlockLast)
 	DEFINE_REMOTE_API_TESTS_EMPTY_RESPONSE_INVALID(RemoteChainApi, BlockAt)

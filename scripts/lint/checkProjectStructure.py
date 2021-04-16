@@ -53,13 +53,13 @@ class AnalyzerOptions():
 
 
 USER_SOURCE_DIRS = {
-    'src': Rules.Default,
-    'sdk': Rules.Plugin,
-    'tests': Rules.Default,
-    'plugins': Rules.Plugin,
-    'extensions': Rules.Extension,
-    'tools': Rules.Tools,
-    'internal/tools': Rules.Tools
+    'src': Rules.DEFAULT,
+    'sdk': Rules.PLUGIN,
+    'tests': Rules.DEFAULT,
+    'plugins': Rules.PLUGIN,
+    'extensions': Rules.EXTENSION,
+    'tools': Rules.TOOLS,
+    'internal/tools': Rules.TOOLS
 }
 
 
@@ -74,15 +74,19 @@ def isSpecialInclude(includePath):
 
 
 class CheckResult(Enum):
-    Success = 1
-    Multiple = 2
-    Invalid = 3
-    Empty = 4
+    SUCCESS = 1
+    MULTIPLE = 2
+    INVALID = 3
+    EMPTY = 4
+
+
+def isExternalInclude(inc):
+    return inc.startswith('<donna') or inc.startswith('<openssl')
 
 
 def checkExternalInclude(incA, incB):
-    extA = incA.startswith('<donna') or incA.startswith('<ripemd160') or incA.startswith('<sha3')
-    extB = incB.startswith('<donna') or incB.startswith('<ripemd160') or incB.startswith('<sha3')
+    extA = isExternalInclude(incA)
+    extB = isExternalInclude(incB)
 
     if extA and not extB:
         return True
@@ -94,7 +98,7 @@ def checkExternalInclude(incA, incB):
 
 
 def isCppInclude(inc):
-    cppIncludes = ['<boost', '<mongocxx', '<bsoncxx', '<rocksdb', '<benchmark', '<tiny-aes-c']
+    cppIncludes = ['<boost', '<mongocxx', '<bsoncxx', '<rocksdb', '<benchmark']
     return any(map(inc.startswith, cppIncludes))
 
 
@@ -153,13 +157,6 @@ class SortableInclude(HeaderParser.Include):
     def __init__(self, inc, ruleset):
         super().__init__(inc.line, inc.lineno, inc.include, inc.rest)
         self.ruleset = ruleset
-
-    @staticmethod
-    def isLibraryInclude(name):
-        for libraryName in ['<ref10', '<ripemd160', '<sha3', '<boost']:
-            if name.startswith(libraryName):
-                return True
-        return False
 
     def comparePaths(self, other):
         incA = self.include
@@ -256,13 +253,13 @@ class Entry:
         self.expectedNamespace = ''
         for filtered in NAMESPACES_FALSEPOSITIVES:
             if filtered.match(self.fullPath()):
-                return CheckResult.Success
+                return CheckResult.SUCCESS
 
         if not self.namespaces:
-            return CheckResult.Empty
+            return CheckResult.EMPTY
 
         if len(self.namespaces) != 1:
-            return CheckResult.Multiple
+            return CheckResult.MULTIPLE
 
         namespace = self.namespaces[0].name.split('::')
         namespace.append('')
@@ -273,8 +270,8 @@ class Entry:
             result = result[0]
 
         if result:
-            return CheckResult.Success
-        return CheckResult.Invalid
+            return CheckResult.SUCCESS
+        return CheckResult.INVALID
 
     def fixRelative(self, elem):
         temp = re.sub(self.includeFixOwnPath, '', elem.include)
@@ -295,7 +292,7 @@ class Entry:
         sortedIncludes = []
         originalIncludes = []
         for elem in preprocessor:
-            if elem.type != HeaderParser.PpType.Include:
+            if elem.type != HeaderParser.PpType.INCLUDE:
                 continue
 
             if isSpecialInclude(elem.include):
@@ -656,20 +653,20 @@ class Analyzer:
         inconsistent = []
         multiple = []
         other = []
-        for _, namespace in self.filter(CheckResult.Invalid):
+        for _, namespace in self.filter(CheckResult.INVALID):
             with io.StringIO() as output:
                 name = os.path.join(namespace.path, namespace.filename)
                 expected = '' if not namespace.expectedNamespace else ' expected >>{}<<'.format(namespace.expectedNamespace)
                 msg = '{} namespace is inconsistent with file location: >>{}<<{}'.format(name, namespace.namespaces[0].name, expected)
                 reporter.formatFailure(output, 'inconsistent', name, msg)
                 inconsistent.append(output.getvalue())
-        for _, namespace in self.filter(CheckResult.Multiple):
+        for _, namespace in self.filter(CheckResult.MULTIPLE):
             with io.StringIO() as output:
                 name = os.path.join(namespace.path, namespace.filename)
                 msg = '{} Multiple: >>{}<<'.format(name, namespace.namespaces)
                 reporter.formatFailure(output, 'multiple', name, msg)
                 multiple.append(output.getvalue())
-        for _, namespace in self.filter(CheckResult.Empty):
+        for _, namespace in self.filter(CheckResult.EMPTY):
             with io.StringIO() as output:
                 name = os.path.join(namespace.path, namespace.filename)
                 msg = '{} Couldn\'t figure out namespace'.format(name)

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -58,9 +59,8 @@ namespace catapult { namespace validators {
 	DECLARE_STATELESS_VALIDATOR(AccountRestrictionModificationPresent, model::AccountRestrictionModificationNotification)();
 
 	/// Validator that applies to account address restriction value notifications and validates that:
-	/// - modification value for network with id \a networkIdentifier is valid
-	DECLARE_STATELESS_VALIDATOR(AccountAddressRestrictionNoSelfModification, model::ModifyAccountAddressRestrictionValueNotification)(
-			model::NetworkIdentifier networkIdentifier);
+	/// - modification value is valid
+	DECLARE_STATEFUL_VALIDATOR(AccountAddressRestrictionNoSelfModification, model::ModifyAccountAddressRestrictionValueNotification)();
 
 	/// Validator that applies to address interaction notifications and validates that:
 	/// - the source address is allowed to interact with all participant addresses

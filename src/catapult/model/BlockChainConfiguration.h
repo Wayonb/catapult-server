@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -93,11 +94,30 @@ namespace catapult { namespace model {
 		/// Maximum number of harvesting mosaic atomic units needed for an account to be eligible for harvesting.
 		Amount MaxHarvesterBalance;
 
+		/// Minimum number of harvesting mosaic atomic units needed for an account to be eligible for voting.
+		Amount MinVoterBalance;
+
+		/// Number of blocks that should be treated as a group for voting set purposes.
+		/// \note Voting sets will only be calculated at blocks that are multiples of this grouping number.
+		uint64_t VotingSetGrouping;
+
+		/// Maximum number of voting keys that can be registered at once per account.
+		uint8_t MaxVotingKeysPerAccount;
+
+		/// Minimum number of finalization rounds for which voting key can be registered.
+		uint32_t MinVotingKeyLifetime;
+
+		/// Maximum number of finalization rounds for which voting key can be registered.
+		uint32_t MaxVotingKeyLifetime;
+
 		/// Percentage of the harvested fee that is collected by the beneficiary account.
 		uint8_t HarvestBeneficiaryPercentage;
 
-		/// Number of blocks between cache pruning.
-		uint32_t BlockPruneInterval;
+		/// Percentage of the harvested fee that is collected by the network.
+		uint8_t HarvestNetworkPercentage;
+
+		/// Address of the harvest network fee sink account.
+		Address HarvestNetworkFeeSinkAddress;
 
 		/// Maximum number of transactions per block.
 		uint32_t MaxTransactionsPerBlock;
@@ -119,17 +139,8 @@ namespace catapult { namespace model {
 	/// Gets the unresolved currency mosaic id from \a config.
 	UnresolvedMosaicId GetUnresolvedCurrencyMosaicId(const BlockChainConfiguration& config);
 
-	/// Calculates the duration of a full rollback for the block chain described by \a config.
-	utils::TimeSpan CalculateFullRollbackDuration(const BlockChainConfiguration& config);
-
-	/// Calculates the duration of the rollback variability buffer for the block chain described by \a config.
-	utils::TimeSpan CalculateRollbackVariabilityBufferDuration(const BlockChainConfiguration& config);
-
 	/// Calculates the duration of time that expired transactions should be cached for the block chain described by \a config.
 	utils::TimeSpan CalculateTransactionCacheDuration(const BlockChainConfiguration& config);
-
-	/// Calculates the number of historical difficulties to cache in memory for the block chain described by \a config.
-	uint64_t CalculateDifficultyHistorySize(const BlockChainConfiguration& config);
 
 	/// Loads plugin configuration for plugin named \a pluginName from \a config.
 	template<typename T>

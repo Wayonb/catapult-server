@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,8 +20,11 @@
 **/
 
 #include "BlockChainConfiguration.h"
+#include "Address.h"
 #include "catapult/utils/ConfigurationBag.h"
 #include "catapult/utils/ConfigurationUtils.h"
+
+DEFINE_ADDRESS_CONFIGURATION_VALUE_SUPPORT
 
 namespace catapult { namespace model {
 
@@ -44,8 +48,8 @@ namespace catapult { namespace model {
 
 		LOAD_NETWORK_PROPERTY(Identifier);
 		LOAD_NETWORK_PROPERTY(NodeEqualityStrategy);
-		LOAD_NETWORK_PROPERTY(PublicKey);
-		LOAD_NETWORK_PROPERTY(GenerationHash);
+		LOAD_NETWORK_PROPERTY(NemesisSignerPublicKey);
+		LOAD_NETWORK_PROPERTY(GenerationHashSeed);
 		LOAD_NETWORK_PROPERTY(EpochAdjustment);
 
 #undef LOAD_NETWORK_PROPERTY
@@ -76,9 +80,17 @@ namespace catapult { namespace model {
 		LOAD_CHAIN_PROPERTY(TotalChainImportance);
 		LOAD_CHAIN_PROPERTY(MinHarvesterBalance);
 		LOAD_CHAIN_PROPERTY(MaxHarvesterBalance);
-		LOAD_CHAIN_PROPERTY(HarvestBeneficiaryPercentage);
+		LOAD_CHAIN_PROPERTY(MinVoterBalance);
 
-		LOAD_CHAIN_PROPERTY(BlockPruneInterval);
+		LOAD_CHAIN_PROPERTY(VotingSetGrouping);
+		LOAD_CHAIN_PROPERTY(MaxVotingKeysPerAccount);
+		LOAD_CHAIN_PROPERTY(MinVotingKeyLifetime);
+		LOAD_CHAIN_PROPERTY(MaxVotingKeyLifetime);
+
+		LOAD_CHAIN_PROPERTY(HarvestBeneficiaryPercentage);
+		LOAD_CHAIN_PROPERTY(HarvestNetworkPercentage);
+		LOAD_CHAIN_PROPERTY(HarvestNetworkFeeSinkAddress);
+
 		LOAD_CHAIN_PROPERTY(MaxTransactionsPerBlock);
 
 #undef LOAD_CHAIN_PROPERTY
@@ -98,37 +110,38 @@ namespace catapult { namespace model {
 			numPluginProperties += iter->second.size();
 		}
 
-		utils::VerifyBagSizeLte(bag, 5 + 21 + numPluginProperties);
+		utils::VerifyBagSizeExact(bag, 5 + 27 + numPluginProperties);
 		return config;
 	}
 
 	// endregion
 
-	// region utils
+	// region calculated properties
 
 	UnresolvedMosaicId GetUnresolvedCurrencyMosaicId(const BlockChainConfiguration& config) {
 		return UnresolvedMosaicId(config.CurrencyMosaicId.unwrap());
 	}
 
-	utils::TimeSpan CalculateFullRollbackDuration(const BlockChainConfiguration& config) {
-		return utils::TimeSpan::FromMilliseconds(config.BlockGenerationTargetTime.millis() * config.MaxRollbackBlocks);
-	}
+	namespace {
+		utils::TimeSpan CalculateFullRollbackDuration(const BlockChainConfiguration& config) {
+			return utils::TimeSpan::FromMilliseconds(config.BlockGenerationTargetTime.millis() * config.MaxRollbackBlocks);
+		}
 
-	utils::TimeSpan CalculateRollbackVariabilityBufferDuration(const BlockChainConfiguration& config) {
-		// use the greater of 25% of the rollback time or one hour as a buffer against block time variability
-		return utils::TimeSpan::FromHours(4).millis() > CalculateFullRollbackDuration(config).millis()
-				? utils::TimeSpan::FromHours(1)
-				: utils::TimeSpan::FromMilliseconds(CalculateFullRollbackDuration(config).millis() / 4);
+		utils::TimeSpan CalculateRollbackVariabilityBufferDuration(const BlockChainConfiguration& config) {
+			// use the greater of 25% of the rollback time or one hour as a buffer against block time variability
+			return utils::TimeSpan::FromHours(4).millis() > CalculateFullRollbackDuration(config).millis()
+					? utils::TimeSpan::FromHours(1)
+					: utils::TimeSpan::FromMilliseconds(CalculateFullRollbackDuration(config).millis() / 4);
+		}
 	}
 
 	utils::TimeSpan CalculateTransactionCacheDuration(const BlockChainConfiguration& config) {
+		if (0 == config.MaxRollbackBlocks)
+			return config.MaxTransactionLifetime;
+
 		return utils::TimeSpan::FromMilliseconds(
 				CalculateFullRollbackDuration(config).millis()
 				+ CalculateRollbackVariabilityBufferDuration(config).millis());
-	}
-
-	uint64_t CalculateDifficultyHistorySize(const BlockChainConfiguration& config) {
-		return config.MaxRollbackBlocks + config.MaxDifficultyBlocks;
 	}
 
 	// endregion

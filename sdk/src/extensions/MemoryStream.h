@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,23 +20,31 @@
 **/
 
 #pragma once
-#include "catapult/io/BufferInputStreamAdapter.h"
+#include "catapult/io/SeekableStream.h"
 #include <vector>
 
 namespace catapult { namespace extensions {
 
 	/// Memory-based implementation of input and output stream.
-	class MemoryStream : public io::BufferInputStreamAdapter<std::vector<uint8_t>>, public io::OutputStream {
+	class MemoryStream : public io::SeekableStream {
 	public:
 		/// Creates a memory stream around \a buffer.
 		explicit MemoryStream(std::vector<uint8_t>& buffer);
 
 	public:
 		void write(const RawBuffer& buffer) override;
-
 		void flush() override;
+
+	public:
+		bool eof() const override;
+		void read(const MutableRawBuffer& buffer) override;
+
+	public:
+		void seek(uint64_t position) override;
+		uint64_t position() const override;
 
 	private:
 		std::vector<uint8_t>& m_buffer;
+		size_t m_position;
 	};
 }}

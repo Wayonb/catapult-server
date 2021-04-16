@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,20 +32,11 @@ namespace catapult { namespace extensions {
 		return MosaicId(unresolvedMosaicId.unwrap());
 	}
 
-	namespace {
-		template<typename TDest, typename TSource>
-		TDest Copy(const TSource& source) {
-			TDest dest;
-			std::memcpy(dest.data(), source.data(), source.size());
-			return dest;
-		}
-	}
-
 	UnresolvedAddress CopyToUnresolvedAddress(const Address& address) {
-		return Copy<UnresolvedAddress>(address);
+		return address.copyTo<UnresolvedAddress>();
 	}
 
 	Address CopyToAddress(const UnresolvedAddress& unresolvedAddress) {
-		return Copy<Address>(unresolvedAddress);
+		return unresolvedAddress.copyTo<Address>();
 	}
 }}

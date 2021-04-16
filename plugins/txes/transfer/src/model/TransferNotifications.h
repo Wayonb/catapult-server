@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -48,18 +49,22 @@ namespace catapult { namespace model {
 		static constexpr auto Notification_Type = Transfer_Message_Notification;
 
 	public:
-		/// Creates a notification around \a sender, \a recipient, \a messageSize and \a pMessage.
-		TransferMessageNotification(const Key& sender, const UnresolvedAddress& recipient, uint16_t messageSize, const uint8_t* pMessage)
+		/// Creates a notification around \a senderPublicKey, \a recipient, \a messageSize and \a pMessage.
+		TransferMessageNotification(
+				const Key& senderPublicKey,
+				const UnresolvedAddress& recipient,
+				uint16_t messageSize,
+				const uint8_t* pMessage)
 				: Notification(Notification_Type, sizeof(TransferMessageNotification))
-				, Sender(sender)
+				, SenderPublicKey(senderPublicKey)
 				, Recipient(recipient)
 				, MessageSize(messageSize)
 				, MessagePtr(pMessage)
 		{}
 
 	public:
-		/// Message sender.
-		const Key& Sender;
+		/// Message sender public key.
+		const Key& SenderPublicKey;
 
 		/// Message recipient.
 		const UnresolvedAddress& Recipient;

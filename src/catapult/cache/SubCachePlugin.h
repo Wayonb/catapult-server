@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -91,6 +92,12 @@ namespace catapult { namespace cache {
 
 		/// Recalculates the merkle root given the specified chain \a height if supported.
 		virtual void updateMerkleRoot(Height height) = 0;
+
+		/// Prunes the cache at \a height.
+		virtual void prune(Height height) = 0;
+
+		/// Prunes the cache at \a time.
+		virtual void prune(Timestamp time) = 0;
 
 		/// Gets a read-only view of this view.
 		virtual const void* asReadOnly() const = 0;

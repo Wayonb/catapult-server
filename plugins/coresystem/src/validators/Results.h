@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -66,6 +67,37 @@ namespace catapult { namespace validators {
 
 	/// Validation failed because internal padding is nonzero.
 	DEFINE_CORE_RESULT(Nonzero_Internal_Padding, 13);
+
+	/// Validation failed because an address collision is detected.
+	DEFINE_CORE_RESULT(Address_Collision, 14);
+
+	/// Validation failed because an importance block mismatch is detected.
+	DEFINE_CORE_RESULT(Importance_Block_Mismatch, 15);
+
+	/// Validation failed because an unexpected block type is detected.
+	DEFINE_CORE_RESULT(Unexpected_Block_Type, 16);
+
+	// region key link results
+
+	/// Validation failed because link action is invalid.
+	DEFINE_CORE_RESULT(Invalid_Link_Action, 101);
+
+	/// Validation failed because main account is already linked to another account.
+	DEFINE_CORE_RESULT(Link_Already_Exists, 102);
+
+	/// Validation failed because unlink data is not consistent with existing account link.
+	DEFINE_CORE_RESULT(Inconsistent_Unlink_Data, 103);
+
+	/// Validation failed because link range is invalid.
+	DEFINE_CORE_RESULT(Invalid_Link_Range, 104);
+
+	/// Validation failed because main account has too many links of the specified type.
+	DEFINE_CORE_RESULT(Too_Many_Links, 105);
+
+	/// Validation failed because the start epoch is invalid.
+	DEFINE_CORE_RESULT(Link_Start_Epoch_Invalid, 106);
+
+	// endregion
 
 #ifndef CUSTOM_RESULT_DEFINITION
 }}

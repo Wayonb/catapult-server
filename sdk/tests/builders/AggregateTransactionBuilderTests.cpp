@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -51,9 +52,9 @@ namespace catapult { namespace builders {
 		class TestContext {
 		public:
 			explicit TestContext(size_t numTransactions)
-					: m_networkId(static_cast<model::NetworkIdentifier>(0x62))
+					: m_networkIdentifier(static_cast<model::NetworkIdentifier>(0x62))
 					, m_signer(test::GenerateRandomByteArray<Key>())
-					, m_builder(m_networkId, m_signer) {
+					, m_builder(m_networkIdentifier, m_signer) {
 				for (auto i = 0u; i < numTransactions; ++i)
 					m_transactions.push_back(mocks::CreateEmbeddedMockTransaction(static_cast<uint16_t>(31 + i)));
 			}
@@ -111,7 +112,7 @@ namespace catapult { namespace builders {
 			}
 
 		private:
-			const model::NetworkIdentifier m_networkId;
+			const model::NetworkIdentifier m_networkIdentifier;
 			const Key m_signer;
 			AggregateTransactionBuilder m_builder;
 			std::vector<std::unique_ptr<mocks::EmbeddedMockTransaction>> m_transactions;
@@ -146,8 +147,8 @@ namespace catapult { namespace builders {
 		void AssertAggregateCosignaturesTransaction(size_t numCosignatures) {
 			// Arrange: create transaction with 3 embedded transactions
 			TestContext context(3);
-			auto generationHash = test::GenerateRandomByteArray<GenerationHash>();
-			AggregateCosignatureAppender builder(generationHash, context.buildTransaction());
+			auto generationHashSeed = test::GenerateRandomByteArray<GenerationHashSeed>();
+			AggregateCosignatureAppender builder(generationHashSeed, context.buildTransaction());
 			auto cosignatories = GenerateKeys(numCosignatures);
 
 			// Act:
@@ -158,7 +159,7 @@ namespace catapult { namespace builders {
 
 			// Assert:
 			context.assertTransaction(*pTransaction, cosignatories.size(), model::Entity_Type_Aggregate_Complete);
-			auto hash = model::CalculateHash(*pTransaction, generationHash, TransactionDataBuffer(*pTransaction));
+			auto hash = model::CalculateHash(*pTransaction, generationHashSeed, TransactionDataBuffer(*pTransaction));
 			const auto* pCosignature = pTransaction->CosignaturesPtr();
 			for (const auto& cosignatory : cosignatories) {
 				EXPECT_EQ(cosignatory.publicKey(), pCosignature->SignerPublicKey) << "invalid signer";

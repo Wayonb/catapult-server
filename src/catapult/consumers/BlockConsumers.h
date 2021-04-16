@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,6 +25,7 @@
 #include "HashCheckOptions.h"
 #include "InputUtils.h"
 #include "catapult/chain/ChainFunctions.h"
+#include "catapult/crypto/Signer.h"
 #include "catapult/disruptor/DisruptorConsumer.h"
 #include "catapult/validators/ParallelValidationPolicy.h"
 
@@ -37,9 +39,9 @@ namespace catapult {
 namespace catapult { namespace consumers {
 
 	/// Creates a consumer that calculates hashes of all entities using \a transactionRegistry for the network with the specified
-	/// generation hash (\a generationHash).
+	/// generation hash seed (\a generationHashSeed).
 	disruptor::BlockConsumer CreateBlockHashCalculatorConsumer(
-			const GenerationHash& generationHash,
+			const GenerationHashSeed& generationHashSeed,
 			const model::TransactionRegistry& transactionRegistry);
 
 	/// Creates a consumer that checks entities for previous processing based on their hash.
@@ -47,10 +49,8 @@ namespace catapult { namespace consumers {
 	disruptor::ConstBlockConsumer CreateBlockHashCheckConsumer(const chain::TimeSupplier& timeSupplier, const HashCheckOptions& options);
 
 	/// Creates a consumer that checks a block chain for internal integrity.
-	/// Valid chain must have no more than \a maxChainSize blocks and end no more than \a maxBlockFutureTime past the current time
-	/// supplied by \a timeSupplier.
+	/// Valid chain must end no more than \a maxBlockFutureTime past the current time supplied by \a timeSupplier.
 	disruptor::ConstBlockConsumer CreateBlockChainCheckConsumer(
-			uint32_t maxChainSize,
 			const utils::TimeSpan& maxBlockFutureTime,
 			const chain::TimeSupplier& timeSupplier);
 
@@ -63,24 +63,25 @@ namespace catapult { namespace consumers {
 			const std::shared_ptr<const validators::ParallelValidationPolicy>& pValidationPolicy,
 			const RequiresValidationPredicate& requiresValidationPredicate);
 
-	/// Creates a consumer that runs batch signature validation using \a pPublisher and \a pPool for the network with the specified
-	/// generation hash (\a generationHash).
+	/// Creates a consumer that runs batch signature validation using \a pPublisher and \a pool for the network with the specified
+	/// generation hash seed (\a generationHashSeed).
 	/// Validation will only be performed for entities for which \a requiresValidationPredicate returns \c true.
+	/// \a randomFiller is used to generate random bytes.
 	disruptor::ConstBlockConsumer CreateBlockBatchSignatureConsumer(
-			const GenerationHash& generationHash,
-			const std::shared_ptr<model::NotificationPublisher>& pPublisher,
-			const std::shared_ptr<thread::IoThreadPool>& pPool,
+			const GenerationHashSeed& generationHashSeed,
+			const crypto::RandomFiller& randomFiller,
+			const std::shared_ptr<const model::NotificationPublisher>& pPublisher,
+			thread::IoThreadPool& pool,
 			const RequiresValidationPredicate& requiresValidationPredicate);
 
 	/// Creates a consumer that attempts to synchronize a remote chain with the local chain, which is composed of
-	/// state (in \a cache) and blocks (in \a storage).
-	/// \a maxRollbackBlocks The maximum number of blocks that can be rolled back.
+	/// state (in \a cache) and blocks (in \a storage) with \a importanceGrouping.
 	/// \a handlers are used to customize the sync process.
 	/// \note This consumer is non-const because it updates the element generation hashes.
 	disruptor::DisruptorConsumer CreateBlockChainSyncConsumer(
+			uint64_t importanceGrouping,
 			cache::CatapultCache& cache,
 			io::BlockStorageCache& storage,
-			uint32_t maxRollbackBlocks,
 			const BlockChainSyncHandlers& handlers);
 
 	/// Creates a consumer that cleans up temporary state produced by the block chain sync consumer given \a dataDirectory.

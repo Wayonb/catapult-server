@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,30 +21,13 @@
 
 #include "LocalNodeRequestTestUtils.h"
 #include "sdk/src/extensions/BlockExtensions.h"
-#include "plugins/txes/mosaic/src/plugins/MosaicDefinitionTransactionPlugin.h"
-#include "plugins/txes/mosaic/src/plugins/MosaicSupplyChangeTransactionPlugin.h"
-#include "plugins/txes/namespace/src/plugins/MosaicAliasTransactionPlugin.h"
-#include "plugins/txes/namespace/src/plugins/NamespaceRegistrationTransactionPlugin.h"
-#include "plugins/txes/transfer/src/plugins/TransferTransactionPlugin.h"
+#include "sdk/src/extensions/TransactionExtensions.h"
 #include "catapult/preprocessor.h"
-#include "tests/test/core/BlockTestUtils.h"
+#include "tests/test/core/TransactionTestUtils.h"
 #include "tests/test/local/RealTransactionFactory.h"
+#include "tests/test/nodeps/Nemesis.h"
 
 namespace catapult { namespace test {
-
-	// region ExternalSourceConnection
-
-	model::TransactionRegistry ExternalSourceConnection::CreateTransactionRegistry() {
-		auto registry = model::TransactionRegistry();
-		registry.registerPlugin(plugins::CreateMosaicDefinitionTransactionPlugin(plugins::MosaicRentalFeeConfiguration()));
-		registry.registerPlugin(plugins::CreateMosaicSupplyChangeTransactionPlugin());
-		registry.registerPlugin(plugins::CreateMosaicAliasTransactionPlugin());
-		registry.registerPlugin(plugins::CreateNamespaceRegistrationTransactionPlugin(plugins::NamespaceRentalFeeConfiguration()));
-		registry.registerPlugin(plugins::CreateTransferTransactionPlugin());
-		return registry;
-	}
-
-	// endregion
 
 	// region push
 
@@ -51,34 +35,60 @@ namespace catapult { namespace test {
 		CATAPULT_LOG(debug) << " >>>> starting push";
 		std::atomic_bool isWriteFinished(false);
 		connection.connect([&isWriteFinished, &payload](const auto& pPacketSocket) {
+			auto pBufferedIo = pPacketSocket->buffered();
+
 			CATAPULT_LOG(debug) << "writing entity";
-			pPacketSocket->write(payload, [&isWriteFinished](auto code) {
+			pBufferedIo->write(payload, [&isWriteFinished](auto code) {
 				CATAPULT_LOG(debug) << "write result: " << code;
 				isWriteFinished = true;
+			});
+
+			// perform a chain statistics (request / response) to ensure socket is not closed until ssl handshake is completed
+			api::CreateRemoteChainApiWithoutRegistry(*pBufferedIo)->chainStatistics().then([](auto&& chainStatisticsFuture) {
+				try {
+					CATAPULT_LOG(debug) << "received height from remote after pushing payload: " << chainStatisticsFuture.get().Height;
+				} catch (const api::catapult_api_error& ex) {
+					CATAPULT_LOG(warning) << "could not receive height from remote after pushing payload: " << ex.what();
+				}
 			});
 		});
 
 		WAIT_FOR(isWriteFinished);
+
 		CATAPULT_LOG(debug) << " <<< push finished";
 		return connection.io();
 	}
 
 	namespace {
 		crypto::KeyPair GetNemesisAccountKeyPair() {
-			return crypto::KeyPair::FromString(Mijin_Test_Private_Keys[0]); // use a nemesis account
+			return crypto::KeyPair::FromString(Test_Network_Private_Keys[4]); // use a nemesis account
+		}
+
+		model::PreviousBlockContext LoadNemesisPreviousBlockContext() {
+			mocks::MockMemoryBlockStorage storage;
+			auto pNemesisBlockElement = storage.loadBlockElement(Height(1));
+			return model::PreviousBlockContext(*pNemesisBlockElement);
 		}
 
 		std::shared_ptr<model::Block> CreateBlock() {
-			constexpr auto Network_Identifier = model::NetworkIdentifier::Mijin_Test;
+			constexpr auto Network_Identifier = model::NetworkIdentifier::Private_Test;
 			auto signer = GetNemesisAccountKeyPair();
+			auto context = LoadNemesisPreviousBlockContext();
 
-			mocks::MockMemoryBlockStorage storage;
-			auto pNemesisBlockElement = storage.loadBlockElement(Height(1));
-
-			model::PreviousBlockContext context(*pNemesisBlockElement);
-			auto pBlock = model::CreateBlock(context, Network_Identifier, signer.publicKey(), model::Transactions());
+			// ImportanceGrouping is 1
+			auto entityType = model::Entity_Type_Block_Importance;
+			auto pBlock = model::CreateBlock(entityType, context, Network_Identifier, signer.publicKey(), model::Transactions());
 			pBlock->Timestamp = context.Timestamp + Timestamp(60000);
-			extensions::BlockExtensions(GetDefaultGenerationHash()).signFullBlock(signer, *pBlock);
+
+			auto vrfKeyPair = LookupVrfKeyPair(signer.publicKey());
+			auto vrfProof = crypto::GenerateVrfProof(context.GenerationHash, vrfKeyPair);
+			pBlock->GenerationHashProof = { vrfProof.Gamma, vrfProof.VerificationHash, vrfProof.Scalar };
+
+			auto& blockFooter = model::GetBlockFooter<model::ImportanceBlockFooter>(*pBlock);
+			blockFooter.HarvestingEligibleAccountsCount = CountOf(Test_Network_Vrf_Private_Keys);
+			blockFooter.PreviousImportanceBlockHash = context.BlockHash;
+
+			extensions::BlockExtensions(GetDefaultGenerationHashSeed()).signFullBlock(signer, *pBlock);
 			return PORTABLE_MOVE(pBlock);
 		}
 	}
@@ -89,8 +99,15 @@ namespace catapult { namespace test {
 	}
 
 	std::shared_ptr<ionet::PacketIo> PushValidTransaction(ExternalSourceConnection& connection) {
+		auto signer = GetNemesisAccountKeyPair();
+		auto context = LoadNemesisPreviousBlockContext();
+
 		auto recipient = test::GenerateRandomUnresolvedAddress();
-		auto pTransaction = CreateTransferTransaction(GetNemesisAccountKeyPair(), recipient, Amount(10000));
+		auto pTransaction = CreateUnsignedTransferTransaction(signer.publicKey(), recipient, Amount(10000));
+		pTransaction->MaxFee = Amount(10 * pTransaction->Size);
+		pTransaction->Deadline = context.Timestamp + Timestamp(120000);
+		extensions::TransactionExtensions(GetNemesisGenerationHashSeed()).sign(signer, *pTransaction);
+
 		return PushEntity(connection, ionet::PacketType::Push_Transactions, std::shared_ptr<model::Transaction>(std::move(pTransaction)));
 	}
 
@@ -98,10 +115,14 @@ namespace catapult { namespace test {
 
 	// region height
 
+	namespace {
+		constexpr auto Long_Wait_Seconds = 15u;
+	}
+
 	Height GetLocalNodeHeightViaApi(ExternalSourceConnection& connection) {
-		struct ChainInfoResult {
+		struct ChainStatisticsResult {
 		public:
-			ChainInfoResult() : IsHeightReceived(false)
+			ChainStatisticsResult() : IsHeightReceived(false)
 			{}
 
 		public:
@@ -109,16 +130,16 @@ namespace catapult { namespace test {
 			std::atomic_bool IsHeightReceived;
 		};
 
-		auto pChainInfoResult = std::make_shared<ChainInfoResult>();
-		connection.apiCall([pChainInfoResult](const auto& pRemoteChainApi) {
-			pRemoteChainApi->chainInfo().then([pChainInfoResult](auto&& infoFuture) {
-				pChainInfoResult->Height = infoFuture.get().Height;
-				pChainInfoResult->IsHeightReceived = true;
+		auto pChainStatisticsResult = std::make_shared<ChainStatisticsResult>();
+		connection.apiCall([pChainStatisticsResult](const auto& pRemoteChainApi) {
+			pRemoteChainApi->chainStatistics().then([pChainStatisticsResult](auto&& chainStatisticsFuture) {
+				pChainStatisticsResult->Height = chainStatisticsFuture.get().Height;
+				pChainStatisticsResult->IsHeightReceived = true;
 			});
 		});
 
-		WAIT_FOR(pChainInfoResult->IsHeightReceived);
-		return Height(pChainInfoResult->Height);
+		WAIT_FOR_VALUE_SECONDS(true, pChainStatisticsResult->IsHeightReceived, Long_Wait_Seconds);
+		return Height(pChainStatisticsResult->Height);
 	}
 
 	void WaitForLocalNodeHeight(ExternalSourceConnection& connection, Height height) {
@@ -134,8 +155,7 @@ namespace catapult { namespace test {
 			return currentHeight;
 		};
 
-		WAIT_FOR_VALUE_EXPR_SECONDS(height, heightSupplierWithBackoff(), 15);
-
+		WAIT_FOR_VALUE_EXPR_SECONDS(height, heightSupplierWithBackoff(), Long_Wait_Seconds);
 	}
 
 	// endregion

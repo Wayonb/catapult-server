@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,7 +22,6 @@
 #include "src/storages/MongoNamespaceCacheStorage.h"
 #include "src/mappers/NamespaceDescriptor.h"
 #include "mongo/src/mappers/MapperUtils.h"
-#include "catapult/model/Address.h"
 #include "mongo/tests/test/MongoHistoricalCacheStorageTests.h"
 #include "mongo/tests/test/MongoTestUtils.h"
 #include "plugins/txes/namespace/tests/test/NamespaceCacheTestUtils.h"
@@ -83,6 +83,7 @@ namespace catapult { namespace mongo { namespace plugins {
 			using ModelType = NamespaceDescriptor;
 
 			static constexpr auto Collection_Name = "namespaces";
+			static constexpr auto Primary_Document_Name = "namespace";
 			static constexpr auto Network_Id = static_cast<model::NetworkIdentifier>(0x5A);
 			static constexpr auto CreateCacheStorage = CreateMongoNamespaceCacheStorage;
 
@@ -90,15 +91,14 @@ namespace catapult { namespace mongo { namespace plugins {
 				return test::NamespaceCacheFactory::Create();
 			}
 
-			static NamespaceDescriptor GenerateRandomElement(uint32_t id, uint32_t index, bool isActive) {
-				return CreateElement(test::GenerateRandomByteArray<Key>(), id, index, isActive);
+			static NamespaceDescriptor GenerateRandomElement(uint32_t id, uint32_t index, bool isLatest) {
+				return CreateElement(test::CreateRandomOwner(), id, index, isLatest);
 			}
 
-			static NamespaceDescriptor CreateElement(const Key& key, uint32_t id, uint32_t index, bool isActive) {
+			static NamespaceDescriptor CreateElement(const Address& owner, uint32_t id, uint32_t index, bool isLatest) {
 				auto alias = GetNamespaceAlias(NamespaceId(id));
-				auto pRoot = std::make_shared<state::RootNamespace>(NamespaceId(id), key, test::CreateLifetime(123, 456));
-				auto address = model::PublicKeyToAddress(key, Network_Id);
-				return NamespaceDescriptor(CreateRootPath(NamespaceId(id)), alias, pRoot, address, index, isActive);
+				auto pRoot = std::make_shared<state::RootNamespace>(NamespaceId(id), owner, test::CreateLifetime(123, 456));
+				return NamespaceDescriptor(CreateRootPath(NamespaceId(id)), alias, pRoot, owner, index, isLatest);
 			}
 
 			static void Add(cache::CatapultCacheDelta& delta, const ModelType& descriptor) {
@@ -117,7 +117,7 @@ namespace catapult { namespace mongo { namespace plugins {
 			}
 
 			static void AssertEqual(const ModelType& descriptor, const bsoncxx::document::view& view) {
-				test::AssertEqualNamespaceData(descriptor, view["namespace"].get_document().view());
+				test::AssertEqualNamespaceData(descriptor, view[Primary_Document_Name].get_document().view());
 			}
 		};
 	}
@@ -125,13 +125,12 @@ namespace catapult { namespace mongo { namespace plugins {
 	struct NamespaceCacheRootModificationTraits : public NamespaceCacheTraits {
 		static NamespaceDescriptor Mutate(cache::CatapultCacheDelta& delta, ModelType& descriptor) {
 			// change owner
-			auto key = test::GenerateRandomByteArray<Key>();
-			auto pChangedRoot = std::make_shared<state::RootNamespace>(descriptor.pRoot->id(), key, descriptor.pRoot->lifetime());
-			auto address = model::PublicKeyToAddress(key, Network_Id);
+			auto owner = test::CreateRandomOwner();
+			auto pChangedRoot = std::make_shared<state::RootNamespace>(descriptor.pRoot->id(), owner, descriptor.pRoot->lifetime());
 
 			// update cache and return new descriptor
 			const auto& path = descriptor.Path;
-			auto modifiedDescriptor = NamespaceDescriptor(path, descriptor.Alias, pChangedRoot, address, descriptor.Index + 1, true);
+			auto modifiedDescriptor = NamespaceDescriptor(path, descriptor.Alias, pChangedRoot, owner, descriptor.Index + 1, true);
 			Add(delta, modifiedDescriptor);
 			return modifiedDescriptor;
 		}

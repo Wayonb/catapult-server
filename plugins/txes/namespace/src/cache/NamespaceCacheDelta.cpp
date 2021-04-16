@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -70,20 +71,20 @@ namespace catapult { namespace cache {
 		if (pHistory) {
 			// if the owner changed, remove all of the current root's children
 			const auto& activeChildren = pHistory->back().children();
-			if (pHistory->back().ownerPublicKey() != ns.ownerPublicKey()) {
+			if (!ns.canExtend(pHistory->back())) {
 				RemoveAll(*m_pNamespaceById, activeChildren);
 				decrementActiveSize(activeChildren.size());
 			} else {
 				incrementDeepSize(activeChildren.size());
 			}
 
-			pHistory->push_back(ns.ownerPublicKey(), ns.lifetime());
+			pHistory->push_back(ns.ownerAddress(), ns.lifetime());
 			incrementDeepSize();
 			return;
 		}
 
 		state::RootNamespaceHistory history(ns.id());
-		history.push_back(ns.ownerPublicKey(), ns.lifetime());
+		history.push_back(ns.ownerAddress(), ns.lifetime());
 		m_pHistoryById->insert(std::move(history));
 		incrementActiveSize();
 		incrementDeepSize();
@@ -156,7 +157,7 @@ namespace catapult { namespace cache {
 		const auto& currentRoot = pHistory->back();
 		auto numRemovedChildren = removedRoot.children().size();
 		auto numRemovedChildrenAndRoot = 1 + numRemovedChildren;
-		if (removedRoot.ownerPublicKey() != currentRoot.ownerPublicKey()) {
+		if (!removedRoot.canExtend(currentRoot)) {
 			RemoveAll(*m_pNamespaceById, removedRoot.children());
 			decrementActiveSize(numRemovedChildren);
 

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,7 +21,6 @@
 
 #pragma once
 #include "mongo/src/storages/MongoCacheStorage.h"
-#include "catapult/model/Address.h"
 
 namespace catapult { namespace mongo { namespace plugins {
 
@@ -38,9 +38,9 @@ namespace catapult { namespace mongo { namespace plugins {
 			return mappers::ToBinary(key);
 		}
 
-		/// Maps \a lockInfo given network \a networkIdentifier to a mongo document.
-		static auto MapToMongoDocument(const ModelType& lockInfo, model::NetworkIdentifier networkIdentifier) {
-			return plugins::ToDbModel(lockInfo, model::PublicKeyToAddress(lockInfo.SenderPublicKey, networkIdentifier));
+		/// Maps \a lockInfo to a mongo document.
+		static auto MapToMongoDocument(const ModelType& lockInfo, model::NetworkIdentifier) {
+			return plugins::ToDbModel(lockInfo);
 		}
 	};
 }}}

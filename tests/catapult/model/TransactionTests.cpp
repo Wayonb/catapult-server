@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -37,7 +38,7 @@ namespace catapult { namespace model {
 		// Arrange:
 		auto expectedSize = sizeof(VerifiableEntity);
 
-#define FIELD(X) expectedSize += sizeof(Transaction::X);
+#define FIELD(X) expectedSize += SizeOf32<decltype(Transaction::X)>();
 		TRANSACTION_FIELDS
 #undef FIELD
 
@@ -74,7 +75,7 @@ namespace catapult { namespace model {
 	TEST(TEST_CLASS, SizeIsInvalidForTransactionWithUnknownType) {
 		// Arrange:
 		Transaction transaction;
-		transaction.Type = static_cast<EntityType>(-1);
+		transaction.Type = static_cast<EntityType>(std::numeric_limits<uint16_t>::max());
 		transaction.Size = sizeof(Transaction);
 
 		// Act + Assert:
@@ -110,6 +111,26 @@ namespace catapult { namespace model {
 		auto pTransaction = CreateMockTransaction(1);
 
 		// Act + Assert:
+		EXPECT_FALSE(IsSizeValid(*pTransaction));
+	}
+
+	TEST(TEST_CLASS, SizeIsInvalidForTransactionWithReportedSizeLessThanHeaderSize) {
+		// Arrange:
+		std::vector<uint8_t> buffer(sizeof(SizePrefixedEntity));
+		auto* pTransaction = reinterpret_cast<Transaction*>(&buffer[0]);
+		pTransaction->Size = sizeof(SizePrefixedEntity);
+
+		// Act:
+		EXPECT_FALSE(IsSizeValid(*pTransaction));
+	}
+
+	TEST(TEST_CLASS, SizeIsInvalidForTransactionWithReportedSizeLessThanDerivedHeaderSize) {
+		// Arrange:
+		auto pTransaction = std::make_unique<Transaction>();
+		pTransaction->Type = mocks::MockTransaction::Entity_Type;
+		pTransaction->Size = sizeof(Transaction);
+
+		// Act:
 		EXPECT_FALSE(IsSizeValid(*pTransaction));
 	}
 

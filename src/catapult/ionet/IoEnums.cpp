@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -18,7 +19,6 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#include "ConnectionSecurityMode.h"
 #include "ConnectResult.h"
 #include "PacketExtractor.h"
 #include "PacketType.h"
@@ -27,14 +27,6 @@
 #include "catapult/utils/MacroBasedEnumIncludes.h"
 
 namespace catapult { namespace ionet {
-
-#define DEFINE_ENUM ConnectionSecurityMode
-#define EXPLICIT_VALUE_ENUM
-#define ENUM_LIST CONNECTION_SECURITY_MODE_LIST
-#include "catapult/utils/MacroBasedEnum.h"
-#undef ENUM_LIST
-#undef EXPLICIT_VALUE_ENUM
-#undef DEFINE_ENUM
 
 #define DEFINE_ENUM ConnectResult
 #define ENUM_LIST CONNECT_RESULT_LIST
@@ -61,15 +53,4 @@ namespace catapult { namespace ionet {
 #undef ENUM_LIST
 #undef EXPLICIT_VALUE_ENUM
 #undef DEFINE_ENUM
-
-	namespace {
-		const std::array<std::pair<const char*, ConnectionSecurityMode>, 2> String_To_Connection_Security_Mode_Pairs{{
-			{ "None", ConnectionSecurityMode::None },
-			{ "Signed", ConnectionSecurityMode::Signed }
-		}};
-	}
-
-	bool TryParseValue(const std::string& str, ConnectionSecurityMode& modes) {
-		return utils::TryParseBitwiseEnumValue(String_To_Connection_Security_Mode_Pairs, str, modes);
-	}
 }}

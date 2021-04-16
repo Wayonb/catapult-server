@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,6 +23,7 @@
 #include "ServerHooks.h"
 #include "ServiceState.h"
 #include "catapult/config/CatapultConfiguration.h"
+#include "catapult/ionet/NodeInfo.h"
 #include "catapult/ionet/PacketHandlers.h"
 #include "catapult/net/PacketIoPickerContainer.h"
 #include "catapult/thread/Task.h"
@@ -32,11 +34,15 @@ namespace catapult {
 		class ReadWriteUtCache;
 		class UtCache;
 	}
-	namespace extensions { class LocalNodeChainScore; }
+	namespace extensions {
+		class LocalNodeChainScore;
+		struct SelectorSettings;
+	}
 	namespace io { class BlockStorageCache; }
 	namespace ionet { class NodeContainer; }
 	namespace plugins { class PluginManager; }
 	namespace subscribers {
+		class FinalizationSubscriber;
 		class NodeSubscriber;
 		class StateChangeSubscriber;
 		class TransactionStatusSubscriber;
@@ -47,22 +53,26 @@ namespace catapult {
 
 namespace catapult { namespace extensions {
 
+	// region ServiceState
+
 	/// State that is used as part of service registration.
 	class ServiceState {
 	public:
 		/// Creates service state around \a config, \a nodes, \a cache, \a storage, \a score, \a utCache, \a timeSupplier
-		/// \a transactionStatusSubscriber, \a stateChangeSubscriber, \a nodeSubscriber, \a counters, \a pluginManager and \a pool.
+		/// \a finalizationSubscriber, \a nodeSubscriber, \a stateChangeSubscriber, \a transactionStatusSubscriber,
+		/// \a counters, \a pluginManager and \a pool.
 		ServiceState(
 				const config::CatapultConfiguration& config,
 				ionet::NodeContainer& nodes,
 				cache::CatapultCache& cache,
 				io::BlockStorageCache& storage,
 				LocalNodeChainScore& score,
-				cache::ReadWriteUtCache& utCache,
+				cache::MemoryUtCacheProxy& utCache,
 				const supplier<Timestamp>& timeSupplier,
-				subscribers::TransactionStatusSubscriber& transactionStatusSubscriber,
-				subscribers::StateChangeSubscriber& stateChangeSubscriber,
+				subscribers::FinalizationSubscriber& finalizationSubscriber,
 				subscribers::NodeSubscriber& nodeSubscriber,
+				subscribers::StateChangeSubscriber& stateChangeSubscriber,
+				subscribers::TransactionStatusSubscriber& transactionStatusSubscriber,
 				const std::vector<utils::DiagnosticCounter>& counters,
 				const plugins::PluginManager& pluginManager,
 				thread::MultiServicePool& pool)
@@ -71,11 +81,19 @@ namespace catapult { namespace extensions {
 				, m_cache(cache)
 				, m_storage(storage)
 				, m_score(score)
-				, m_utCache(utCache)
+				/**
+				*** cannot hold reference to MemoryUtCacheProxy because it is not allowed to be called across modules
+				*** (it does not have type_visibility attribute) and ServiceState is passed to extensions.
+				*** instead, call MemoryUtCacheProxy::get (both return types with type_visibility attribute) during ServiceState
+				*** construction, which is expected to be in same module as MemoryUtCacheProxy.
+				**/
+				, m_readWriteUtCache(const_cast<const cache::MemoryUtCacheProxy&>(utCache).get())
+				, m_utCache(utCache.get())
 				, m_timeSupplier(timeSupplier)
-				, m_transactionStatusSubscriber(transactionStatusSubscriber)
-				, m_stateChangeSubscriber(stateChangeSubscriber)
+				, m_finalizationSubscriber(finalizationSubscriber)
 				, m_nodeSubscriber(nodeSubscriber)
+				, m_stateChangeSubscriber(stateChangeSubscriber)
+				, m_transactionStatusSubscriber(transactionStatusSubscriber)
 				, m_counters(counters)
 				, m_pluginManager(pluginManager)
 				, m_pool(pool)
@@ -110,7 +128,7 @@ namespace catapult { namespace extensions {
 
 		/// Gets the unconfirmed transactions cache.
 		const cache::ReadWriteUtCache& utCache() const {
-			return m_utCache;
+			return m_readWriteUtCache;
 		}
 
 		/// Gets the unconfirmed transactions cache.
@@ -123,9 +141,14 @@ namespace catapult { namespace extensions {
 			return m_timeSupplier;
 		}
 
-		/// Gets the transaction status subscriber.
-		auto& transactionStatusSubscriber() const {
-			return m_transactionStatusSubscriber;
+		/// Gets the finalization subscriber.
+		auto& finalizationSubscriber() const {
+			return m_finalizationSubscriber;
+		}
+
+		/// Gets the node subscriber.
+		auto& nodeSubscriber() const {
+			return m_nodeSubscriber;
 		}
 
 		/// Gets the state change subscriber.
@@ -133,9 +156,9 @@ namespace catapult { namespace extensions {
 			return m_stateChangeSubscriber;
 		}
 
-		/// Gets the node subscriber.
-		auto& nodeSubscriber() const {
-			return m_nodeSubscriber;
+		/// Gets the transaction status subscriber.
+		auto& transactionStatusSubscriber() const {
+			return m_transactionStatusSubscriber;
 		}
 
 		/// Gets the (basic) counters.
@@ -186,12 +209,14 @@ namespace catapult { namespace extensions {
 		cache::CatapultCache& m_cache;
 		io::BlockStorageCache& m_storage;
 		LocalNodeChainScore& m_score;
-		cache::ReadWriteUtCache& m_utCache;
+		const cache::ReadWriteUtCache& m_readWriteUtCache;
+		cache::UtCache& m_utCache;
 		supplier<Timestamp> m_timeSupplier;
 
-		subscribers::TransactionStatusSubscriber& m_transactionStatusSubscriber;
-		subscribers::StateChangeSubscriber& m_stateChangeSubscriber;
+		subscribers::FinalizationSubscriber& m_finalizationSubscriber;
 		subscribers::NodeSubscriber& m_nodeSubscriber;
+		subscribers::StateChangeSubscriber& m_stateChangeSubscriber;
+		subscribers::TransactionStatusSubscriber& m_transactionStatusSubscriber;
 
 		const std::vector<utils::DiagnosticCounter>& m_counters;
 		const plugins::PluginManager& m_pluginManager;
@@ -203,4 +228,34 @@ namespace catapult { namespace extensions {
 		ServerHooks m_hooks;
 		net::PacketIoPickerContainer m_packetIoPickers;
 	};
+
+	// endregion
+
+	// region utils
+
+	/// Creates and returns a local finalized height hash pair supplier based on \a state.
+	/// \note Result is guaranteed to be in local block chain storage.
+	supplier<model::HeightHashPair> CreateLocalFinalizedHeightHashPairSupplier(const ServiceState& state);
+
+	/// Creates and returns a local finalized height supplier based on \a state.
+	/// \note Result is guaranteed to be in local block chain storage.
+	supplier<Height> CreateLocalFinalizedHeightSupplier(const ServiceState& state);
+
+	/// Creates and returns a network finalized height hash pair supplier based on \a state.
+	/// \note Result is *NOT* guaranteed to be in local block chain storage.
+	supplier<model::HeightHashPair> CreateNetworkFinalizedHeightHashPairSupplier(const ServiceState& state);
+
+	/// Creates outgoing selector settings based on \a state for \a serviceId and \a requiredRole.
+	SelectorSettings CreateOutgoingSelectorSettings(
+			const ServiceState& state,
+			ionet::ServiceIdentifier serviceId,
+			ionet::NodeRoles requiredRole);
+
+	/// Creates incoming selector settings based on \a state for \a serviceId.
+	SelectorSettings CreateIncomingSelectorSettings(const ServiceState& state, ionet::ServiceIdentifier serviceId);
+
+	/// Creates a predicate based on \a state that returns \c true when transaction data should be processed.
+	predicate<> CreateShouldProcessTransactionsPredicate(const ServiceState& state);
+
+	// endregion
 }}

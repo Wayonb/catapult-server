@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,7 +22,7 @@
 #pragma once
 #include "ObserverStatementBuilder.h"
 #include "catapult/cache/CatapultCacheDelta.h"
-#include "catapult/model/ResolverContext.h"
+#include "catapult/model/NotificationContext.h"
 #include "catapult/state/CatapultState.h"
 #include <iosfwd>
 
@@ -72,24 +73,22 @@ namespace catapult { namespace observers {
 	// region ObserverContext
 
 	/// Context passed to all the observers.
-	struct ObserverContext {
+	struct ObserverContext : public model::NotificationContext {
 	public:
-		/// Creates an observer context around \a state at \a height with specified \a mode and \a resolvers.
+		/// Creates an observer context around \a notificationContext, \a state and \a mode.
 		/// \note \a state is const to enable more consise code even though it only contains non-const references.
-		ObserverContext(const ObserverState& state, Height height, NotifyMode mode, const model::ResolverContext& resolvers);
+		ObserverContext(const model::NotificationContext& notificationContext, const ObserverState& state, NotifyMode mode);
 
 	public:
 		/// Catapult cache.
 		cache::CatapultCacheDelta& Cache;
 
-		/// Current height.
-		const catapult::Height Height;
-
 		/// Notification mode.
 		const NotifyMode Mode;
 
-		/// Alias resolvers.
-		const model::ResolverContext Resolvers;
+		/// Original (undecorated) alias resolvers from the notification context.
+		/// \note These are used during undo to avoid adding resolutions.
+		const model::ResolverContext UndecoratedResolvers;
 
 	public:
 		/// Statement builder.

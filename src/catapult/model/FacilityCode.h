@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,6 +23,11 @@
 #include <stdint.h>
 
 namespace catapult { namespace model {
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow" // FacilityCode::Mosaic shadows model::Mosaic
+#endif
 
 	/// Possible facility codes.
 	enum class FacilityCode : uint8_t {
@@ -61,4 +67,8 @@ namespace catapult { namespace model {
 		/// Transfer facility code.
 		Transfer = 0x54
 	};
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 }}

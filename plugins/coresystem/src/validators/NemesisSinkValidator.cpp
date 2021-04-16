@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,7 +20,6 @@
 **/
 
 #include "Validators.h"
-#include "catapult/model/NetworkInfo.h"
 #include "catapult/validators/ValidatorContext.h"
 
 namespace catapult { namespace validators {
@@ -28,9 +28,9 @@ namespace catapult { namespace validators {
 
 	DEFINE_STATEFUL_VALIDATOR(NemesisSink, [](const Notification& notification, const ValidatorContext& context) {
 		auto isBlockHeightOne = context.Height == Height(1);
-		auto isNemesisPublicKey = notification.Signer == context.Network.PublicKey;
+		auto isNemesisPublicKey = notification.SignerPublicKey == context.Network.NemesisSignerPublicKey;
 		return isBlockHeightOne || !isNemesisPublicKey
 				? ValidationResult::Success
 				: Failure_Core_Nemesis_Account_Signed_After_Nemesis_Block;
-	});
+	})
 }}

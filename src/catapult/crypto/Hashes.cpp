@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,142 +20,131 @@
 **/
 
 #include "Hashes.h"
-#include "KeccakHash.h"
 #include "catapult/utils/Casting.h"
+#include "catapult/utils/MemoryUtils.h"
 
 #ifdef __clang__
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdocumentation"
-#pragma clang diagnostic ignored "-Wdocumentation-unknown-command"
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wreserved-id-macro"
 #endif
-
-extern "C" {
-#include <ripemd160/ripemd160.h>
-}
-
+#include <openssl/evp.h>
+#include <openssl/hmac.h>
+#include <openssl/ripemd.h>
+#include <openssl/sha.h>
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
-
-#include <sha256/crypto_hash_sha256.h>
 
 namespace catapult { namespace crypto {
 
 	// region free functions
 
-	void Ripemd160(const RawBuffer& dataBuffer, Hash160& hash) noexcept {
-		struct ripemd160 context;
-		ripemd160(&context, dataBuffer.pData, dataBuffer.Size);
-		memcpy(hash.data(), context.u.u8, hash.size());
-	}
-
 	namespace {
-		void Sha256(crypto_hash_sha256_state& state, const RawBuffer& dataBuffer, Hash256& hash) {
-			crypto_hash_sha256_init(&state);
+		template<typename THash>
+		void HashSingleBuffer(const EVP_MD* pMessageDigest, const RawBuffer& dataBuffer, THash& hash) {
+			auto outputSize = static_cast<unsigned int>(hash.size());
 
-			if (0 < dataBuffer.Size)
-				crypto_hash_sha256_update(&state, dataBuffer.pData, dataBuffer.Size);
-
-			crypto_hash_sha256_final(&state, hash.data());
+			OpensslDigestContext context;
+			context.dispatch(EVP_DigestInit_ex, pMessageDigest, nullptr);
+			context.dispatch(EVP_DigestUpdate, dataBuffer.pData, dataBuffer.Size);
+			context.dispatch(EVP_DigestFinal_ex, hash.data(), &outputSize);
 		}
 	}
 
-	void Bitcoin160(const RawBuffer& dataBuffer, Hash160& hash) noexcept {
-		crypto_hash_sha256_state state;
+	void Ripemd160(const RawBuffer& dataBuffer, Hash160& hash) {
+		HashSingleBuffer(EVP_ripemd160(), dataBuffer, hash);
+	}
+
+	void Bitcoin160(const RawBuffer& dataBuffer, Hash160& hash) {
 		Hash256 firstHash;
-		Sha256(state, dataBuffer, firstHash);
+		Sha256(dataBuffer, firstHash);
 		Ripemd160(firstHash, hash);
 	}
 
-	void Sha256Double(const RawBuffer& dataBuffer, Hash256& hash) noexcept {
-		crypto_hash_sha256_state state;
+	void Sha256(const RawBuffer& dataBuffer, Hash256& hash) {
+		HashSingleBuffer(EVP_sha256(), dataBuffer, hash);
+	}
+
+	void Sha256Double(const RawBuffer& dataBuffer, Hash256& hash) {
 		Hash256 firstHash;
-		Sha256(state, dataBuffer, firstHash);
-		Sha256(state, firstHash, hash);
+		Sha256(dataBuffer, firstHash);
+		Sha256(firstHash, hash);
 	}
 
-	namespace {
-		template<typename TBuilder, typename THash>
-		void HashSingleBuffer(const RawBuffer& dataBuffer, THash& hash) noexcept {
-			TBuilder hashBuilder;
-			hashBuilder.update(dataBuffer);
-			hashBuilder.final(hash);
-		}
+	void Sha512(const RawBuffer& dataBuffer, Hash512& hash) {
+		HashSingleBuffer(EVP_sha512(), dataBuffer, hash);
 	}
 
-	void Sha3_256(const RawBuffer& dataBuffer, Hash256& hash) noexcept {
-		HashSingleBuffer<Sha3_256_Builder>(dataBuffer, hash);
+	void Sha3_256(const RawBuffer& dataBuffer, Hash256& hash) {
+		HashSingleBuffer(EVP_sha3_256(), dataBuffer, hash);
 	}
 
-	void Sha3_512(const RawBuffer& dataBuffer, Hash512& hash) noexcept {
-		HashSingleBuffer<Sha3_512_Builder>(dataBuffer, hash);
+	void Hmac_Sha256(const RawBuffer& key, const RawBuffer& input, Hash256& output) {
+		unsigned int outputSize = 0;
+		HMAC(EVP_sha256(), key.pData, static_cast<int>(key.Size), input.pData, input.Size, output.data(), &outputSize);
 	}
 
-	void Keccak_256(const RawBuffer& dataBuffer, Hash256& hash) noexcept {
-		HashSingleBuffer<Keccak_256_Builder>(dataBuffer, hash);
+	void Hmac_Sha512(const RawBuffer& key, const RawBuffer& input, Hash512& output) {
+		unsigned int outputSize = 0;
+		HMAC(EVP_sha512(), key.pData, static_cast<int>(key.Size), input.pData, input.Size, output.data(), &outputSize);
 	}
 
-	void Keccak_512(const RawBuffer& dataBuffer, Hash512& hash) noexcept {
-		HashSingleBuffer<Keccak_512_Builder>(dataBuffer, hash);
+	void Pbkdf2_Sha512(const RawBuffer& password, const RawBuffer& salt, uint32_t iterationCount, Hash512& output) {
+		PKCS5_PBKDF2_HMAC(
+				reinterpret_cast<const char*>(password.pData),
+				static_cast<int>(password.Size),
+				salt.pData,
+				static_cast<int>(salt.Size),
+				static_cast<int>(iterationCount),
+				EVP_sha512(),
+				Hash512::Size,
+				output.data());
 	}
 
 	// endregion
 
-	// region sha3 / keccak builders
+	// region hash builders
 
 	namespace {
-		Keccak_HashInstance* CastToKeccakHashInstance(uint8_t* pHashContext) noexcept {
-			return reinterpret_cast<Keccak_HashInstance*>(pHashContext);
+		const EVP_MD* GetMessageDigest(Sha2ModeTag, Hash512_tag) {
+			return EVP_sha512();
 		}
 
-		inline void KeccakInitialize(Keccak_HashInstance* pHashContext, Hash256_tag) {
-			Keccak_HashInitialize_SHA3_256(pHashContext);
+		const EVP_MD* GetMessageDigest(Sha3ModeTag, Hash256_tag) {
+			return EVP_sha3_256();
 		}
 
-		inline void KeccakInitialize(Keccak_HashInstance* pHashContext, Hash512_tag) {
-			Keccak_HashInitialize_SHA3_512(pHashContext);
-		}
-
-		inline void KeccakInitialize(Keccak_HashInstance* pHashContext, GenerationHash_tag) {
-			Keccak_HashInitialize_SHA3_256(pHashContext);
-		}
-
-		inline void KeccakFinal(uint8_t* context, uint8_t* output, int hashSize, KeccakModeTag) noexcept {
-			Keccak_HashSqueeze(CastToKeccakHashInstance(context), output, static_cast<uint32_t>(hashSize * 8));
-		}
-
-		inline void KeccakFinal(uint8_t* context, uint8_t* output, int /* ignore last argument */, Sha3ModeTag) noexcept {
-			Keccak_HashFinal(CastToKeccakHashInstance(context), output);
+		const EVP_MD* GetMessageDigest(Sha3ModeTag, GenerationHash_tag) {
+			return EVP_sha3_256();
 		}
 	}
 
 	template<typename TModeTag, typename THashTag>
-	KeccakBuilder<TModeTag, THashTag>::KeccakBuilder() {
-		static_assert(sizeof(Keccak_HashInstance) <= sizeof(m_hashContext), "m_hashContext is too small to fit Keccak instance");
-		KeccakInitialize(CastToKeccakHashInstance(m_hashContext), THashTag());
+	HashBuilderT<TModeTag, THashTag>::HashBuilderT() {
+		m_context.dispatch(EVP_DigestInit_ex, GetMessageDigest(TModeTag(), THashTag()), nullptr);
 	}
 
 	template<typename TModeTag, typename THashTag>
-	void KeccakBuilder<TModeTag, THashTag>::update(const RawBuffer& dataBuffer) noexcept {
-		Keccak_HashUpdate(CastToKeccakHashInstance(m_hashContext), dataBuffer.pData, dataBuffer.Size * 8);
+	void HashBuilderT<TModeTag, THashTag>::update(const RawBuffer& dataBuffer) {
+		m_context.dispatch(EVP_DigestUpdate, dataBuffer.pData, dataBuffer.Size);
 	}
 
 	template<typename TModeTag, typename THashTag>
-	void KeccakBuilder<TModeTag, THashTag>::update(std::initializer_list<const RawBuffer> buffers) noexcept {
+	void HashBuilderT<TModeTag, THashTag>::update(std::initializer_list<const RawBuffer> buffers) {
 		for (const auto& buffer : buffers)
 			update(buffer);
 	}
 
 	template<typename TModeTag, typename THashTag>
-	void KeccakBuilder<TModeTag, THashTag>::final(OutputType& output) noexcept {
-		KeccakFinal(m_hashContext, output.data(), THashTag::Size, TModeTag());
+	void HashBuilderT<TModeTag, THashTag>::final(OutputType& output) {
+		auto outputSize = static_cast<unsigned int>(output.size());
+		m_context.dispatch(EVP_DigestFinal_ex, output.data(), &outputSize);
 	}
 
-	template class KeccakBuilder<Sha3ModeTag, Hash256_tag>;
-	template class KeccakBuilder<Sha3ModeTag, Hash512_tag>;
-	template class KeccakBuilder<KeccakModeTag, Hash256_tag>;
-	template class KeccakBuilder<KeccakModeTag, Hash512_tag>;
-	template class KeccakBuilder<Sha3ModeTag, GenerationHash_tag>;
+	template class HashBuilderT<Sha2ModeTag, Hash512_tag>;
+	template class HashBuilderT<Sha3ModeTag, Hash256_tag>;
+	template class HashBuilderT<Sha3ModeTag, GenerationHash_tag>;
 
 	// endregion
 }}

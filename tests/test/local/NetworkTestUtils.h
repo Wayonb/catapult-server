@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -30,11 +31,8 @@ namespace catapult { namespace net { class PacketWriters; } }
 
 namespace catapult { namespace test {
 
-	/// Creates a connection to localhost on \a port configured with server public key \a serverPublicKey using \a ioContext.
-	std::shared_ptr<ionet::PacketSocket> ConnectToLocalHost(
-			boost::asio::io_context& ioContext,
-			unsigned short port,
-			const Key& serverPublicKey);
+	/// Creates a connection to localhost on \a port configured using \a ioContext.
+	std::shared_ptr<ionet::PacketSocket> ConnectToLocalHost(boost::asio::io_context& ioContext, unsigned short port);
 
 	/// Creates a connection to localhost configured with server public key \a serverPublicKey
 	/// using \a packetWriters.

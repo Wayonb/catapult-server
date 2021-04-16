@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -81,7 +82,21 @@ namespace catapult { namespace cache {
 		auto delta = cache.createDelta();
 
 		// Assert:
+		EXPECT_EQ(CatapultCacheDelta::Disposition::Attached, delta.disposition());
 		AssertSubCacheSizes(delta, 0);
+	}
+
+	TEST(TEST_CLASS, CanCreateCatapultCache_DetachedDelta) {
+		// Act:
+		auto cache = CreateSimpleCatapultCache();
+		auto cacheDetachableDelta = cache.createDetachableDelta();
+		auto cacheDetachedDelta = cacheDetachableDelta.detach();
+		auto pDetachedDelta = cacheDetachedDelta.tryLock();
+
+		// Assert:
+		ASSERT_TRUE(!!pDetachedDelta);
+		EXPECT_EQ(CatapultCacheDelta::Disposition::Detached, pDetachedDelta->disposition());
+		AssertSubCacheSizes(*pDetachedDelta, 0);
 	}
 
 	// endregion
@@ -223,11 +238,50 @@ namespace catapult { namespace cache {
 		const auto& subCacheMerkleRoots = view.calculateStateHash(Height(123)).SubCacheMerkleRoots;
 		EXPECT_EQ(3u, subCacheMerkleRoots.size());
 
-		// - adjust expected hashes because SimpleCache updateMerkleRoot changes the first byte of the merkle root
+		// - adjust expected hashes because SimpleCache::updateMerkleRoot changes the first byte of the merkle root
 		for (auto& hash : hashes)
-			hash[0] = 123u;
+			hash[0] = 123;
 
 		EXPECT_EQ(hashes, subCacheMerkleRoots);
+	}
+
+	// endregion
+
+	// region prune
+
+	namespace {
+		template<typename TPruneValue>
+		void AssertCanPruneAll(size_t pruneSentinelIndex) {
+			// Arrange:
+			auto cache = CreateSimpleCatapultCacheForStateHashTests();
+			auto view = cache.createDelta();
+			auto hashes = test::GenerateRandomDataVector<Hash256>(3);
+			view.setSubCacheMerkleRoots(hashes);
+
+			// Act:
+			view.prune(TPruneValue(101));
+
+			// Assert:
+			const auto& subCacheMerkleRoots = view.calculateStateHash(Height(123)).SubCacheMerkleRoots;
+			EXPECT_EQ(3u, subCacheMerkleRoots.size());
+
+			// - adjust expected hashes because SimpleCache::updateMerkleRoot changes the first byte of the merkle root
+			//   and SimpleCache::prune changes the `pruneSentinelIndex` byte
+			for (auto& hash : hashes) {
+				hash[0] = 123;
+				hash[pruneSentinelIndex] = 101;
+			}
+
+			EXPECT_EQ(hashes, subCacheMerkleRoots);
+		}
+	}
+
+	TEST(TEST_CLASS, CanPruneAllSubCachesAtHeight) {
+		AssertCanPruneAll<Height>(1);
+	}
+
+	TEST(TEST_CLASS, CanPruneAllSubCachesAtTimestamp) {
+		AssertCanPruneAll<Timestamp>(2);
 	}
 
 	// endregion
@@ -671,7 +725,7 @@ namespace catapult { namespace cache {
 			class ViewProxy {
 			public:
 				ViewProxy()
-						: m_view(m_dependentState, {})
+						: m_view(CatapultCacheDelta::Disposition::Detached, m_dependentState, {})
 						, m_isValid(false)
 				{}
 

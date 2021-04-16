@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,17 +23,19 @@
 #include "NemesisConfiguration.h"
 #include "catapult/extensions/BlockExtensions.h"
 #include "catapult/io/FileBlockStorage.h"
+#include "catapult/io/FileProofStorage.h"
 #include "catapult/io/IndexFile.h"
+#include "catapult/io/PodIoUtils.h"
 #include "catapult/utils/HexFormatter.h"
 #include "catapult/utils/HexParser.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 namespace catapult { namespace tools { namespace nemgen {
 
 	namespace {
 		void CreatePlaceholderHashesFile(const std::string& binDirectory) {
-			auto blockVersionedDirectory = boost::filesystem::path(binDirectory) / "00000";
-			boost::filesystem::create_directories(blockVersionedDirectory);
+			auto blockVersionedDirectory = std::filesystem::path(binDirectory) / "00000";
+			std::filesystem::create_directories(blockVersionedDirectory);
 
 			io::RawFile hashesFile((blockVersionedDirectory / "hashes.dat").generic_string(), io::OpenMode::Read_Write);
 			hashesFile.write(Hash256());
@@ -40,7 +43,7 @@ namespace catapult { namespace tools { namespace nemgen {
 		}
 
 		void UpdateFileBlockStorageData(const model::BlockElement& blockElement, const std::string& binDirectory) {
-			io::FileBlockStorage storage(binDirectory);
+			io::FileBlockStorage storage(binDirectory, 1);
 			storage.saveBlock(blockElement);
 		}
 
@@ -91,7 +94,7 @@ namespace catapult { namespace tools { namespace nemgen {
 
 	void SaveNemesisBlockElement(const model::BlockElement& blockElement, const NemesisConfiguration& config) {
 		// 1. reset the index file
-		io::IndexFile((boost::filesystem::path(config.BinDirectory) / "index.dat").generic_string()).set(0);
+		io::IndexFile((std::filesystem::path(config.BinDirectory) / "index.dat").generic_string()).set(0);
 
 		// 2. create placeholder hashes file
 		CreatePlaceholderHashesFile(config.BinDirectory);
@@ -105,5 +108,47 @@ namespace catapult { namespace tools { namespace nemgen {
 			CATAPULT_LOG(info) << "creating cpp file " << config.CppFile;
 			UpdateMemoryBlockStorageData(blockElement.Block, config.CppFile, config.CppFileHeader);
 		}
+	}
+
+	namespace {
+		void RemoveProofIndexFile(const std::string& binDirectory) {
+			auto proofIndexFilename = std::filesystem::path(binDirectory) / "proof.index.dat";
+
+			if (std::filesystem::exists(proofIndexFilename))
+				std::filesystem::remove(proofIndexFilename);
+		}
+
+		void CreatePlaceholderHeightsFile(const std::string& binDirectory) {
+			auto blockVersionedDirectory = std::filesystem::path(binDirectory) / "00000";
+
+			io::RawFile heightsFile((blockVersionedDirectory / "proof.heights.dat").generic_string(), io::OpenMode::Read_Write);
+			io::Write64(heightsFile, 0);
+			io::Write64(heightsFile, 0);
+		}
+
+		std::unique_ptr<model::FinalizationProof> CreateNemesisProof(const Hash256& nemesisEntityHash) {
+			auto pProof = std::make_unique<model::FinalizationProof>();
+			pProof->Size = sizeof(model::FinalizationProofHeader);
+			pProof->Version = model::FinalizationProofHeader::Current_Version;
+			pProof->Round = { FinalizationEpoch(1), FinalizationPoint(1) };
+			pProof->Height = Height(1);
+			pProof->Hash = nemesisEntityHash;
+			return pProof;
+		}
+	}
+
+	void FinalizeNemesisBlockElement(const model::BlockElement& blockElement, const NemesisConfiguration& config) {
+		// 1. remove index file
+		RemoveProofIndexFile(config.BinDirectory);
+
+		// 2. create placeholder heights file
+		CreatePlaceholderHeightsFile(config.BinDirectory);
+
+		// 3. create proof
+		auto pNemesisProof = CreateNemesisProof(blockElement.EntityHash);
+
+		// 4. save proof
+		io::FileProofStorage proofStorage(config.BinDirectory, 1);
+		proofStorage.saveProof(*pNemesisProof);
 	}
 }}}

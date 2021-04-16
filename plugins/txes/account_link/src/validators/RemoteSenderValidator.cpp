@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -29,9 +30,9 @@ namespace catapult { namespace validators {
 
 	DEFINE_STATEFUL_VALIDATOR(RemoteSender, [](const Notification& notification, const ValidatorContext& context) {
 		const auto& cache = context.Cache.sub<cache::AccountStateCache>();
-		auto accountStateIter = cache.find(notification.Signer);
+		auto accountStateIter = cache.find(notification.Sender);
 		return accountStateIter.tryGet() && state::IsRemote(accountStateIter.get().AccountType)
 				? Failure_AccountLink_Remote_Account_Signer_Prohibited
 				: ValidationResult::Success;
-	});
+	})
 }}

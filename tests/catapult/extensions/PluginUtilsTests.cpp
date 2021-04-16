@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -34,7 +35,7 @@ namespace catapult { namespace extensions {
 		// Arrange:
 		test::MutableCatapultConfiguration config;
 		config.Node.EnableCacheDatabaseStorage = true;
-		config.Node.MaxCacheDatabaseWriteBatchSize = utils::FileSize::FromKilobytes(123);
+		config.Node.CacheDatabase.MaxWriteBatchSize = utils::FileSize::FromKilobytes(123);
 		config.User.DataDirectory = "foo_bar";
 
 		// Act:
@@ -43,7 +44,7 @@ namespace catapult { namespace extensions {
 		// Assert:
 		EXPECT_TRUE(storageConfig.PreferCacheDatabase);
 		EXPECT_EQ("foo_bar/statedb", storageConfig.CacheDatabaseDirectory);
-		EXPECT_EQ(utils::FileSize::FromKilobytes(123), storageConfig.MaxCacheDatabaseWriteBatchSize);
+		EXPECT_EQ(utils::FileSize::FromKilobytes(123), storageConfig.CacheDatabaseConfig.MaxWriteBatchSize);
 	}
 
 	namespace {

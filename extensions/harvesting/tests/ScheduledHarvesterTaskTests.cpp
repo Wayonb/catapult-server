@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -114,7 +115,7 @@ namespace catapult { namespace harvesting {
 
 		void UnlockAccount(UnlockedAccounts& unlockedAccounts, const KeyPair& keyPair) {
 			auto modifier = unlockedAccounts.modifier();
-			modifier.add(test::CopyKeyPair(keyPair));
+			modifier.add(BlockGeneratorAccountDescriptor(test::CopyKeyPair(keyPair), test::GenerateKeyPair()));
 		}
 
 		struct HarvesterContext {
@@ -131,9 +132,12 @@ namespace catapult { namespace harvesting {
 		};
 
 		auto CreateHarvester(HarvesterContext& context) {
-			return std::make_unique<Harvester>(context.Cache, context.Config, Key(), context.Accounts, [](const auto& blockHeader, auto) {
-				auto pBlock = std::make_unique<model::Block>();
-				std::memcpy(static_cast<void*>(pBlock.get()), &blockHeader, sizeof(model::BlockHeader));
+			return std::make_unique<Harvester>(context.Cache, context.Config, Address(), context.Accounts, [](
+					const auto& blockHeader,
+					auto) {
+				auto size = model::GetBlockHeaderSize(blockHeader.Type);
+				auto pBlock = utils::MakeUniqueWithSize<model::Block>(size);
+				std::memcpy(static_cast<void*>(pBlock.get()), &blockHeader, size);
 				return pBlock;
 			});
 		}

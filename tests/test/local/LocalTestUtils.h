@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,7 +21,6 @@
 
 #pragma once
 #include "catapult/config/CatapultConfiguration.h"
-#include "catapult/crypto/KeyPair.h"
 #include "catapult/plugins/PluginManager.h"
 #include "tests/test/core/AddressTestUtils.h"
 #include "tests/test/net/NodeTestUtils.h"
@@ -51,9 +51,6 @@ namespace catapult { namespace test {
 
 	/// Creates a default network time supplier for use in local tests.
 	supplier<Timestamp> CreateDefaultNetworkTimeSupplier();
-
-	/// Gets the server key pair.
-	crypto::KeyPair LoadServerKeyPair();
 
 	/// Creates a prototypical block chain configuration that is safe to use in local tests.
 	model::BlockChainConfiguration CreatePrototypicalBlockChainConfiguration();

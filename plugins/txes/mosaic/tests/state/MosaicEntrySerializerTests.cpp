@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -37,7 +38,7 @@ namespace catapult { namespace state {
 			catapult::MosaicId MosaicId;
 			Amount Supply;
 			catapult::Height Height;
-			Key Owner;
+			Address Owner;
 			uint32_t Revision;
 			model::MosaicFlags Flags;
 			uint8_t Divisibility;
@@ -61,7 +62,7 @@ namespace catapult { namespace state {
 				MosaicId mosaicId,
 				Amount supply,
 				Height height,
-				const Key& owner,
+				const Address& owner,
 				uint32_t revision,
 				uint64_t propertiesSeed) {
 			auto message = "entry header at 0";
@@ -88,7 +89,7 @@ namespace catapult { namespace state {
 		std::vector<uint8_t> buffer;
 		mocks::MockMemoryStream stream(buffer);
 
-		auto definition = MosaicDefinition(Height(888), test::GenerateRandomByteArray<Key>(), 5, CreateMosaicProperties(17));
+		auto definition = MosaicDefinition(Height(888), test::CreateRandomOwner(), 5, CreateMosaicProperties(17));
 		auto entry = MosaicEntry(MosaicId(123), definition);
 		entry.increaseSupply(Amount(111));
 
@@ -97,7 +98,7 @@ namespace catapult { namespace state {
 
 		// Assert:
 		ASSERT_EQ(sizeof(MosaicEntryHeader), buffer.size());
-		AssertEntryHeader(buffer, MosaicId(123), Amount(111), Height(888), definition.ownerPublicKey(), 5, 17);
+		AssertEntryHeader(buffer, MosaicId(123), Amount(111), Height(888), definition.ownerAddress(), 5, 17);
 	}
 
 	// endregion
@@ -106,7 +107,7 @@ namespace catapult { namespace state {
 
 	TEST(TEST_CLASS, CanRoundtripEntry) {
 		// Arrange:
-		auto definition = MosaicDefinition(Height(888), test::GenerateRandomByteArray<Key>(), 5, CreateMosaicProperties(17));
+		auto definition = MosaicDefinition(Height(888), test::CreateRandomOwner(), 5, CreateMosaicProperties(17));
 		auto originalEntry = MosaicEntry(MosaicId(123), definition);
 		originalEntry.increaseSupply(Amount(111));
 

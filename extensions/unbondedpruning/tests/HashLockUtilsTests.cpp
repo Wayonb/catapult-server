@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -46,7 +47,7 @@ namespace catapult { namespace unbondedpruning {
 
 				// raise one hash lock notification for each dependent hash
 				for (const auto& hash : m_dependentHashes)
-					sub.notify(model::HashLockNotification(Key(), model::UnresolvedMosaic(), BlockDuration(), hash));
+					sub.notify(model::HashLockNotification(Address(), model::UnresolvedMosaic(), BlockDuration(), hash));
 
 				// if there are no dependent hashes, don't raise any notifications
 			}

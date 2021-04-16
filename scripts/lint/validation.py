@@ -397,7 +397,17 @@ class TypoChecker(SimpleValidator):
             re.compile(r'/// Gets the (const )?(pointer|reference)\b'): 'use a instead of the',
             re.compile(r'\d+u( [^:] \d+)*u'): 'only first `u` is needed',
             re.compile(r' \.([^\.]|$)'): 'check spacing around \'.\'',
-            re.compile(r'Header::(Footer|Header)'): 'drop Header'
+            re.compile(r'Header::(Footer|Header)'): 'drop Header',
+            re.compile(r'\S \(\)[^>]'): 'remove space before ()',
+            re.compile(r'(etwork|ccount)Ids?\d*\b'): 'use Identifier instead of Id',
+            re.compile(r'typename T?AccountKey'): 'use TAccountIdentifier',
+            re.compile(r'ccountKeys?\b|ccount keys'): 'qualify with public or private',
+            re.compile(r'shared_ptr<(thread::)?IoThreadPool'): 'use unique_ptr instead',
+            re.compile(r'auto pData\b'): 'use auto*',
+            re.compile(r'[^:]memcpy\('): 'use std::memcpy',
+            re.compile(r'\)\{$'): 'missing space before brace',
+            re.compile(r'boost/(filesystem|thread.hpp)'): 'use std',
+            re.compile(r'boost::(filesystem|thread)'): 'use std'
         }
 
     def check(self, lineNumber, line):
@@ -540,6 +550,7 @@ class ReturnOnNewLineValidator(SimpleValidator):
         return '{}:{} `return` should be on newline >>{}<<'.format(name, err.lineno, err.line)
 
 
+# pylint: disable=too-many-public-methods
 class MultiConditionChecker(SimpleValidator):
     """Validator for more complicated cases, that require several conditions.
 
@@ -555,7 +566,7 @@ class MultiConditionChecker(SimpleValidator):
 
     def __init__(self):
         super().__init__()
-        self.patternOperatorBool = re.compile(r'operator bool')
+        self.patternOperatorBool = re.compile(r'[^\:]operator bool')
         self.patternOperatorBoolWithExplicit = re.compile(r'explicit operator bool')
         self.patternTest = re.compile(r'\s+(NO_STRESS_)?TEST\(')
         self.patternTestClass = re.compile(r'TEST\([A-Z_]*TEST_CLASS')
@@ -568,8 +579,7 @@ class MultiConditionChecker(SimpleValidator):
         self.patternDefineTests = re.compile(r'#define [A-Z_]*DEFINE_[A-Z_]*_TEST[^S]')
         self.patternDefineTestTraits = re.compile(r'#define [A-Z_]*DEFINE_[A-Z_]*_TEST_TRAITS[A-Z_]*')
         self.patternFileSize = re.compile(r'FileSize&')
-        self.patternOperator = re.compile(r'operator')
-        self.patternTryParseValue = re.compile(r'TryParseValue')
+        self.patternFileSizeReferenceAllowed = re.compile(r'operator|TryParseValue|cacheSize')
         self.patternFileSizeCast = re.compile(r'const_cast<utils::FileSize&>.* = ')
         self.patternTestExpectedSize = re.compile(r'expected\w*Size =[^=]')
 
@@ -598,6 +608,8 @@ class MultiConditionChecker(SimpleValidator):
 
         self.patternTrailingOperator = re.compile(r' (\+|-|\*|/|%|&|\||^|<<|>>)\s*$')
 
+        self.patternStructAssignment = re.compile(r'^\t*(static )?(const(expr)? )?([a-zA-Z][a-zA-Z0-9:_]+) [a-zA-Z_][a-zA-Z0-9_]+ = {')
+
         self.errors = {
             self.checkTestLine: 'TEST should use TEST_CLASS',
             self.checkExplicitOperatorBool: 'Missing explicit before operator bool',
@@ -616,7 +628,8 @@ class MultiConditionChecker(SimpleValidator):
             self.checkCppDoxygenComment: '/// unexpected in cpp file',
             self.checkAutoContextParam: 'use type name instead of auto',
             self.checkGetsSetsDocumentation: 'add an article to documentation',
-            self.checkTrailingOperator: 'operators should start lines, not finish them'
+            self.checkTrailingOperator: 'operators should start lines, not finish them',
+            self.checkStructAssignment: 'prefer struct initialization to struct assignment'
         }
 
     def reset(self, path, errorReporter):
@@ -665,7 +678,7 @@ class MultiConditionChecker(SimpleValidator):
             return False
 
         # allow implicit constructors for some types
-        if 'TestBlockTransactions' == match.group(1):
+        if match.group(1) in ['Resolvable', 'TestBlockTransactions']:
             return False
 
         return True
@@ -697,8 +710,8 @@ class MultiConditionChecker(SimpleValidator):
         if not self.patternFileSize.search(line):
             return False
 
-        # ignore operator, TryParseValue
-        if self.patternOperator.search(line) or self.patternTryParseValue.search(line):
+        # ignore lines where FileSize reference is explicitly allowed
+        if self.patternFileSizeReferenceAllowed.search(line):
             return False
 
         # ignore cast
@@ -750,6 +763,14 @@ class MultiConditionChecker(SimpleValidator):
     def checkTrailingOperator(self, line, _):
         # not part of SimpleValidator because comments and strings should be removed before applying rule
         return self.patternTrailingOperator.search(line)
+
+    def checkStructAssignment(self, line, _):
+        match = self.patternStructAssignment.match(line)
+        if match:
+            # treat auto assignments as valid ones (`auto foo = { ... }`)
+            return 'auto' != match.group(4)
+
+        return False
 
     def check(self, lineNumber, line):
         strippedLine = stripCommentsAndStrings(line)
@@ -1082,7 +1103,7 @@ class CopyrightCommentValidator(SimpleValidator):
 
     def __init__(self):
         super().__init__()
-        self.expectedHash = unhexlify('6d244ea9972afcb6b17d695594958de6dc162f50')
+        self.expectedHash = unhexlify('261ac1f521fdc6a8de61d71a65e105cea0838713')
 
     # pylint: disable=attribute-defined-outside-init
     def reset(self, path, errorReporter):

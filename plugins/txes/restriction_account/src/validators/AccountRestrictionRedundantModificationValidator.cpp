@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -54,9 +55,8 @@ namespace catapult { namespace validators {
 			if (modificationsInfo.HasRedundantModification)
 				return Failure_RestrictionAccount_Redundant_Modification;
 
-			auto address = model::PublicKeyToAddress(notification.Key, context.Network.Identifier);
 			const auto& cache = context.Cache.sub<cache::AccountRestrictionCache>();
-			return modificationsInfo.HasDeleteModification && !cache.contains(address)
+			return modificationsInfo.HasDeleteModification && !cache.contains(notification.Address)
 					? Failure_RestrictionAccount_Invalid_Modification
 					: ValidationResult::Success;
 		}
@@ -67,7 +67,7 @@ namespace catapult { namespace validators {
 			const model::Modify##RESTRICTION_NAME##sNotification& notification, \
 			const ValidatorContext& context) { \
 		return Validate<RESTRICTION_VALUE_TYPE, model::Modify##RESTRICTION_NAME##sNotification, HASHER_TYPE>(notification, context); \
-	}));
+	}))
 
 	DEFINE_ACCOUNT_RESTRICTION_REDUNDANT_MODIFICATION_VALIDATOR(
 			AccountAddressRestriction,

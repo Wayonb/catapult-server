@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,6 +22,7 @@
 #include "src/validators/Validators.h"
 #include "catapult/model/BlockChainConfiguration.h"
 #include "tests/test/MosaicCacheTestUtils.h"
+#include "tests/test/MosaicTestUtils.h"
 #include "tests/test/plugins/ValidatorTestUtils.h"
 #include "tests/TestHarness.h"
 
@@ -53,7 +55,7 @@ namespace catapult { namespace validators {
 				cache::CatapultCache& cache,
 				MosaicId id,
 				Amount mosaicSupply,
-				const Key& owner,
+				const Address& owner,
 				Amount ownerSupply,
 				model::MosaicFlags flags = model::MosaicFlags::Supply_Mutable) {
 			auto delta = cache.createDelta();
@@ -62,7 +64,7 @@ namespace catapult { namespace validators {
 			model::MosaicProperties properties(flags, 0, BlockDuration());
 
 			auto& mosaicCacheDelta = delta.sub<cache::MosaicCache>();
-			auto definition = state::MosaicDefinition(Height(50), Key(), 3, properties);
+			auto definition = state::MosaicDefinition(Height(50), owner, 3, properties);
 			auto entry = state::MosaicEntry(id, definition);
 			entry.increaseSupply(mosaicSupply);
 			mosaicCacheDelta.insert(entry);
@@ -77,11 +79,11 @@ namespace catapult { namespace validators {
 	namespace {
 		void AssertCanChangeImmutableSupplyWhenOwnerHasCompleteSupply(model::MosaicSupplyChangeAction action) {
 			// Arrange:
-			auto signer = test::GenerateRandomByteArray<Key>();
-			auto notification = model::MosaicSupplyChangeNotification(signer, test::UnresolveXor(MosaicId(123)), action, Amount(100));
+			auto owner = test::CreateRandomOwner();
+			auto notification = model::MosaicSupplyChangeNotification(owner, test::UnresolveXor(MosaicId(123)), action, Amount(100));
 
 			auto cache = test::MosaicCacheFactory::Create(model::BlockChainConfiguration::Uninitialized());
-			AddMosaic(cache, MosaicId(123), Amount(500), signer, Amount(500), model::MosaicFlags::None);
+			AddMosaic(cache, MosaicId(123), Amount(500), owner, Amount(500), model::MosaicFlags::None);
 
 			// Assert:
 			AssertValidationResult(ValidationResult::Success, cache, Height(100), notification);
@@ -99,11 +101,11 @@ namespace catapult { namespace validators {
 	namespace {
 		void AssertCannotChangeImmutableSupplyWhenOwnerHasPartialSupply(model::MosaicSupplyChangeAction action) {
 			// Arrange:
-			auto signer = test::GenerateRandomByteArray<Key>();
-			auto notification = model::MosaicSupplyChangeNotification(signer, test::UnresolveXor(MosaicId(123)), action, Amount(100));
+			auto owner = test::CreateRandomOwner();
+			auto notification = model::MosaicSupplyChangeNotification(owner, test::UnresolveXor(MosaicId(123)), action, Amount(100));
 
 			auto cache = test::MosaicCacheFactory::Create(model::BlockChainConfiguration::Uninitialized());
-			AddMosaic(cache, MosaicId(123), Amount(500), signer, Amount(499), model::MosaicFlags::None);
+			AddMosaic(cache, MosaicId(123), Amount(500), owner, Amount(499), model::MosaicFlags::None);
 
 			// Assert:
 			AssertValidationResult(Failure_Mosaic_Supply_Immutable, cache, Height(100), notification);
@@ -125,12 +127,12 @@ namespace catapult { namespace validators {
 	namespace {
 		void AssertDecreaseValidationResult(ValidationResult expectedResult, Amount mosaicSupply, Amount ownerSupply, Amount delta) {
 			// Arrange:
-			auto signer = test::GenerateRandomByteArray<Key>();
+			auto owner = test::CreateRandomOwner();
 			auto action = model::MosaicSupplyChangeAction::Decrease;
-			auto notification = model::MosaicSupplyChangeNotification(signer, test::UnresolveXor(MosaicId(123)), action, delta);
+			auto notification = model::MosaicSupplyChangeNotification(owner, test::UnresolveXor(MosaicId(123)), action, delta);
 
 			auto cache = test::MosaicCacheFactory::Create(model::BlockChainConfiguration::Uninitialized());
-			AddMosaic(cache, MosaicId(123), mosaicSupply, signer, ownerSupply);
+			AddMosaic(cache, MosaicId(123), mosaicSupply, owner, ownerSupply);
 
 			// Assert:
 			AssertValidationResult(expectedResult, cache, Height(100), notification);
@@ -158,12 +160,12 @@ namespace catapult { namespace validators {
 	namespace {
 		void AssertIncreaseValidationResult(ValidationResult expectedResult, Amount maxAtomicUnits, Amount mosaicSupply, Amount delta) {
 			// Arrange:
-			auto signer = test::GenerateRandomByteArray<Key>();
+			auto owner = test::CreateRandomOwner();
 			auto action = model::MosaicSupplyChangeAction::Increase;
-			auto notification = model::MosaicSupplyChangeNotification(signer, test::UnresolveXor(MosaicId(123)), action, delta);
+			auto notification = model::MosaicSupplyChangeNotification(owner, test::UnresolveXor(MosaicId(123)), action, delta);
 
 			auto cache = test::MosaicCacheFactory::Create(model::BlockChainConfiguration::Uninitialized());
-			AddMosaic(cache, MosaicId(123), mosaicSupply, signer, Amount(111));
+			AddMosaic(cache, MosaicId(123), mosaicSupply, owner, Amount(111));
 
 			// Assert:
 			AssertValidationResult(expectedResult, cache, Height(100), notification, maxAtomicUnits);

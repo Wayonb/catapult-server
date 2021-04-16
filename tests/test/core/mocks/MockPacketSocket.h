@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,6 +32,7 @@ namespace catapult { namespace mocks {
 		MockPacketSocket()
 				: m_numStatsCalls(0)
 				, m_numCloseCalls(0)
+				, m_numAbortCalls(0)
 				, m_numBufferedCalls(0)
 				, m_pBufferedIo(std::make_shared<MockPacketIo>())
 		{}
@@ -44,6 +46,11 @@ namespace catapult { namespace mocks {
 		/// Number of times close was called.
 		size_t numCloseCalls() const {
 			return m_numCloseCalls;
+		}
+
+		/// Number of times abort was called.
+		size_t numAbortCalls() const {
+			return m_numAbortCalls;
 		}
 
 		/// Number of times buffered was called.
@@ -94,6 +101,10 @@ namespace catapult { namespace mocks {
 			++m_numCloseCalls;
 		}
 
+		void abort() override{
+			++m_numAbortCalls;
+		}
+
 		std::shared_ptr<PacketIo> buffered() override {
 			++m_numBufferedCalls;
 			return m_pBufferedIo;
@@ -102,6 +113,7 @@ namespace catapult { namespace mocks {
 	private:
 		size_t m_numStatsCalls;
 		size_t m_numCloseCalls;
+		size_t m_numAbortCalls;
 		size_t m_numBufferedCalls;
 
 		std::shared_ptr<MockPacketIo> m_pBufferedIo;

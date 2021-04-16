@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -46,7 +47,7 @@ namespace catapult { namespace extensions {
 #define TEST_CLASS LocalNodeStateFileStorageTests
 
 	namespace {
-		constexpr auto Default_Network_Id = model::NetworkIdentifier::Mijin_Test;
+		constexpr auto Default_Network_Id = model::NetworkIdentifier::Private_Test;
 		constexpr auto Harvesting_Mosaic_Id = MosaicId(9876);
 
 		constexpr size_t Account_Cache_Size = 123;
@@ -69,6 +70,8 @@ namespace catapult { namespace extensions {
 
 				pAccountState->Balances.credit(Harvesting_Mosaic_Id, Amount(10));
 				test::RandomFillAccountData(i, *pAccountState);
+
+				cacheDelta.updateHighValueAccounts(Height(1));
 			}
 		}
 
@@ -98,9 +101,7 @@ namespace catapult { namespace extensions {
 		cache::SupplementalData CreateDeterministicSupplementalData() {
 			cache::SupplementalData supplementalData;
 			supplementalData.ChainScore = model::ChainScore(0x1234567890ABCDEF, 0xFEDCBA0987654321);
-			supplementalData.State.LastRecalculationHeight = model::ImportanceHeight(12345);
-			supplementalData.State.DynamicFeeMultiplier = BlockFeeMultiplier(334455);
-			supplementalData.State.NumTotalTransactions = 7654321;
+			supplementalData.State = test::CreateDeterministicCatapultState();
 			return supplementalData;
 		}
 
@@ -145,7 +146,7 @@ namespace catapult { namespace extensions {
 		// Arrange: create a sentinel file
 		test::TempDirectoryGuard tempDir;
 		auto stateDirectory = config::CatapultDirectory(tempDir.name() + "/zstate");
-		boost::filesystem::create_directories(stateDirectory.path());
+		std::filesystem::create_directories(stateDirectory.path());
 		io::IndexFile(stateDirectory.file("supplemental.dat")).set(123);
 
 		// Act:
@@ -201,21 +202,23 @@ namespace catapult { namespace extensions {
 	TEST(TEST_CLASS, NemesisBlockIsExecutedWhenSupplementalDataFileIsNotPresent) {
 		// Arrange: seed and save the cache state (real plugin manager is needed to execute nemesis)
 		test::TempDirectoryGuard tempDir;
+		config::CatapultDataDirectoryPreparer::Prepare(tempDir.name());
+
 		auto stateDirectory = config::CatapultDirectory(tempDir.name() + "/zstate");
-		auto blockChainConfig = test::CreateCatapultConfigurationWithNemesisPluginExtensions("").BlockChain;
+		auto config = test::CreateCatapultConfigurationWithNemesisPluginExtensions(tempDir.name());
 
 		{
-			auto pPluginManager = test::CreatePluginManagerWithRealPlugins(blockChainConfig);
+			auto pPluginManager = test::CreatePluginManagerWithRealPlugins(config);
 			auto originalCache = pPluginManager->createCache();
 			PrepareAndSaveCompleteState(stateDirectory, originalCache);
 		}
 
 		// - remove the supplemental data file
-		ASSERT_TRUE(boost::filesystem::remove(stateDirectory.file("supplemental.dat")));
+		ASSERT_TRUE(std::filesystem::remove(stateDirectory.file("supplemental.dat")));
 
 		// Act: load the state
-		auto pPluginManager = test::CreatePluginManagerWithRealPlugins(blockChainConfig);
-		test::LocalNodeTestState loadedState(blockChainConfig, stateDirectory.str(), pPluginManager->createCache());
+		auto pPluginManager = test::CreatePluginManagerWithRealPlugins(config);
+		test::LocalNodeTestState loadedState(config.BlockChain, stateDirectory.str(), pPluginManager->createCache());
 		auto heights = LoadStateFromDirectory(stateDirectory, loadedState.ref(), *pPluginManager);
 
 		// Assert:
@@ -227,8 +230,9 @@ namespace catapult { namespace extensions {
 		auto cacheView = loadedState.ref().Cache.createView();
 		auto expectedState = state::CatapultState();
 		expectedState.LastRecalculationHeight = model::ImportanceHeight(1);
+		expectedState.LastFinalizedHeight = Height(1);
 		expectedState.DynamicFeeMultiplier = BlockFeeMultiplier(1);
-		expectedState.NumTotalTransactions = 31;
+		expectedState.NumTotalTransactions = 31 + 11;
 		test::AssertEqual(expectedState, cacheView.dependentState());
 		EXPECT_EQ(Height(1), cacheView.height());
 	}
@@ -240,25 +244,25 @@ namespace catapult { namespace extensions {
 	namespace {
 		void PrepareNonexistentDirectory(const config::CatapultDirectory& directory) {
 			// Sanity:
-			EXPECT_FALSE(boost::filesystem::exists(directory.path()));
+			EXPECT_FALSE(std::filesystem::exists(directory.path()));
 		}
 
 		void PrepareEmptyDirectory(const config::CatapultDirectory& directory) {
 			// Arrange:
-			boost::filesystem::create_directories(directory.path());
+			std::filesystem::create_directories(directory.path());
 
 			// Sanity:
-			EXPECT_TRUE(boost::filesystem::exists(directory.path()));
+			EXPECT_TRUE(std::filesystem::exists(directory.path()));
 		}
 
 		void PrepareDirectoryWithSentinel(const config::CatapultDirectory& directory) {
 			// Arrange:
-			boost::filesystem::create_directories(directory.path());
+			std::filesystem::create_directories(directory.path());
 			io::IndexFile(directory.file("sentinel")).set(1);
 
 			// Sanity:
-			EXPECT_TRUE(boost::filesystem::exists(directory.path()));
-			EXPECT_TRUE(boost::filesystem::exists(directory.file("sentinel")));
+			EXPECT_TRUE(std::filesystem::exists(directory.path()));
+			EXPECT_TRUE(std::filesystem::exists(directory.file("sentinel")));
 		}
 	}
 
@@ -299,7 +303,7 @@ namespace catapult { namespace extensions {
 
 			EXPECT_EQ(3u, test::CountFilesAndDirectories(stateDirectory.path()));
 			for (const auto* supplementalFilename : { "supplemental.dat", "AccountStateCache.dat", "BlockStatisticCache.dat" })
-				EXPECT_TRUE(boost::filesystem::exists(stateDirectory.file(supplementalFilename))) << supplementalFilename;
+				EXPECT_TRUE(std::filesystem::exists(stateDirectory.file(supplementalFilename))) << supplementalFilename;
 		}
 	}
 
@@ -317,7 +321,7 @@ namespace catapult { namespace extensions {
 
 	namespace {
 		cache::CatapultCache CreateCacheWithRealCoreSystemPlugins(const std::string& databaseDirectory) {
-			auto cacheConfig = cache::CacheConfiguration(databaseDirectory, utils::FileSize(), cache::PatriciaTreeStorageMode::Enabled);
+			auto cacheConfig = cache::CacheConfiguration(databaseDirectory, cache::PatriciaTreeStorageMode::Enabled);
 
 			cache::AccountStateCacheTypes::Options options;
 			options.ImportanceGrouping = 1;
@@ -357,15 +361,17 @@ namespace catapult { namespace extensions {
 
 			auto expectedView = originalCache.createView();
 			auto actualView = loadedState.ref().Cache.createView();
+			const auto& expectedAccountStateCache = expectedView.sub<cache::AccountStateCache>();
 			const auto& actualAccountStateCache = actualView.sub<cache::AccountStateCache>();
+
 			EXPECT_EQ(0u, actualAccountStateCache.size());
-			EXPECT_FALSE(actualAccountStateCache.highValueAddresses().empty());
-			EXPECT_EQ(expectedView.sub<cache::AccountStateCache>().highValueAddresses(), actualAccountStateCache.highValueAddresses());
+			EXPECT_FALSE(actualAccountStateCache.highValueAccounts().addresses().empty());
+			EXPECT_EQ(expectedAccountStateCache.highValueAccounts().addresses(), actualAccountStateCache.highValueAccounts().addresses());
 			EXPECT_EQ(expectedView.sub<cache::BlockStatisticCache>().size(), actualView.sub<cache::BlockStatisticCache>().size());
 
 			EXPECT_EQ(3u, test::CountFilesAndDirectories(stateDirectory.path()));
 			for (const auto* supplementalFilename : { "supplemental.dat", "AccountStateCache_summary.dat", "BlockStatisticCache.dat" })
-				EXPECT_TRUE(boost::filesystem::exists(stateDirectory.file(supplementalFilename))) << supplementalFilename;
+				EXPECT_TRUE(std::filesystem::exists(stateDirectory.file(supplementalFilename))) << supplementalFilename;
 		}
 	}
 
@@ -387,7 +393,7 @@ namespace catapult { namespace extensions {
 			// Arrange: write a file in the source directory
 			test::TempDirectoryGuard tempDir;
 			auto stateDirectory = config::CatapultDirectory(tempDir.name() + "/zstate");
-			boost::filesystem::create_directories(stateDirectory.path());
+			std::filesystem::create_directories(stateDirectory.path());
 			io::IndexFile(stateDirectory.file("sentinel")).set(123);
 
 			// - run additional preparation on destination directory
@@ -399,8 +405,8 @@ namespace catapult { namespace extensions {
 			serializer.moveTo(stateDirectory2);
 
 			// Assert:
-			EXPECT_FALSE(boost::filesystem::exists(stateDirectory.file("sentinel")));
-			EXPECT_TRUE(boost::filesystem::exists(stateDirectory2.file("sentinel")));
+			EXPECT_FALSE(std::filesystem::exists(stateDirectory.file("sentinel")));
+			EXPECT_TRUE(std::filesystem::exists(stateDirectory2.file("sentinel")));
 
 			EXPECT_EQ(123u, io::IndexFile(stateDirectory2.file("sentinel")).get());
 		}
@@ -467,9 +473,7 @@ namespace catapult { namespace extensions {
 
 		// Act: save the state
 		constexpr auto SaveState = SaveStateToDirectoryWithCheckpointing;
-		EXPECT_THROW(
-				SaveState(dataDirectory, nodeConfig, catapultCache, supplementalData.ChainScore),
-				boost::filesystem::filesystem_error);
+		EXPECT_THROW(SaveState(dataDirectory, nodeConfig, catapultCache, supplementalData.ChainScore), std::filesystem::filesystem_error);
 
 		// Assert:
 		EXPECT_EQ(consumers::CommitOperationStep::State_Written, ReadCommitStep(dataDirectory));

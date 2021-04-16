@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -32,7 +33,7 @@ namespace catapult { namespace state {
 
 		void SaveDefinition(io::OutputStream& output, const MosaicDefinition& definition) {
 			io::Write(output, definition.startHeight());
-			output.write(definition.ownerPublicKey());
+			output.write(definition.ownerAddress());
 			io::Write32(output, definition.revision());
 
 			SaveProperties(output, definition.properties());
@@ -54,7 +55,7 @@ namespace catapult { namespace state {
 		}
 
 		MosaicDefinition LoadDefinition(io::InputStream& input) {
-			Key owner;
+			Address owner;
 			auto height = io::Read<Height>(input);
 			input.read(owner);
 			auto revision = io::Read32(input);

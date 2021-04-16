@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -35,9 +36,10 @@ namespace catapult { namespace mongo { namespace plugins {
 		bson_stream::document builder;
 		auto doc = builder
 				<< "metadataEntry" << bson_stream::open_document
+					<< "version" << 1
 					<< "compositeHash" << ToBinary(key.uniqueKey())
-					<< "senderPublicKey" << ToBinary(key.sourcePublicKey())
-					<< "targetPublicKey" << ToBinary(key.targetPublicKey())
+					<< "sourceAddress" << ToBinary(key.sourceAddress())
+					<< "targetAddress" << ToBinary(key.targetAddress())
 					<< "scopedMetadataKey" << static_cast<int64_t>(key.scopedMetadataKey())
 					<< "targetId" << static_cast<int64_t>(key.targetId())
 					<< "metadataType" << utils::to_underlying_type(metadataEntry.key().metadataType())

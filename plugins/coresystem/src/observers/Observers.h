@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -41,19 +42,30 @@ namespace catapult { namespace observers {
 
 	// region Block
 
+	/// Options for the harvest fee observer.
+	struct HarvestFeeOptions {
+		/// Mosaic id used as primary chain currency.
+		MosaicId CurrencyMosaicId;
+
+		/// Percentage of the harvested fee that is collected by the beneficiary account.
+		uint8_t HarvestBeneficiaryPercentage;
+
+		/// Percentage of the harvested fee that is collected by the network.
+		uint8_t HarvestNetworkPercentage;
+
+		/// Address of the harvest network fee sink account.
+		Address HarvestNetworkFeeSinkAddress;
+	};
+
 	/// Observes block notifications and triggers importance recalculations using either \a pCommitCalculator (for commits)
 	/// or \a pRollbackCalculator (for rollbacks).
 	DECLARE_OBSERVER(RecalculateImportances, model::BlockNotification)(
 			std::unique_ptr<importance::ImportanceCalculator>&& pCommitCalculator,
 			std::unique_ptr<importance::ImportanceCalculator>&& pRollbackCalculator);
 
-	/// Observes block notifications and credits the harvester and optionally the beneficiary account with transaction fees
-	/// given the currency mosaic id (\a currencyMosaicId), the harvest beneficiary percentage (\a harvestBeneficiaryPercentage)
-	/// and the inflation \a calculator.
-	DECLARE_OBSERVER(HarvestFee, model::BlockNotification)(
-			MosaicId currencyMosaicId,
-			uint8_t harvestBeneficiaryPercentage,
-			const model::InflationCalculator& calculator);
+	/// Observes block notifications and credits the harvester and, optionally, additional accounts specified in \a options
+	/// with the currency mosaic given the specified inflation \a calculator.
+	DECLARE_OBSERVER(HarvestFee, model::BlockNotification)(const HarvestFeeOptions& options, const model::InflationCalculator& calculator);
 
 	/// Observes block beneficiary.
 	DECLARE_OBSERVER(Beneficiary, model::BlockNotification)();
@@ -65,6 +77,9 @@ namespace catapult { namespace observers {
 
 	/// Observes block notifications and counts transactions.
 	DECLARE_OBSERVER(TotalTransactions, model::BlockNotification)();
+
+	/// Observes block notifications and recalculates high value account information when \a mode matches.
+	DECLARE_OBSERVER(HighValueAccount, model::BlockNotification)(NotifyMode mode);
 
 	// endregion
 

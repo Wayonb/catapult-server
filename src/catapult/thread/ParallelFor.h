@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -33,6 +34,7 @@ namespace catapult { namespace thread {
 			size_t numPartitions,
 			TWorkCallback callback) {
 		// region ParallelContext
+
 		class ParallelContext {
 		public:
 			ParallelContext() : m_numOutstandingOperations(1) // note that the work partitioning is the initial operation

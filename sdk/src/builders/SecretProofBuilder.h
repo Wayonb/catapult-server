@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,14 +37,14 @@ namespace catapult { namespace builders {
 		SecretProofBuilder(model::NetworkIdentifier networkIdentifier, const Key& signer);
 
 	public:
+		/// Sets the locked mosaic recipient address to \a recipientAddress.
+		void setRecipientAddress(const UnresolvedAddress& recipientAddress);
+
 		/// Sets the secret to \a secret.
 		void setSecret(const Hash256& secret);
 
 		/// Sets the hash algorithm to \a hashAlgorithm.
 		void setHashAlgorithm(model::LockHashAlgorithm hashAlgorithm);
-
-		/// Sets the locked mosaic recipient address to \a recipientAddress.
-		void setRecipientAddress(const UnresolvedAddress& recipientAddress);
 
 		/// Sets the proof data to \a proof.
 		void setProof(const RawBuffer& proof);
@@ -67,9 +68,9 @@ namespace catapult { namespace builders {
 		std::unique_ptr<TTransaction> buildImpl() const;
 
 	private:
+		UnresolvedAddress m_recipientAddress;
 		Hash256 m_secret;
 		model::LockHashAlgorithm m_hashAlgorithm;
-		UnresolvedAddress m_recipientAddress;
 		std::vector<uint8_t> m_proof;
 	};
 }}

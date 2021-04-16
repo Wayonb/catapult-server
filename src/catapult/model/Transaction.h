@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -72,16 +73,7 @@ namespace catapult { namespace model {
 	static constexpr EntityType Entity_Type = TYPE;
 
 /// Defines \a NAME (\a TYPE typed) variable data accessors around a similarly named templated untyped data accessor.
-#define DEFINE_TRANSACTION_VARIABLE_DATA_ACCESSORS(NAME, TYPE) \
-	/* Returns a const pointer to the typed data contained in this transaction. */ \
-	const TYPE* NAME##Ptr() const { \
-		return reinterpret_cast<const TYPE*>(NAME##PtrT(*this)); \
-	} \
-	\
-	/* Returns a pointer to the typed data contained in this transaction. */ \
-	TYPE* NAME##Ptr() { \
-		return reinterpret_cast<TYPE*>(NAME##PtrT(*this)); \
-	}
+#define DEFINE_TRANSACTION_VARIABLE_DATA_ACCESSORS DEFINE_SIZE_PREFIXED_ENTITY_VARIABLE_DATA_ACCESSORS
 
 /// Defines a transaction with \a NAME that supports embedding.
 #define DEFINE_EMBEDDABLE_TRANSACTION(NAME) \

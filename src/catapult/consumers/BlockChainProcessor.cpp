@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,6 +23,8 @@
 #include "InputUtils.h"
 #include "catapult/cache/CatapultCache.h"
 #include "catapult/cache/ReadOnlyCatapultCache.h"
+#include "catapult/cache_core/AccountStateCache.h"
+#include "catapult/cache_core/AccountStateCacheUtils.h"
 #include "catapult/chain/ChainResults.h"
 #include "catapult/chain/ChainUtils.h"
 #include "catapult/io/BlockStatementSerializer.h"
@@ -123,15 +126,16 @@ namespace catapult { namespace consumers {
 
 				for (auto& element : elements) {
 					// 1. check generation hash
-					if (!CheckGenerationHash(element, *pParent, *pParentGenerationHash, blockHitPredicate))
-						return chain::Failure_Chain_Block_Not_Hit;
+					auto result = CheckGenerationHash(element, *pParent, *pParentGenerationHash, blockHitPredicate, readOnlyCache);
+					if (!IsValidationResultSuccess(result))
+						return result;
 
 					// 2. validate and observe block
 					model::BlockStatementBuilder blockStatementBuilder;
 					auto blockDependentState = createBlockDependentObserverState(state, blockStatementBuilder);
 
 					const auto& block = element.Block;
-					auto result = m_batchEntityProcessor(block.Height, block.Timestamp, ExtractEntityInfos(element), blockDependentState);
+					result = m_batchEntityProcessor(block.Height, block.Timestamp, ExtractEntityInfos(element), blockDependentState);
 					if (!IsValidationResultSuccess(result)) {
 						CATAPULT_LOG(warning) << "batch processing of block " << block.Height << " failed with " << result;
 						return result;
@@ -163,19 +167,46 @@ namespace catapult { namespace consumers {
 			}
 
 		private:
-			static bool CheckGenerationHash(
+			static Key GetVrfPublicKey(const cache::ReadOnlyAccountStateCache& accountStateCache, const Address& blockHarvester) {
+				Key vrfPublicKey;
+				cache::ProcessForwardedAccountState(accountStateCache, blockHarvester, [&vrfPublicKey](const auto& accountState) {
+					vrfPublicKey = state::GetVrfPublicKey(accountState);
+				});
+				return vrfPublicKey;
+			}
+
+			static validators::ValidationResult CheckGenerationHash(
 					model::BlockElement& element,
 					const model::Block& parentBlock,
 					const GenerationHash& parentGenerationHash,
-					const BlockHitPredicate& blockHitPredicate) {
+					const BlockHitPredicate& blockHitPredicate,
+					const cache::ReadOnlyCatapultCache& readOnlyCache) {
 				const auto& block = element.Block;
-				element.GenerationHash = model::CalculateGenerationHash(parentGenerationHash, block.SignerPublicKey);
-				if (!blockHitPredicate(parentBlock, block, element.GenerationHash)) {
-					CATAPULT_LOG(warning) << "block " << block.Height << " failed hit";
-					return false;
+				const auto& accountStateCache = readOnlyCache.sub<cache::AccountStateCache>();
+
+				auto accountStateIter = accountStateCache.find(block.SignerPublicKey);
+				if (!accountStateIter.tryGet()) {
+					CATAPULT_LOG(warning)
+							<< "block signer at height " << block.Height
+							<< " is not present in account state cache " << block.SignerPublicKey;
+					return chain::Failure_Chain_Block_Unknown_Signer;
 				}
 
-				return true;
+				auto vrfPublicKey = GetVrfPublicKey(accountStateCache, accountStateIter.get().Address);
+				auto vrfVerifyResult = crypto::VerifyVrfProof(block.GenerationHashProof, parentGenerationHash, vrfPublicKey);
+
+				if (Hash512() == vrfVerifyResult) {
+					CATAPULT_LOG(warning) << "vrf proof does not validate at height " << block.Height;
+					return chain::Failure_Chain_Block_Invalid_Vrf_Proof;
+				}
+
+				element.GenerationHash = vrfVerifyResult.copyTo<GenerationHash>();
+				if (!blockHitPredicate(parentBlock, block, element.GenerationHash)) {
+					CATAPULT_LOG(warning) << "block " << block.Height << " failed hit";
+					return chain::Failure_Chain_Block_Not_Hit;
+				}
+
+				return validators::ValidationResult::Success;
 			}
 
 			static bool CheckStateHash(

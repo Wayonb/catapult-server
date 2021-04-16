@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,8 +24,27 @@
 
 namespace catapult { namespace test {
 
+	state::CatapultState CreateRandomCatapultState() {
+		auto state = state::CatapultState();
+		state.LastRecalculationHeight = test::GenerateRandomValue<model::ImportanceHeight>();
+		state.LastFinalizedHeight = test::GenerateRandomValue<Height>();
+		state.DynamicFeeMultiplier = test::GenerateRandomValue<BlockFeeMultiplier>();
+		state.NumTotalTransactions = test::Random();
+		return state;
+	}
+
+	state::CatapultState CreateDeterministicCatapultState() {
+		auto state = state::CatapultState();
+		state.LastRecalculationHeight = model::ImportanceHeight(12345);
+		state.LastFinalizedHeight = Height(9876);
+		state.DynamicFeeMultiplier = BlockFeeMultiplier(334455);
+		state.NumTotalTransactions = 7654321;
+		return state;
+	}
+
 	void AssertEqual(const state::CatapultState& expected, const state::CatapultState& actual, const std::string& message) {
 		EXPECT_EQ(expected.LastRecalculationHeight, actual.LastRecalculationHeight) << message;
+		EXPECT_EQ(expected.LastFinalizedHeight, actual.LastFinalizedHeight) << message;
 		EXPECT_EQ(expected.DynamicFeeMultiplier, actual.DynamicFeeMultiplier) << message;
 		EXPECT_EQ(expected.NumTotalTransactions, actual.NumTotalTransactions) << message;
 	}

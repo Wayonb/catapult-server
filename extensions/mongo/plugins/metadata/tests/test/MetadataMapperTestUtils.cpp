@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -27,13 +28,14 @@ namespace catapult { namespace test {
 	void AssertEqualMetadataEntry(const state::MetadataEntry& metadataEntry, const bsoncxx::document::view& dbMetadataEntry) {
 		const auto& key = metadataEntry.key();
 		const auto& value = metadataEntry.value();
-		EXPECT_EQ(value.empty() ? 7u : 8u, GetFieldCount(dbMetadataEntry));
+		EXPECT_EQ(value.empty() ? 8u : 9u, GetFieldCount(dbMetadataEntry));
+		EXPECT_EQ(1u, GetUint32(dbMetadataEntry, "version"));
 
 		auto compositeHash = metadataEntry.key().uniqueKey();
 		EXPECT_EQ(compositeHash, GetHashValue(dbMetadataEntry, "compositeHash"));
 
-		EXPECT_EQ(key.sourcePublicKey(), GetKeyValue(dbMetadataEntry, "senderPublicKey"));
-		EXPECT_EQ(key.targetPublicKey(), GetKeyValue(dbMetadataEntry, "targetPublicKey"));
+		EXPECT_EQ(key.sourceAddress(), GetAddressValue(dbMetadataEntry, "sourceAddress"));
+		EXPECT_EQ(key.targetAddress(), GetAddressValue(dbMetadataEntry, "targetAddress"));
 		EXPECT_EQ(key.scopedMetadataKey(), GetUint64(dbMetadataEntry, "scopedMetadataKey"));
 		EXPECT_EQ(key.targetId(), GetUint64(dbMetadataEntry, "targetId"));
 		EXPECT_EQ(key.metadataType(), static_cast<model::MetadataType>(GetUint8(dbMetadataEntry, "metadataType")));

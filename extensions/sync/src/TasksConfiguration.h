@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,7 +21,7 @@
 
 #pragma once
 #include "catapult/utils/TimeSpan.h"
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 #include <unordered_map>
 
 namespace catapult { namespace utils { class ConfigurationBag; } }
@@ -134,6 +135,6 @@ namespace catapult { namespace sync {
 		static TasksConfiguration LoadFromBag(const utils::ConfigurationBag& bag);
 
 		/// Loads a tasks configuration from \a resourcesPath.
-		static TasksConfiguration LoadFromPath(const boost::filesystem::path& resourcesPath);
+		static TasksConfiguration LoadFromPath(const std::filesystem::path& resourcesPath);
 	};
 }}

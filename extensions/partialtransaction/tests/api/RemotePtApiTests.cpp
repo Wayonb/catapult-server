@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -32,28 +33,28 @@ namespace catapult { namespace api {
 		std::shared_ptr<ionet::Packet> CreatePacketWithTransactionInfos(uint16_t numTransactions) {
 			// Arrange: create transactions with variable (incrementing) sizes
 			//          (each info in this test has two parts: (1) tag, (2) transaction)
-			uint32_t payloadSize = numTransactions * sizeof(uint64_t);
+			uint32_t payloadSize = numTransactions * SizeOf32<uint64_t>();
 			for (uint16_t i = 0u; i < numTransactions; ++i) {
-				uint32_t transactionSize = sizeof(TransactionType) + i + 1;
+				uint32_t transactionSize = SizeOf32<TransactionType>() + i + 1;
 				payloadSize += transactionSize + utils::GetPaddingSize(transactionSize, 8);
 			}
 
 			auto pPacket = ionet::CreateSharedPacket<ionet::Packet>(payloadSize);
 			test::FillWithRandomData({ pPacket->Data(), payloadSize });
 
-			auto pData = pPacket->Data();
+			auto* pData = pPacket->Data();
 			for (uint16_t i = 0u; i < numTransactions; ++i) {
 				// - tag (transaction and no cosignatures)
 				reinterpret_cast<uint64_t&>(*pData) = 0x8000;
 				pData += sizeof(uint64_t);
 
 				// - transaction
-				uint32_t transactionSize = sizeof(TransactionType) + i + 1;
+				uint32_t transactionSize = SizeOf32<TransactionType>() + i + 1;
 				auto& transaction = reinterpret_cast<TransactionType&>(*pData);
 				transaction.Size = transactionSize;
 				transaction.Type = TransactionType::Entity_Type;
 				transaction.Deadline = Timestamp(5 * i);
-				transaction.Data.Size = i + 1;
+				transaction.Data.Size = static_cast<uint16_t>(i + 1);
 				pData += transactionSize;
 
 				// - padding
@@ -66,6 +67,7 @@ namespace catapult { namespace api {
 		}
 
 		struct TransactionInfosTraits {
+			static constexpr uint32_t Request_Data_Header_Size = sizeof(Timestamp);
 			static constexpr uint32_t Request_Data_Size = 3 * sizeof(cache::ShortHashPair);
 
 			static std::vector<uint32_t> KnownHashesValues() {
@@ -78,7 +80,7 @@ namespace catapult { namespace api {
 			}
 
 			static auto Invoke(const RemotePtApi& api) {
-				return api.transactionInfos(KnownShortHashPairs());
+				return api.transactionInfos(Timestamp(84), KnownShortHashPairs());
 			}
 
 			static auto CreateValidResponsePacket() {
@@ -96,8 +98,9 @@ namespace catapult { namespace api {
 
 			static void ValidateRequest(const ionet::Packet& packet) {
 				EXPECT_EQ(ionet::PacketType::Pull_Partial_Transaction_Infos, packet.Type);
-				ASSERT_EQ(sizeof(ionet::Packet) + Request_Data_Size, packet.Size);
-				EXPECT_EQ_MEMORY(packet.Data(), KnownHashesValues().data(), Request_Data_Size);
+				ASSERT_EQ(sizeof(ionet::Packet) + Request_Data_Header_Size + Request_Data_Size, packet.Size);
+				EXPECT_EQ(Timestamp(84), reinterpret_cast<const Timestamp&>(*packet.Data()));
+				EXPECT_EQ_MEMORY(packet.Data() + Request_Data_Header_Size, KnownHashesValues().data(), Request_Data_Size);
 			}
 
 			static void ValidateResponse(

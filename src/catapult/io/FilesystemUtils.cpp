@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,17 +20,28 @@
 **/
 
 #include "FilesystemUtils.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 namespace catapult { namespace io {
 
 	void PurgeDirectory(const std::string& directory) {
-		if (!boost::filesystem::exists(directory))
+		if (!std::filesystem::exists(directory))
 			return;
 
-		auto begin = boost::filesystem::directory_iterator(directory);
-		auto end = boost::filesystem::directory_iterator();
+		auto begin = std::filesystem::directory_iterator(directory);
+		auto end = std::filesystem::directory_iterator();
 		for (auto iter = begin; end != iter; ++iter)
-			boost::filesystem::remove_all(iter->path());
+			std::filesystem::remove_all(iter->path());
+	}
+
+	void MoveAllFiles(const std::string& sourceDirectory, const std::string& destDirectory) {
+		auto begin = std::filesystem::directory_iterator(sourceDirectory);
+		auto end = std::filesystem::directory_iterator();
+		for (auto iter = begin; iter != end; ++iter) {
+			if (!iter->is_regular_file())
+				continue;
+
+			std::filesystem::rename(iter->path(), destDirectory / iter->path().filename());
+		}
 	}
 }}

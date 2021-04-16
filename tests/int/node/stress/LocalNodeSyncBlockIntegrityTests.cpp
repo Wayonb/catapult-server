@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -65,13 +66,14 @@ namespace catapult { namespace local {
 			}
 
 			// Act: two different connections, each having its own identity, are needed because first identity will be banned
-			test::ExternalSourceConnection connection1;
-			test::ExternalSourceConnection connection2;
+			test::ExternalSourceConnection connection1(context.publicKey());
+			test::ExternalSourceConnection connection2(context.publicKey());
 			auto pIo1 = test::PushEntity(connection1, ionet::PacketType::Push_Block, pUnsignedBlock);
 			auto pIo2 = test::PushEntity(connection2, ionet::PacketType::Push_Block, pSignedBlock);
 
 			// - wait for the chain height to change and for all height readers to disconnect
-			test::WaitForHeightAndElements(context, Height(2), 2, 2);
+			//   (notice that the reader pushing the invalid entity will be forcibly disconnected)
+			test::WaitForHeightAndElements(context, Height(2), 2, 1);
 			stateHashes.emplace_back(GetStateHash(context));
 
 			// Assert: the cache has expected balances (from the signed block)

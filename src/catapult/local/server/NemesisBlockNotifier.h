@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -32,7 +33,10 @@ namespace catapult {
 		struct BlockElement;
 	}
 	namespace plugins { class PluginManager; }
-	namespace subscribers { class StateChangeSubscriber; }
+	namespace subscribers {
+		class FinalizationSubscriber;
+		class StateChangeSubscriber;
+	}
 }
 
 namespace catapult { namespace local {
@@ -50,6 +54,9 @@ namespace catapult { namespace local {
 	public:
 		/// Raises and forwards block change notifications to \a subscriber.
 		void raise(io::BlockChangeSubscriber& subscriber);
+
+		/// Raises and forwards finalization notifications to \a subscriber.
+		void raise(subscribers::FinalizationSubscriber& subscriber);
 
 		/// Raises and forwards state change notifications to \a subscriber.
 		void raise(subscribers::StateChangeSubscriber& subscriber);

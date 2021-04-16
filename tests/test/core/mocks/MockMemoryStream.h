@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,6 +24,8 @@
 
 namespace catapult { namespace mocks {
 
+	// region MockMemoryStream
+
 	/// Memory-based implementation of input and output stream.
 	class MockMemoryStream final : public extensions::MemoryStream {
 	public:
@@ -39,4 +42,28 @@ namespace catapult { namespace mocks {
 	private:
 		size_t m_flushCount;
 	};
+
+	// endregion
+
+	// region MockSeekableMemoryStream
+
+	/// Memory-based implementation of seekable input and output stream.
+	class MockSeekableMemoryStream : public extensions::MemoryStream {
+	public:
+		/// Creates an empty memory stream.
+		MockSeekableMemoryStream();
+
+	public:
+		/// Gets the underlying buffer.
+		const std::vector<uint8_t>& buffer() const;
+
+	public:
+		/// Copies the contents of this stream into \a dest.
+		void copyTo(MockSeekableMemoryStream& dest) const;
+
+	private:
+		std::vector<uint8_t> m_buffer;
+	};
+
+	// endregion
 }}

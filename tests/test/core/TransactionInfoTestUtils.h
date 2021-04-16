@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,8 +32,11 @@ namespace catapult { namespace test {
 	/// Creates a random transaction info.
 	model::TransactionInfo CreateRandomTransactionInfo();
 
+	/// Creates a random transaction info with size \a entitySize.
+	model::TransactionInfo CreateRandomTransactionInfoWithSize(uint32_t entitySize);
+
 	/// Creates a transaction info composed of a random transaction with the specified \a deadline and a random hash.
-	model::TransactionInfo CreateTransactionInfoWithDeadline(size_t deadline);
+	model::TransactionInfo CreateTransactionInfoWithDeadline(uint64_t deadline);
 
 	// endregion
 

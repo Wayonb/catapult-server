@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -34,7 +35,7 @@ namespace catapult { namespace local {
 			ionet::BanSettings banSettings;
 			banSettings.DefaultBanDuration = utils::TimeSpan::FromHours(1);
 			banSettings.MaxBannedNodes = 50;
-			return ionet::NodeContainer(maxNodes, equalityStrategy, banSettings, []() { return Timestamp(0); });
+			return ionet::NodeContainer(maxNodes, equalityStrategy, banSettings, []() { return Timestamp(0); }, [](auto) { return true; });
 		}
 
 		std::unique_ptr<subscribers::NodeSubscriber> CreateNodeContainerSubscriberAdapter(ionet::NodeContainer& nodes) {
@@ -148,12 +149,26 @@ namespace catapult { namespace local {
 	}
 
 	TEST(TEST_CLASS, NotifyIncomingNodeAddsDynamicIncomingNodeWithLocalNetwork) {
-		AssertNotifyIncomingNodeAddsDynamicIncomingNode("9.8.7.1", "127.0.0.1");
+		AssertNotifyIncomingNodeAddsDynamicIncomingNode("9.8.7.1", "_local_");
 	}
 
 	// endregion
 
 	// region notifyNode / notifyIncomingNode combinations
+
+	namespace {
+		void AssertMergedConnectionStates(const ionet::NodeInfo& nodeInfo) {
+			EXPECT_EQ(2u, nodeInfo.numConnectionStates());
+
+			const auto* pConnectionState1 = nodeInfo.getConnectionState(ionet::ServiceIdentifier(1));
+			ASSERT_TRUE(!!pConnectionState1);
+			EXPECT_EQ(0u, pConnectionState1->Age);
+
+			const auto* pConnectionState2 = nodeInfo.getConnectionState(ionet::ServiceIdentifier(2));
+			ASSERT_TRUE(!!pConnectionState2);
+			EXPECT_EQ(1u, pConnectionState2->Age);
+		}
+	}
 
 	TEST(TEST_CLASS, NotifyNodeCanBeFollowedByNotifyIncomingNode) {
 		// Arrange: create a container and register a connection state
@@ -175,17 +190,8 @@ namespace catapult { namespace local {
 		EXPECT_EQ(1u, nodesView.size());
 		AssertSingleNode(nodesView, identity, "", "alice", ionet::NodeSource::Dynamic);
 
-		// - node has expected connection states
-		const auto& nodeInfo = nodesView.getNodeInfo(identity);
-		EXPECT_EQ(2u, nodeInfo.numConnectionStates());
-
-		const auto* pConnectionState1 = nodeInfo.getConnectionState(ionet::ServiceIdentifier(1));
-		ASSERT_TRUE(!!pConnectionState1);
-		EXPECT_EQ(0u, pConnectionState1->Age);
-
-		const auto* pConnectionState2 = nodeInfo.getConnectionState(ionet::ServiceIdentifier(2));
-		ASSERT_TRUE(!!pConnectionState2);
-		EXPECT_EQ(1u, pConnectionState2->Age);
+		// - node has merged original and new connection states
+		AssertMergedConnectionStates(nodesView.getNodeInfo(identity));
 	}
 
 	TEST(TEST_CLASS, NotifyNodeCanBeFollowedByNotifyIncomingNodeWithHostChange) {
@@ -203,8 +209,19 @@ namespace catapult { namespace local {
 		pSubscriber->notifyNode(node);
 		auto notifyIncomingNodeResult = pSubscriber->notifyIncomingNode(identity2, ionet::ServiceIdentifier(2));
 
-		// Assert: node was not added (downgraded source cannot trigger key migration)
-		EXPECT_FALSE(notifyIncomingNodeResult);
+		// Assert: node added but not migrated (downgraded source cannot trigger key migration)
+		EXPECT_TRUE(notifyIncomingNodeResult);
+
+		auto nodesView = nodes.view();
+		EXPECT_EQ(2u, nodesView.size());
+
+		// - node has only original connection state (downgrade doesn't allow update)
+		const auto& nodeInfo = nodesView.getNodeInfo(identity2);
+		EXPECT_EQ(1u, nodeInfo.numConnectionStates());
+
+		const auto* pConnectionState2 = nodeInfo.getConnectionState(ionet::ServiceIdentifier(2));
+		ASSERT_TRUE(!!pConnectionState2);
+		EXPECT_EQ(1u, pConnectionState2->Age);
 	}
 
 	TEST(TEST_CLASS, NotifyIncomingNodeCanBeFollowedByNotifyNode) {
@@ -227,17 +244,45 @@ namespace catapult { namespace local {
 		EXPECT_EQ(1u, nodesView.size());
 		AssertSingleNode(nodesView, identity, "", "alice", ionet::NodeSource::Dynamic);
 
-		// - node has expected connection states
-		const auto& nodeInfo = nodesView.getNodeInfo(identity);
-		EXPECT_EQ(2u, nodeInfo.numConnectionStates());
+		// - node has merged original and new connection states
+		AssertMergedConnectionStates(nodesView.getNodeInfo(identity));
+	}
 
-		const auto* pConnectionState1 = nodeInfo.getConnectionState(ionet::ServiceIdentifier(1));
-		ASSERT_TRUE(!!pConnectionState1);
-		EXPECT_EQ(0u, pConnectionState1->Age);
+	TEST(TEST_CLASS, NotifyIncomingNodeCanBeFollowedByNotifyNodeWithHostChange) {
+		// Arrange: create a container and register a connection state
+		auto nodes = CreateNodeContainer(5, model::NodeIdentityEqualityStrategy::Host);
+		nodes.modifier().addConnectionStates(ionet::ServiceIdentifier(1), ionet::NodeRoles::Peer);
 
-		const auto* pConnectionState2 = nodeInfo.getConnectionState(ionet::ServiceIdentifier(2));
-		ASSERT_TRUE(!!pConnectionState2);
-		EXPECT_EQ(1u, pConnectionState2->Age);
+		auto identityPublicKey = test::GenerateRandomByteArray<Key>();
+		auto identity1 = model::NodeIdentity{ identityPublicKey, "11.22.33.44" };
+		auto identity2 = model::NodeIdentity{ identityPublicKey, "22.33.44.33" };
+		auto node1 = test::CreateNamedNode(identity1, "alice", ionet::NodeRoles::Peer);
+		auto node2 = test::CreateNamedNode(identity2, "alice", ionet::NodeRoles::Peer);
+
+		// - add the node to the container
+		auto pSubscriber = CreateNodeContainerSubscriberAdapter(nodes);
+		pSubscriber->notifyNode(node1);
+
+		{
+			// Sanity:
+			auto nodesView = nodes.view();
+			EXPECT_EQ(1u, nodesView.size());
+			AssertSingleNode(nodesView, identity1, "", "alice", ionet::NodeSource::Dynamic);
+		}
+
+		// Act: notify the node and simulate a two phase identity change
+		auto notifyIncomingNodeResult = pSubscriber->notifyIncomingNode(identity2, ionet::ServiceIdentifier(2));
+		pSubscriber->notifyNode(node2);
+
+		// Assert: node was added (endpoint host comes from node)
+		EXPECT_TRUE(notifyIncomingNodeResult);
+
+		auto nodesView = nodes.view();
+		EXPECT_EQ(1u, nodesView.size());
+		AssertSingleNode(nodesView, identity2, "", "alice", ionet::NodeSource::Dynamic);
+
+		// - node has merged original and new connection states
+		AssertMergedConnectionStates(nodesView.getNodeInfo(identity2));
 	}
 
 	// endregion
@@ -309,12 +354,31 @@ namespace catapult { namespace local {
 
 		// Act:
 		auto pSubscriber = CreateNodeContainerSubscriberAdapter(nodes);
-		pSubscriber->notifyBan(identity, static_cast<validators::ValidationResult>(123));
+		pSubscriber->notifyBan(identity, 123);
 
 		// Assert:
 		auto nodesView = nodes.view();
 		EXPECT_EQ(0u, nodesView.size());
 		EXPECT_TRUE(nodesView.isBanned(identity));
+	}
+
+	TEST(TEST_CLASS, NotifyBanForwardsNodeIdentityToBannedNodeIdentitySink) {
+		// Arrange:
+		auto nodes = CreateNodeContainer();
+		auto identity = model::NodeIdentity{ test::GenerateRandomByteArray<Key>(), "11.22.33.44" };
+		std::vector<model::NodeIdentity> bannedNodeIdentities;
+		extensions::BannedNodeIdentitySink bannedNodeIdentitySink = [&bannedNodeIdentities](const auto& bannedNodeIdentity) {
+			bannedNodeIdentities.push_back(bannedNodeIdentity);
+		};
+
+		// Act:
+		auto pSubscriber = CreateNodeContainerSubscriberAdapter(nodes, {}, bannedNodeIdentitySink);
+		pSubscriber->notifyBan(identity, 123);
+
+		// Assert:
+		ASSERT_EQ(1u, bannedNodeIdentities.size());
+		EXPECT_EQ(identity.PublicKey, bannedNodeIdentities[0].PublicKey);
+		EXPECT_EQ(identity.Host, bannedNodeIdentities[0].Host);
 	}
 
 	// endregion

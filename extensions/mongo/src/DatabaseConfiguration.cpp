@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -39,19 +40,21 @@ namespace catapult { namespace mongo {
 		LOAD_DB_PROPERTY(DatabaseUri);
 		LOAD_DB_PROPERTY(DatabaseName);
 		LOAD_DB_PROPERTY(MaxWriterThreads);
+		LOAD_DB_PROPERTY(MaxDropBatchSize);
+		LOAD_DB_PROPERTY(WriteTimeout);
 
 #undef LOAD_DB_PROPERTY
 
 		auto pluginsPair = utils::ExtractSectionAsUnorderedSet(bag, "plugins");
 		config.Plugins = pluginsPair.first;
 
-		utils::VerifyBagSizeLte(bag, 3 + pluginsPair.second);
+		utils::VerifyBagSizeExact(bag, 5 + pluginsPair.second);
 		return config;
 	}
 
 #undef LOAD_PROPERTY
 
-	DatabaseConfiguration DatabaseConfiguration::LoadFromPath(const boost::filesystem::path& resourcesPath) {
+	DatabaseConfiguration DatabaseConfiguration::LoadFromPath(const std::filesystem::path& resourcesPath) {
 		return config::LoadIniConfiguration<DatabaseConfiguration>(resourcesPath / "config-database.properties");
 	}
 }}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -32,9 +33,6 @@ namespace catapult { namespace net {
 	/// Manages a collection of connections.
 	class ConnectionContainer {
 	public:
-		using AcceptCallback = consumer<const PeerConnectResult&>;
-
-	public:
 		virtual ~ConnectionContainer() = default;
 
 	public:
@@ -45,10 +43,17 @@ namespace catapult { namespace net {
 		virtual model::NodeIdentitySet identities() const = 0;
 
 	public:
-		/// Accepts a connection represented by \a socketInfo and calls \a callback on completion.
-		virtual void accept(const ionet::PacketSocketInfo& socketInfo, const AcceptCallback& callback) = 0;
-
 		/// Closes any active connections to the node identified by \a identity.
 		virtual bool closeOne(const model::NodeIdentity& identity) = 0;
+	};
+
+	/// Manages a collection of accepted connections.
+	class AcceptedConnectionContainer : public ConnectionContainer {
+	public:
+		using AcceptCallback = predicate<const PeerConnectResult&>;
+
+	public:
+		/// Accepts a connection represented by \a socketInfo and calls \a callback on completion.
+		virtual void accept(const ionet::PacketSocketInfo& socketInfo, const AcceptCallback& callback) = 0;
 	};
 }}

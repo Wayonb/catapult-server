@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -30,6 +31,10 @@
 
 namespace catapult { namespace test {
 
+	namespace {
+		constexpr auto Block_Header_Size = sizeof(model::BlockHeader) + sizeof(model::PaddedBlockFooter);
+	}
+
 	// region TestBlockTransactions
 
 	TestBlockTransactions::TestBlockTransactions(const ConstTransactions& transactions) : m_transactions(transactions)
@@ -51,7 +56,7 @@ namespace catapult { namespace test {
 	// region Block factory functions
 
 	namespace {
-		constexpr auto Network_Identifier = model::NetworkIdentifier::Mijin_Test;
+		constexpr auto Network_Identifier = model::NetworkIdentifier::Private_Test;
 
 		void RandomizeBlock(model::Block& block) {
 			auto difficultyRange = (Difficulty::Max() - Difficulty::Min()).unwrap();
@@ -65,23 +70,31 @@ namespace catapult { namespace test {
 			FillWithRandomData(block.TransactionsHash);
 			FillWithRandomData(block.ReceiptsHash);
 			FillWithRandomData(block.StateHash);
-			FillWithRandomData(block.BeneficiaryPublicKey);
+			FillWithRandomData(block.BeneficiaryAddress);
 		}
 
 		struct TestBlockOptions {
 		public:
-			explicit TestBlockOptions(const crypto::KeyPair& signer) : Signer(signer)
+			explicit TestBlockOptions(const crypto::KeyPair& signer)
+					: Signer(signer)
+					, EntityType(model::Entity_Type_Block_Normal)
 			{}
 
 		public:
 			const crypto::KeyPair& Signer;
+			model::EntityType EntityType;
 			catapult::Height Height;
 			catapult::Timestamp Timestamp;
 		};
 
 		std::unique_ptr<model::Block> GenerateBlock(const TestBlockTransactions& transactions, const TestBlockOptions& options) {
 			model::PreviousBlockContext context;
-			auto pBlock = model::CreateBlock(context, Network_Identifier, options.Signer.publicKey(), transactions.get());
+			auto pBlock = model::CreateBlock(
+					options.EntityType,
+					context,
+					Network_Identifier,
+					options.Signer.publicKey(),
+					transactions.get());
 			RandomizeBlock(*pBlock);
 
 			if (Height() != options.Height)
@@ -101,8 +114,15 @@ namespace catapult { namespace test {
 		return GenerateBlockWithTransactions(0);
 	}
 
+	std::unique_ptr<model::Block> GenerateImportanceBlockWithTransactions(const TestBlockTransactions& transactions) {
+		auto signer = GenerateKeyPair();
+		auto blockOptions = TestBlockOptions(signer);
+		blockOptions.EntityType = model::Entity_Type_Block_Importance;
+		return GenerateBlock(transactions, blockOptions);
+	}
+
 	std::unique_ptr<model::Block> GenerateBlockWithTransactions(const TestBlockTransactions& transactions) {
-		return GenerateBlock(transactions, TestBlockOptions(GenerateKeyPair()));
+		return GenerateBlockWithTransactions(GenerateKeyPair(), transactions);
 	}
 
 	std::unique_ptr<model::Block> GenerateBlockWithTransactions(const crypto::KeyPair& signer, const TestBlockTransactions& transactions) {
@@ -137,22 +157,21 @@ namespace catapult { namespace test {
 		pBlock->PreviousBlockHash = { { 123 } };
 		pBlock->ReceiptsHash = { { 55 } };
 		pBlock->StateHash = { { 242, 111 } };
-		pBlock->BeneficiaryPublicKey = { { 77, 99, 88 } };
+		pBlock->BeneficiaryAddress = { { 77, 99, 88 } };
 
-		auto generationHash = utils::ParseByteArray<GenerationHash>(test::Deterministic_Network_Generation_Hash_String);
-		extensions::BlockExtensions(generationHash).signFullBlock(keyPair, *pBlock);
+		auto generationHashSeed = utils::ParseByteArray<GenerationHashSeed>(test::Deterministic_Network_Generation_Hash_Seed_String);
+		extensions::BlockExtensions(generationHashSeed).signFullBlock(keyPair, *pBlock);
 		return pBlock;
 	}
 
 	// endregion
 
 	std::vector<uint8_t> CreateRandomBlockBuffer(size_t numBlocks) {
-		constexpr auto Entity_Size = sizeof(model::BlockHeader);
-		auto buffer = GenerateRandomVector(numBlocks * Entity_Size);
+		auto buffer = GenerateRandomVector(numBlocks * Block_Header_Size);
 		for (auto i = 0u; i < numBlocks; ++i) {
-			auto& block = reinterpret_cast<model::Block&>(buffer[i * Entity_Size]);
-			block.Size = Entity_Size;
-			block.Type = model::Entity_Type_Block;
+			auto& block = reinterpret_cast<model::Block&>(buffer[i * Block_Header_Size]);
+			block.Size = Block_Header_Size;
+			block.Type = model::Entity_Type_Block_Normal;
 		}
 
 		return buffer;
@@ -163,14 +182,18 @@ namespace catapult { namespace test {
 	}
 
 	model::BlockRange CreateBlockEntityRange(size_t numBlocks) {
+		std::vector<size_t> offsets;
+		for (auto i = 0u; i < numBlocks; ++i)
+			offsets.push_back(i * Block_Header_Size);
+
 		auto buffer = CreateRandomBlockBuffer(numBlocks);
-		return model::BlockRange::CopyFixed(buffer.data(), numBlocks);
+		return model::BlockRange::CopyVariable(buffer.data(), buffer.size(), offsets);
 	}
 
-	std::vector<model::BlockRange> PrepareRanges(size_t count) {
+	std::vector<model::BlockRange> PrepareRanges(size_t count, size_t increment) {
 		std::vector<model::BlockRange> ranges;
 		for (auto i = 0u; i < count; ++i)
-			ranges.push_back(CreateBlockEntityRange(3));
+			ranges.push_back(CreateBlockEntityRange(3 + increment * i));
 
 		return ranges;
 	}
@@ -181,11 +204,12 @@ namespace catapult { namespace test {
 	}
 
 	model::BlockElement BlockToBlockElement(const model::Block& block) {
-		return BlockToBlockElement(block, GetDefaultGenerationHash());
+		return BlockToBlockElement(block, GetDefaultGenerationHashSeed());
 	}
 
-	model::BlockElement BlockToBlockElement(const model::Block& block, const GenerationHash& generationHash) {
-		return extensions::BlockExtensions(generationHash).convertBlockToBlockElement(block, generationHash);
+	model::BlockElement BlockToBlockElement(const model::Block& block, const GenerationHashSeed& generationHashSeed) {
+		auto generationHash = model::CalculateGenerationHash(block.GenerationHashProof.Gamma);
+		return extensions::BlockExtensions(generationHashSeed).convertBlockToBlockElement(block, generationHash);
 	}
 
 	model::BlockElement BlockToBlockElement(const model::Block& block, const Hash256& hash) {

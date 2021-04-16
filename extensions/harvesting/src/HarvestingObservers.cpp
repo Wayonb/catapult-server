@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,34 +20,45 @@
 **/
 
 #include "HarvestingObservers.h"
+#include "catapult/cache_core/AccountStateCache.h"
+#include "catapult/model/Address.h"
 
 namespace catapult { namespace harvesting {
 
 	namespace {
-		template<typename TAccountId>
 		class CollectingAccountVisitor {
 		public:
-			CollectingAccountVisitor(const observers::ObserverContext& context, RefCountedAccountIds<TAccountId>& accountIds)
+			CollectingAccountVisitor(const observers::ObserverContext& context, HarvestingAffectedAccounts& accounts)
 					: m_context(context)
-					, m_accountIds(accountIds)
+					, m_accounts(accounts)
 			{}
 
 		public:
-			void visit(const UnresolvedAddress& address) {
-				notify(m_context.Resolvers.resolve(address));
+			void visit(const model::ResolvableAddress& address) {
+				notify(address.resolved(m_context.Resolvers), m_accounts.Addresses);
 			}
 
 			void visit(const Key& publicKey) {
-				notify(publicKey);
+				notify(publicKey, m_accounts.PublicKeys);
+
+				// notify address separately so that account public key can be rolled back independent of addresss
+				auto& accountStateCacheDelta = m_context.Cache.template sub<cache::AccountStateCache>();
+				auto address = model::PublicKeyToAddress(publicKey, accountStateCacheDelta.networkIdentifier());
+				notify(address, m_accounts.Addresses);
+
+				if (observers::NotifyMode::Commit != m_context.Mode)
+					accountStateCacheDelta.queueRemove(address, m_context.Height);
 			}
 
 		private:
-			template<typename AccountId>
-			void notify(const AccountId& accountId) {
-				auto iter = m_accountIds.find(accountId);
+			template<typename TAccountIdentifier>
+			void notify(
+					const TAccountIdentifier& accountIdentifier,
+					RefCountedAccountIdentifiers<TAccountIdentifier>& accountIdentifiers) const {
+				auto iter = accountIdentifiers.find(accountIdentifier);
 				if (observers::NotifyMode::Commit == m_context.Mode) {
-					if (m_accountIds.cend() == iter)
-						m_accountIds.emplace(accountId, 1);
+					if (accountIdentifiers.cend() == iter)
+						accountIdentifiers.emplace(accountIdentifier, 1);
 					else
 						++iter->second;
 
@@ -55,29 +67,29 @@ namespace catapult { namespace harvesting {
 
 				// rollback - so account must have been previously added
 				if (0 == --iter->second)
-					m_accountIds.erase(iter);
+					accountIdentifiers.erase(iter);
 			}
 
 		private:
 			const observers::ObserverContext& m_context;
-			RefCountedAccountIds<TAccountId>& m_accountIds;
+			HarvestingAffectedAccounts& m_accounts;
 		};
 	}
 
-	DECLARE_OBSERVER(HarvestingAccountAddress, model::AccountAddressNotification)(RefCountedAccountIds<Address>& addresses) {
-		return MAKE_OBSERVER(HarvestingAccountAddress, model::AccountAddressNotification, ([&addresses](
+	DECLARE_OBSERVER(HarvestingAccountAddress, model::AccountAddressNotification)(HarvestingAffectedAccounts& accounts) {
+		return MAKE_OBSERVER(HarvestingAccountAddress, model::AccountAddressNotification, ([&accounts](
 				const model::AccountAddressNotification& notification,
 				const observers::ObserverContext& context) {
-			CollectingAccountVisitor<Address> visitor(context, addresses);
+			CollectingAccountVisitor visitor(context, accounts);
 			visitor.visit(notification.Address);
 		}));
 	}
 
-	DECLARE_OBSERVER(HarvestingAccountPublicKey, model::AccountPublicKeyNotification)(RefCountedAccountIds<Key>& publicKeys) {
-		return MAKE_OBSERVER(HarvestingAccountPublicKey, model::AccountPublicKeyNotification, ([&publicKeys](
+	DECLARE_OBSERVER(HarvestingAccountPublicKey, model::AccountPublicKeyNotification)(HarvestingAffectedAccounts& accounts) {
+		return MAKE_OBSERVER(HarvestingAccountPublicKey, model::AccountPublicKeyNotification, ([&accounts](
 				const model::AccountPublicKeyNotification& notification,
 				const observers::ObserverContext& context) {
-			CollectingAccountVisitor<Key> visitor(context, publicKeys);
+			CollectingAccountVisitor visitor(context, accounts);
 			visitor.visit(notification.PublicKey);
 		}));
 	}

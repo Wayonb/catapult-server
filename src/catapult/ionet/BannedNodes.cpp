@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -55,7 +56,7 @@ namespace catapult { namespace ionet {
 	}
 
 	void BannedNodes::add(const model::NodeIdentity& nodeIdentity, uint32_t reason) {
-		if ("127.0.0.1" == nodeIdentity.Host)
+		if ("_local_" == nodeIdentity.Host)
 			return;
 
 		auto defaultBanDuration = m_banSettings.DefaultBanDuration;
@@ -77,7 +78,7 @@ namespace catapult { namespace ionet {
 		CATAPULT_LOG(warning)
 				<< "banning node with identity " << nodeIdentity
 				<< " for " << iter->second.BanDuration
-				<< ", reason: " << iter->second.Reason;
+				<< ", reason: " << utils::HexFormat(iter->second.Reason);
 	}
 
 	void BannedNodes::prune() {

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -98,9 +99,9 @@ namespace catapult { namespace local {
 		const auto& stream = *pStream;
 
 		// - create data
-		auto chainScore = model::ChainScore(test::Random(), test::Random());
+		auto chainScoreDelta = model::ChainScore::Delta(static_cast<int64_t>(test::Random()));
 		auto height = test::GenerateRandomValue<Height>();
-		auto stateChangeInfo = subscribers::StateChangeInfo(cache::CacheChanges({}), chainScore, height);
+		auto stateChangeInfo = subscribers::StateChangeInfo(cache::CacheChanges({}), chainScoreDelta, height);
 
 		// - simulate two cache changes storages
 		auto storageSentinel1 = static_cast<uint32_t>(test::Random());
@@ -123,13 +124,12 @@ namespace catapult { namespace local {
 
 		// Assert:
 		EXPECT_EQ(1u, stream.numFlushes());
-		ASSERT_EQ(1u + 3 * sizeof(uint64_t) + 2 * (sizeof(uint32_t) + sizeof(uintptr_t)), buffer.size());
+		ASSERT_EQ(1u + 2 * sizeof(uint64_t) + 2 * (sizeof(uint32_t) + sizeof(uintptr_t)), buffer.size());
 
 		test::BufferReader reader(buffer);
 		EXPECT_EQ(subscribers::StateChangeOperationType::State_Change, reader.read<subscribers::StateChangeOperationType>());
 
-		EXPECT_EQ(chainScore.toArray()[0], reader.read<uint64_t>());
-		EXPECT_EQ(chainScore.toArray()[1], reader.read<uint64_t>());
+		EXPECT_EQ(chainScoreDelta, model::ChainScore::Delta(reader.read<int64_t>()));
 		EXPECT_EQ(height, reader.read<Height>());
 
 		// - check that both uint32_t value and CacheChanges pointer were written for each storage

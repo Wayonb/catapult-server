@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -45,17 +46,7 @@ namespace catapult { namespace model {
 		TIdentifier Id;
 
 		// followed by data if DataSize > 0
-
-	public:
-		/// Gets a const pointer to the first data byte in this cache entry info.
-		const uint8_t* DataPtr() const {
-			return DataSize ? ToTypedPointer(PayloadStart(*this)) : nullptr;
-		}
-
-		/// Gets a pointer to the first data byte in this cache entry info.
-		uint8_t* DataPtr() {
-			return DataSize ? ToTypedPointer(PayloadStart(*this)) : nullptr;
-		}
+		DEFINE_TRAILING_VARIABLE_DATA_LAYOUT_ACCESSORS(Data, Size)
 
 	public:
 		/// Returns \c true if data is available.

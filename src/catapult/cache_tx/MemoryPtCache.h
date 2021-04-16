@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -41,10 +42,11 @@ namespace catapult { namespace cache {
 		using UnknownTransactionInfos = std::vector<model::CosignedTransactionInfo>;
 
 	public:
-		/// Creates a view around around a maximum response size (\a maxResponseSize), a partial transaction data container
-		/// (\a transactionDataContainer) with lock context \a readLock.
+		/// Creates a view around around a maximum response size (\a maxResponseSize), current cache size (\a cacheSize)
+		/// and a partial transaction data container (\a transactionDataContainer) with lock context \a readLock.
 		MemoryPtCacheView(
-				uint64_t maxResponseSize,
+				utils::FileSize maxResponseSize,
+				utils::FileSize cacheSize,
 				const PtDataContainer& transactionDataContainer,
 				utils::SpinReaderWriterLock::ReaderLockGuard&& readLock);
 
@@ -52,18 +54,24 @@ namespace catapult { namespace cache {
 		/// Gets the number of partial transactions in the cache.
 		size_t size() const;
 
+		/// Gets the memory size of all partial transactions in the cache.
+		/// \note Size of detached cosignatures is not included.
+		utils::FileSize memorySize() const;
+
 		/// Finds a partial transaction in the cache with associated \a hash or returns \c nullptr if no such transaction exists.
 		model::WeakCosignedTransactionInfo find(const Hash256& hash) const;
 
 		/// Gets a range of short hash pairs of all transactions in the cache.
-		/// Each short hash pair consists of the first 4 bytes of the transaction hash and the first 4 bytes of the cosignature hash.
+		/// \note Each short hash pair consists of the first 4 bytes of the transaction hash and the first 4 bytes of the cosignature hash.
 		ShortHashPairRange shortHashPairs() const;
 
-		/// Gets a vector of all unknown transaction infos in the cache that do not have a short hash pair in \a knownShortHashPairs.
-		UnknownTransactionInfos unknownTransactions(const ShortHashPairMap& knownShortHashPairs) const;
+		/// Gets a vector of all unknown transaction infos in the cache that have a deadline at least \a minDeadline
+		/// and do not have a short hash pair in \a knownShortHashPairs.
+		UnknownTransactionInfos unknownTransactions(Timestamp minDeadline, const ShortHashPairMap& knownShortHashPairs) const;
 
 	private:
-		uint64_t m_maxResponseSize;
+		utils::FileSize m_maxResponseSize;
+		utils::FileSize m_cacheSize;
 		const PtDataContainer& m_transactionDataContainer;
 		utils::SpinReaderWriterLock::ReaderLockGuard m_readLock;
 	};

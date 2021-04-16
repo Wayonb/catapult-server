@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -52,7 +53,7 @@ namespace catapult { namespace mocks {
 			return identities;
 		}
 
-		void connect(const ionet::Node& node, const AcceptCallback& callback) override {
+		void connect(const ionet::Node& node, const ConnectCallback& callback) override {
 			m_nodes.push_back(node);
 
 			// call the callback from a separate thread after some delay
@@ -109,10 +110,6 @@ namespace catapult { namespace mocks {
 			CATAPULT_THROW_RUNTIME_ERROR("not implemented in mock");
 		}
 
-		void accept(const ionet::PacketSocketInfo&, const AcceptCallback&) override {
-			CATAPULT_THROW_RUNTIME_ERROR("not implemented in mock");
-		}
-
 		void shutdown() override {
 			CATAPULT_THROW_RUNTIME_ERROR("not implemented in mock");
 		}
@@ -120,9 +117,13 @@ namespace catapult { namespace mocks {
 	// endregion
 
 	private:
-		net::PeerConnectResult getResult(const model::NodeIdentity& identity) const {
+		net::PeerConnectResultEx getResult(const model::NodeIdentity& identity) const {
 			auto resultIter = m_nodeConnectCodeMap.find(identity);
-			return { m_nodeConnectCodeMap.cend() == resultIter ? net::PeerConnectCode::Accepted : resultIter->second, identity };
+			return {
+				m_nodeConnectCodeMap.cend() == resultIter ? net::PeerConnectCode::Accepted : resultIter->second,
+				identity,
+				nullptr
+			};
 		}
 
 	private:
@@ -195,9 +196,14 @@ namespace catapult { namespace mocks {
 	/// Mock packet writers that has a broadcast implementation.
 	class BroadcastAwareMockPacketWriters : public MockPacketWriters {
 	public:
+		/// Creates writers.
+		BroadcastAwareMockPacketWriters() : m_numBroadcastCalls(0)
+		{}
+
+	public:
 		/// Gets the number of broadcast calls.
 		size_t numBroadcastCalls() const {
-			return m_payloads.size();
+			return m_numBroadcastCalls;
 		}
 
 		/// Gets the broadcasted payloads.
@@ -208,9 +214,11 @@ namespace catapult { namespace mocks {
 	public:
 		void broadcast(const ionet::PacketPayload& payload) override {
 			m_payloads.push_back(payload);
+			++m_numBroadcastCalls;
 		}
 
 	private:
+		std::atomic<size_t> m_numBroadcastCalls;
 		std::vector<ionet::PacketPayload> m_payloads;
 	};
 }}

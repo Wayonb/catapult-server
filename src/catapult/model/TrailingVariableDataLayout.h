@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,6 +20,8 @@
 **/
 
 #pragma once
+#include "SizeChecker.h"
+#include "catapult/utils/NonCopyable.h"
 #include <stdint.h>
 
 namespace catapult { namespace model {
@@ -26,9 +29,8 @@ namespace catapult { namespace model {
 #pragma pack(push, 1)
 
 	/// Defines a layout for a fixed header followed by variable data.
-	/// \note Do not derive from SizePrefixedEntity in order to allow copying.
 	template<typename TDerived, typename TVariableDataType>
-	struct TrailingVariableDataLayout {
+	struct TrailingVariableDataLayout : public utils::NonCopyable {
 	public:
 		/// Data size.
 		uint32_t Size;
@@ -37,7 +39,7 @@ namespace catapult { namespace model {
 		/// Gets the start of the variable data part of \a derived.
 		template<typename T>
 		static auto PayloadStart(T& derived) {
-			return derived.Size != TDerived::CalculateRealSize(derived) ? nullptr : ToBytePointer(derived) + sizeof(T);
+			return !model::IsSizeValidT(derived) ? nullptr : ToBytePointer(derived) + sizeof(T);
 		}
 
 		/// Gets a typed pointer to the variable data \a pData.
@@ -61,4 +63,17 @@ namespace catapult { namespace model {
 	};
 
 #pragma pack(pop)
+
+/// Defines \a NAME variable data accessors around a similarly named templated untyped data accessor.
+/// \a SIZE_POSTFIX specifies the postfix of the corresponding size or count field.
+#define DEFINE_TRAILING_VARIABLE_DATA_LAYOUT_ACCESSORS(NAME, SIZE_POSTFIX) \
+	/* Returns a const pointer to the typed data contained in this entity. */ \
+	const auto* NAME##Ptr() const { \
+		return NAME##SIZE_POSTFIX ? ToTypedPointer(PayloadStart(*this)) : nullptr; \
+	} \
+	\
+	/* Returns a pointer to the typed data contained in this entity. */ \
+	auto* NAME##Ptr() { \
+		return NAME##SIZE_POSTFIX ? ToTypedPointer(PayloadStart(*this)) : nullptr; \
+	}
 }}

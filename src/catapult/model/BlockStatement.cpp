@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -57,13 +58,13 @@ namespace catapult { namespace model {
 			}
 		}
 
-		template<typename TKey, typename TStatement>
+		template<typename TStatementKey, typename TStatementValue>
 		void CopyResolutionStatements(
-				std::map<TKey, TStatement>& destination,
-				const std::map<TKey, TStatement>& source,
+				std::map<TStatementKey, TStatementValue>& destination,
+				const std::map<TStatementKey, TStatementValue>& source,
 				uint32_t maxSourcePrimaryId) {
 			for (const auto& pair : source) {
-				TStatement statement(pair.first);
+				TStatementValue statement(pair.first);
 				for (auto i = 0u; i < pair.second.size(); ++i) {
 					const auto& entry = pair.second.entryAt(i);
 					if (entry.Source.PrimaryId > maxSourcePrimaryId)

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -30,7 +31,6 @@
 #include "tests/TestHarness.h"
 #include <unordered_set>
 #include <vector>
-#include <zmq_addon.hpp>
 
 namespace catapult {
 	namespace model {
@@ -73,6 +73,13 @@ namespace catapult { namespace test {
 
 	/// Asserts that the given \a message is equivalent to a drop blocks message with \a height.
 	void AssertDropBlocksMessage(const zmq::multipart_t& message, Height height);
+
+	/// Asserts that the given \a message is equivalent to a finalized block message with \a round, \a height and \a hash.
+	void AssertFinalizedBlockMessage(
+			const zmq::multipart_t& message,
+			const model::FinalizationRound& round,
+			Height height,
+			const Hash256& hash);
 
 	/// Asserts that the given \a message has \a topic as first part and matches the data in \a transactionElement and \a height.
 	void AssertTransactionElementMessage(
@@ -117,22 +124,29 @@ namespace catapult { namespace test {
 	/// Base context for all zeromq related contexts.
 	class MqContext {
 	public:
-		/// Creates a message queue context.
-		MqContext()
+		/// Creates a message queue context around \a listenInterface.
+		explicit MqContext(const std::string& listenInterface = std::string("127.0.0.1"))
 				: m_registry(mocks::CreateDefaultTransactionRegistry())
 				, m_pZeroMqEntityPublisher(std::make_shared<zeromq::ZeroMqEntityPublisher>(
+						listenInterface,
 						GetDefaultLocalHostZmqPort(),
 						model::CreateNotificationPublisher(m_registry, UnresolvedMosaicId())))
 				, m_zmqSocket(m_zmqContext, ZMQ_SUB) {
-			m_zmqSocket.setsockopt(ZMQ_RCVTIMEO, 10);
-			m_zmqSocket.connect("tcp://localhost:" + std::to_string(GetDefaultLocalHostZmqPort()));
+			m_zmqSocket.set(zmq::sockopt::rcvtimeo, 10);
+			if (std::string::npos != listenInterface.find(':'))
+				m_zmqSocket.set(zmq::sockopt::ipv6, 1);
+
+			std::ostringstream out;
+			out << "tcp://[" << listenInterface<< "]:" << GetDefaultLocalHostZmqPort();
+			m_zmqSocket.connect(out.str());
 		}
 
 	public:
 		/// Subscribes to \a topic.
 		template<typename TTopic>
 		void subscribe(TTopic topic) {
-			m_zmqSocket.setsockopt(ZMQ_SUBSCRIBE, &topic, sizeof(TTopic));
+			auto topicBuffer = zmq::const_buffer(reinterpret_cast<const void*>(&topic), sizeof(TTopic));
+			m_zmqSocket.set(zmq::sockopt::subscribe, topicBuffer);
 
 			// make an additional subscription and wait until messages can be received
 			waitForReceiveSuccess();
@@ -164,7 +178,9 @@ namespace catapult { namespace test {
 		void waitForReceiveSuccess() {
 			constexpr uint8_t Max_Attempts = 20;
 			auto marker = zeromq::BlockMarker::Drop_Blocks_Marker;
-			m_zmqSocket.setsockopt(ZMQ_SUBSCRIBE, &marker, sizeof(marker));
+			auto topicBuffer = zmq::const_buffer(reinterpret_cast<const void*>(&marker), sizeof(zeromq::BlockMarker));
+			m_zmqSocket.set(zmq::sockopt::subscribe, topicBuffer);
+
 			auto receiveSuccess = false;
 			auto counter = 0u;
 			zmq::multipart_t message;
@@ -195,7 +211,7 @@ namespace catapult { namespace test {
 
 	private:
 		static unsigned short GetDefaultLocalHostZmqPort() {
-			return GetLocalHostPort() + 2;
+			return static_cast<unsigned short>(GetLocalHostPort() + 2);
 		}
 
 	private:
@@ -220,7 +236,7 @@ namespace catapult { namespace test {
 
 	public:
 		/// Gets the notification publisher.
-		model::NotificationPublisher& notificationPublisher() const {
+		const model::NotificationPublisher& notificationPublisher() const {
 			return *m_pNotificationPublisher;
 		}
 
@@ -230,7 +246,7 @@ namespace catapult { namespace test {
 		}
 
 	private:
-		std::unique_ptr<model::NotificationPublisher> m_pNotificationPublisher;
+		std::unique_ptr<const model::NotificationPublisher> m_pNotificationPublisher;
 		std::shared_ptr<TSubscriber> m_pZeroMqSubscriber;
 	};
 }}

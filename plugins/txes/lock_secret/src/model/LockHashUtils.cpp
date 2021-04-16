@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -35,11 +36,9 @@ namespace catapult { namespace model {
 
 		template<typename THashType, typename THasher>
 		Hash256 CalculateHash(THasher hasher, const RawBuffer& data) {
-			Hash256 result{}; // 0-pad hash
 			THashType hash;
 			hasher(data, hash);
-			std::memcpy(result.data(), hash.data(), hash.size());
-			return result;
+			return hash.template copyTo<Hash256>();
 		}
 	}
 
@@ -47,9 +46,6 @@ namespace catapult { namespace model {
 		switch (hashAlgorithm) {
 		case LockHashAlgorithm::Op_Sha3_256:
 			return CalculateHash256(crypto::Sha3_256, data);
-
-		case LockHashAlgorithm::Op_Keccak_256:
-			return CalculateHash256(crypto::Keccak_256, data);
 
 		case LockHashAlgorithm::Op_Hash_160:
 			return CalculateHash<Hash160>(crypto::Bitcoin160, data);

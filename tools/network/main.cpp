@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -45,6 +46,7 @@ namespace catapult { namespace tools { namespace network {
 		public:
 			ionet::Node Local;
 			ionet::Node Remote;
+			model::NodeIdentity RemoteIdentity;
 			model::NodeIdentityMap<ionet::Node> Partners;
 			model::EntityRange<ionet::PackedNodeInfo> PartnerNodeInfos;
 		};
@@ -88,13 +90,15 @@ namespace catapult { namespace tools { namespace network {
 			}
 		};
 
-		std::string Summarize(const ionet::Node& node) {
+		std::string Summarize(const ionet::Node& node, const model::NodeIdentity& nodeIdentity) {
 			SummaryBuilder builder;
+			builder.add("PublicKey (Identity)", nodeIdentity.PublicKey);
+			builder.add("Host (Identity)", nodeIdentity.Host);
+
 			builder.add("IdentityKey", node.identity().PublicKey);
-			builder.add("Host (Resolved)", node.identity().Host);
 			builder.add("Host", node.endpoint().Host);
 			builder.add("Port", node.endpoint().Port);
-			builder.add("Network", node.metadata().NetworkIdentifier);
+			builder.add("Network", node.metadata().NetworkFingerprint);
 			builder.add("Name", node.metadata().Name);
 			builder.add("Version", node.metadata().Version);
 			builder.add("Roles", node.metadata().Roles);
@@ -177,9 +181,8 @@ namespace catapult { namespace tools { namespace network {
 				builder.add("---", "---");
 
 				// output partner host and roles
-				std::ostringstream keyOut;
-				keyOut << GetName(identityNameMap, partnerNode) << " [" << partnerNode.endpoint().Host << "]";
-				builder.add(keyOut.str(), partnerNode.metadata().Roles);
+				builder.add(partnerNode.endpoint().Host, partnerNode.identity().PublicKey);
+				builder.add(GetName(identityNameMap, partnerNode), partnerNode.metadata().Roles);
 
 				// get detailed partner information
 				const auto* pPartnerNodeInfo = TryFindPartnerNodeInfo(partnerNode.identity(), nodeInfo.PartnerNodeInfos);
@@ -295,7 +298,7 @@ namespace catapult { namespace tools { namespace network {
 			// 1. output detailed node information reported by each node about itself
 			CATAPULT_LOG(info) << "--- NODE INFO for known peers ---";
 			for (const auto& pNodeInfo : nodeInfos)
-				CATAPULT_LOG(info) << "> " << pNodeInfo->Local << Summarize(pNodeInfo->Remote);
+				CATAPULT_LOG(info) << "> " << pNodeInfo->Local << Summarize(pNodeInfo->Remote, pNodeInfo->RemoteIdentity);
 
 			// 2. output summary information of peers reported by each node
 			CATAPULT_LOG(info) << "--- PARTNER INFO for known peers ---";
@@ -316,13 +319,23 @@ namespace catapult { namespace tools { namespace network {
 			{}
 
 		private:
-			std::vector<thread::future<bool>> getNodeInfoFutures(thread::IoThreadPool&, ionet::PacketIo& io, NodeInfo& nodeInfo) override {
+			void prepareAdditionalOptions(OptionsBuilder&) override
+			{}
+
+			std::vector<thread::future<bool>> getNodeInfoFutures(
+					const Options&,
+					thread::IoThreadPool&,
+					ionet::PacketIo& io,
+					const model::NodeIdentity& nodeIdentity,
+					NodeInfo& nodeInfo) override {
 				auto pApi = api::CreateRemoteNodeApi(io);
 				auto pDiagnosticApi = extensions::CreateRemoteDiagnosticApi(io);
 
 				std::vector<thread::future<bool>> infoFutures;
-				infoFutures.emplace_back(pApi->nodeInfo().then([&nodeInfo](auto&& nodeFuture) {
-					return UnwrapFutureAndSuppressErrors("querying node info", std::move(nodeFuture), [&nodeInfo](const auto& remoteNode) {
+				infoFutures.emplace_back(pApi->nodeInfo().then([nodeIdentity, &nodeInfo](auto&& nodeFuture) {
+					return UnwrapFutureAndSuppressErrors("querying node info", std::move(nodeFuture), [nodeIdentity, &nodeInfo](
+							const auto& remoteNode) {
+						nodeInfo.RemoteIdentity = nodeIdentity;
 						nodeInfo.Remote = remoteNode;
 					});
 				}));

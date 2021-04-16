@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,6 +21,7 @@
 
 #pragma once
 #include "NemesisFundingState.h"
+#include "catapult/model/NemesisNotificationPublisher.h"
 #include "catapult/observers/ObserverTypes.h"
 #include "catapult/functions.h"
 
@@ -29,7 +31,6 @@ namespace catapult {
 	namespace model {
 		struct BlockChainConfiguration;
 		struct BlockElement;
-		class NotificationPublisher;
 	}
 	namespace plugins { class PluginManager; }
 }
@@ -72,6 +73,13 @@ namespace catapult { namespace extensions {
 	private:
 		enum class Verbosity { Off, On };
 
+		void validateStateless(const model::WeakEntityInfos& entityInfos) const;
+
+		void validateStatefulAndObserve(
+				Timestamp timestamp,
+				const model::WeakEntityInfos& entityInfos,
+				observers::ObserverState& observerState) const;
+
 		void execute(
 				const model::BlockChainConfiguration& config,
 				const model::BlockElement& nemesisBlockElement,
@@ -81,9 +89,9 @@ namespace catapult { namespace extensions {
 	private:
 		cache::CatapultCacheDelta& m_cacheDelta;
 		const plugins::PluginManager& m_pluginManager;
-		Key m_nemesisPublicKey;
+		Address m_nemesisAddress;
 		NemesisFundingState m_nemesisFundingState;
-		std::unique_ptr<const observers::EntityObserver> m_pObserver;
-		std::unique_ptr<const model::NotificationPublisher> m_pPublisher;
+		std::shared_ptr<const observers::AggregateNotificationObserver> m_pNotificationObserver;
+		model::NemesisNotificationPublisherOptions m_publisherOptions;
 	};
 }}

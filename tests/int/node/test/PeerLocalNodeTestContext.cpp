@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -55,13 +56,17 @@ namespace catapult { namespace test {
 			const consumer<config::CatapultConfiguration&>& configTransform)
 			: m_context(
 					nodeFlag | NodeFlag::With_Partner,
-					{ CreateLocalPartnerNode() },
+					{},
 					[additionalPlugins, configTransform](auto& config) {
 						AddAdditionalPlugins(config, additionalPlugins);
 						configTransform(config);
 					},
 					"")
 	{}
+
+	const Key& PeerLocalNodeTestContext::publicKey() const {
+		return m_context.publicKey();
+	}
 
 	local::LocalNode& PeerLocalNodeTestContext::localNode() const {
 		return m_context.localNode();
@@ -76,7 +81,7 @@ namespace catapult { namespace test {
 	}
 
 	Height PeerLocalNodeTestContext::height() const {
-		ExternalSourceConnection connection;
+		ExternalSourceConnection connection(publicKey());
 		return GetLocalNodeHeightViaApi(connection);
 	}
 
@@ -84,8 +89,12 @@ namespace catapult { namespace test {
 		return m_context.loadSavedStateChainHeight();
 	}
 
+	config::CatapultConfiguration PeerLocalNodeTestContext::createConfig() const {
+		return m_context.createConfig();
+	}
+
 	void PeerLocalNodeTestContext::waitForHeight(Height height) const {
-		ExternalSourceConnection connection;
+		ExternalSourceConnection connection(publicKey());
 		WaitForLocalNodeHeight(connection, height);
 	}
 
@@ -101,6 +110,5 @@ namespace catapult { namespace test {
 		// Assert: the external reader connection is still active
 		EXPECT_EQ(1u, stats.NumActiveReaders);
 		EXPECT_EQ(1u, stats.NumActiveWriters);
-		EXPECT_EQ(0u, stats.NumActiveBroadcastWriters);
 	}
 }}

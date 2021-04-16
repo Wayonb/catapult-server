@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,7 +29,8 @@
 namespace catapult { namespace test {
 
 	std::unique_ptr<cache::MemoryUtCache> CreateSeededMemoryUtCache(uint32_t count) {
-		auto pCache = std::make_unique<cache::MemoryUtCache>(cache::MemoryCacheOptions(1000, 1000));
+		auto cacheOptions = cache::MemoryCacheOptions(utils::FileSize::FromKilobytes(1), utils::FileSize::FromMegabytes(1));
+		auto pCache = std::make_unique<cache::MemoryUtCache>(cacheOptions);
 		auto transactionInfos = CreateTransactionInfos(count);
 		AddAll(*pCache, transactionInfos);
 		return pCache;
@@ -100,6 +102,10 @@ namespace catapult { namespace test {
 				++i;
 			}
 		}
+	}
+
+	void AssertContainsAll(const cache::MemoryUtCacheProxy& cacheProxy, const std::vector<Hash256>& hashes) {
+		AssertContainsAll(cacheProxy.view(), hashes, true);
 	}
 
 	void AssertContainsAll(const cache::MemoryUtCache& cache, const std::vector<Hash256>& hashes) {

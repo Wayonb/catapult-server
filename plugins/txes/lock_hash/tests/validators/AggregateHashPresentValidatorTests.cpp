@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -32,7 +33,7 @@ namespace catapult { namespace validators {
 
 	namespace {
 		auto CreateNotification(const Hash256& transactionHash, model::EntityType transactionType) {
-			return model::TransactionNotification(Key(), transactionHash, transactionType, Timestamp());
+			return model::TransactionNotification(Address(), transactionHash, transactionType, Timestamp());
 		}
 
 		auto CreateCache(const Hash256& transactionHash, Height expirationHeight, state::LockStatus status = state::LockStatus::Unused) {

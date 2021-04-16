@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,6 +21,7 @@
 
 #pragma once
 #include "partialtransaction/src/PtTypes.h"
+#include "catapult/chain/ChainFunctions.h"
 #include "catapult/chain/RemoteNodeSynchronizer.h"
 #include "catapult/model/CosignedTransactionInfo.h"
 
@@ -27,9 +29,12 @@ namespace catapult { namespace api { class RemotePtApi; } }
 
 namespace catapult { namespace chain {
 
-	/// Creates a partial transactions synchronizer around the specified short hash pairs supplier (\a shortHashPairsSupplier)
-	/// and partial transaction infos consumer (\a transactionInfosConsumer).
+	/// Creates a partial transactions synchronizer around the specified time supplier (\a timeSupplier),
+	/// short hash pairs supplier (\a shortHashPairsSupplier) and partial transaction infos consumer (\a transactionInfosConsumer).
+	/// \note Remote operation is only initiated when \a shouldExecute returns \c true.
 	RemoteNodeSynchronizer<api::RemotePtApi> CreatePtSynchronizer(
+			const TimeSupplier& timeSupplier,
 			const partialtransaction::ShortHashPairsSupplier& shortHashPairsSupplier,
-			const partialtransaction::CosignedTransactionInfosConsumer& transactionInfosConsumer);
+			const partialtransaction::CosignedTransactionInfosConsumer& transactionInfosConsumer,
+			const predicate<>& shouldExecute);
 }}

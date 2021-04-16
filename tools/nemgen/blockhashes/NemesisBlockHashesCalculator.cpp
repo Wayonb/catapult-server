@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,26 +20,26 @@
 **/
 
 #include "NemesisBlockHashesCalculator.h"
-#include "PluginLoader.h"
 #include "catapult/cache/ReadOnlyCatapultCache.h"
+#include "catapult/cache_core/AccountStateCache.h"
 #include "catapult/chain/BlockExecutor.h"
-#include "catapult/config/CatapultConfiguration.h"
+#include "catapult/model/NemesisNotificationPublisher.h"
 #include "catapult/observers/NotificationObserverAdapter.h"
+#include "catapult/plugins/PluginManager.h"
 
 namespace catapult { namespace tools { namespace nemgen {
 
 	BlockExecutionHashesInfo CalculateNemesisBlockExecutionHashes(
 			const model::BlockElement& blockElement,
-			const config::CatapultConfiguration& config) {
-		// 1. load all plugins
-		PluginLoader pluginLoader(config);
-		pluginLoader.loadAll();
-		auto& pluginManager = pluginLoader.manager();
+			const model::BlockChainConfiguration& config,
+			plugins::PluginManager& pluginManager) {
+		// 1. prepare observer
+		auto publisherOptions = model::ExtractNemesisNotificationPublisherOptions(config);
+		observers::NotificationObserverAdapter entityObserver(
+				pluginManager.createObserver(),
+				model::CreateNemesisNotificationPublisher(pluginManager.createNotificationPublisher(), publisherOptions));
 
-		// 2. prepare observer
-		observers::NotificationObserverAdapter entityObserver(pluginManager.createObserver(), pluginManager.createNotificationPublisher());
-
-		// 3. prepare observer state
+		// 2. prepare observer state
 		auto cache = pluginManager.createCache();
 		auto cacheDetachableDelta = cache.createDetachableDelta();
 		auto cacheDetachedDelta = cacheDetachableDelta.detach();
@@ -46,18 +47,27 @@ namespace catapult { namespace tools { namespace nemgen {
 		auto blockStatementBuilder = model::BlockStatementBuilder();
 		auto observerState = observers::ObserverState(*pCacheDelta, blockStatementBuilder);
 
-		// 4. prepare resolvers
+		// 3. prepare resolvers
 		auto readOnlyCache = pCacheDelta->toReadOnly();
 		auto resolverContext = pluginManager.createResolverContext(readOnlyCache);
 
-		// 5. execute block
+		// 4. execute block
 		chain::ExecuteBlock(blockElement, { entityObserver, resolverContext, observerState });
 		auto pBlockStatement = blockStatementBuilder.build();
 		auto cacheStateHashInfo = pCacheDelta->calculateStateHash(blockElement.Block.Height);
-		auto blockReceiptsHash = config.BlockChain.EnableVerifiableReceipts
+		auto blockReceiptsHash = config.EnableVerifiableReceipts
 				? model::CalculateMerkleHash(*pBlockStatement)
 				: Hash256();
 
-		return { blockReceiptsHash, cacheStateHashInfo.StateHash, cacheStateHashInfo.SubCacheMerkleRoots, std::move(pBlockStatement) };
+		auto highValueAccountStatistics = readOnlyCache.sub<cache::AccountStateCache>().highValueAccountStatistics();
+		return {
+			highValueAccountStatistics.VotingEligibleAccountsCount,
+			highValueAccountStatistics.HarvestingEligibleAccountsCount,
+			highValueAccountStatistics.TotalVotingBalance,
+			blockReceiptsHash,
+			cacheStateHashInfo.StateHash,
+			cacheStateHashInfo.SubCacheMerkleRoots,
+			std::move(pBlockStatement)
+		};
 	}
 }}}

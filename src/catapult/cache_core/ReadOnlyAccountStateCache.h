@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,7 +21,7 @@
 
 #pragma once
 #include "catapult/cache/ReadOnlyArtifactCache.h"
-#include "catapult/model/NetworkInfo.h"
+#include "catapult/model/NetworkIdentifier.h"
 #include "catapult/state/AccountState.h"
 
 namespace catapult {
@@ -32,13 +33,25 @@ namespace catapult {
 
 namespace catapult { namespace cache {
 
+	/// High value account statistics.
+	struct HighValueAccountStatistics {
+		/// Number of voting eligible accounts.
+		uint32_t VotingEligibleAccountsCount;
+
+		/// Number of harvesting eligible accounts.
+		uint64_t HarvestingEligibleAccountsCount;
+
+		/// Total balance eligible for voting.
+		Amount TotalVotingBalance;
+	};
+
 	/// Read-only overlay on top of an account cache.
 	class ReadOnlyAccountStateCache
 			: public ReadOnlyArtifactCache<BasicAccountStateCacheView, BasicAccountStateCacheDelta, Address, state::AccountState>
 			, public ReadOnlyArtifactCache<BasicAccountStateCacheView, BasicAccountStateCacheDelta, Key, state::AccountState> {
 	private:
-		template<typename TKey, typename TValue>
-		using ReadOnlySubCache = ReadOnlyArtifactCache<BasicAccountStateCacheView, BasicAccountStateCacheDelta, TKey, TValue>;
+		template<typename TCacheKey, typename TCacheValue>
+		using ReadOnlySubCache = ReadOnlyArtifactCache<BasicAccountStateCacheView, BasicAccountStateCacheDelta, TCacheKey, TCacheValue>;
 
 		using AddressBasedCache = ReadOnlySubCache<Address, state::AccountState>;
 		using KeyBasedCache = ReadOnlySubCache<Key, state::AccountState>;
@@ -65,6 +78,9 @@ namespace catapult { namespace cache {
 
 		/// Gets the harvesting mosaic id.
 		MosaicId harvestingMosaicId() const;
+
+		/// Gets the high value account statistics.
+		HighValueAccountStatistics highValueAccountStatistics() const;
 
 	public:
 		using AddressBasedCache::size;

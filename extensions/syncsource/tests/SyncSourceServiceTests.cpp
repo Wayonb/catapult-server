@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -44,6 +45,8 @@ namespace catapult { namespace syncsource {
 					return [&counter, source](auto&&) { counter += disruptor::InputSource::Remote_Push == source ? 1 : 0; };
 				});
 
+				hooks.setLocalFinalizedHeightHashPairSupplier([]() { return model::HeightHashPair{ Height(1), Hash256() }; });
+
 				// the service needs to be able to parse the mock transactions sent to it
 				testState().pluginManager().addTransactionSupport(mocks::CreateMockTransactionPlugin());
 			}
@@ -79,7 +82,7 @@ namespace catapult { namespace syncsource {
 		EXPECT_TRUE(handlers.canProcess(ionet::PacketType::Push_Block));
 		EXPECT_TRUE(handlers.canProcess(ionet::PacketType::Pull_Block));
 
-		EXPECT_TRUE(handlers.canProcess(ionet::PacketType::Chain_Info));
+		EXPECT_TRUE(handlers.canProcess(ionet::PacketType::Chain_Statistics));
 		EXPECT_TRUE(handlers.canProcess(ionet::PacketType::Block_Hashes));
 		EXPECT_TRUE(handlers.canProcess(ionet::PacketType::Pull_Blocks));
 

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,7 +22,6 @@
 #include "Validators.h"
 #include "AccountRestrictionView.h"
 #include "src/cache/AccountRestrictionCache.h"
-#include "catapult/model/Address.h"
 #include "catapult/validators/ValidatorContext.h"
 
 namespace catapult { namespace validators {
@@ -36,5 +36,5 @@ namespace catapult { namespace validators {
 		auto mosaicId = context.Resolvers.resolve(notification.MosaicId);
 		auto isTransferAllowed = view.isAllowed(model::AccountRestrictionFlags::MosaicId, mosaicId);
 		return isTransferAllowed ? ValidationResult::Success : Failure_RestrictionAccount_Mosaic_Transfer_Prohibited;
-	});
+	})
 }}

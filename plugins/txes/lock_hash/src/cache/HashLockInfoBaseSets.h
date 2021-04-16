@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -25,16 +26,5 @@
 
 namespace catapult { namespace cache {
 
-	class HashLockInfoPatriciaTree : public LockInfoPatriciaTree<HashLockInfoCacheDescriptor> {
-	public:
-		using LockInfoPatriciaTree<HashLockInfoCacheDescriptor>::LockInfoPatriciaTree;
-		using Serializer = HashLockInfoCacheDescriptor::Serializer;
-	};
-
-	struct HashLockInfoBaseSetDeltaPointers : public LockInfoBaseSetDeltaPointers<HashLockInfoCacheTypes, HashLockInfoCacheDescriptor> {};
-
-	struct HashLockInfoBaseSets
-			: public LockInfoBaseSets<HashLockInfoCacheTypes, HashLockInfoCacheDescriptor, HashLockInfoBaseSetDeltaPointers> {
-		using LockInfoBaseSets<HashLockInfoCacheTypes, HashLockInfoCacheDescriptor, HashLockInfoBaseSetDeltaPointers>::LockInfoBaseSets;
-	};
+	DEFINE_LOCK_INFO_BASE_SETS(HashLockInfo)
 }}

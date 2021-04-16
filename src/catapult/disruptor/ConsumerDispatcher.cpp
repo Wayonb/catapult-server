@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,7 +29,7 @@ namespace catapult { namespace disruptor {
 
 	namespace {
 		const ConsumerDispatcherOptions& CheckOptions(const ConsumerDispatcherOptions& options) {
-			if (!options.DispatcherName || 0 == options.DisruptorSize)
+			if (!options.DispatcherName || 0 == options.DisruptorSlotCount || utils::FileSize() == options.DisruptorMaxMemorySize)
 				CATAPULT_THROW_INVALID_ARGUMENT("consumer dispatcher options are invalid");
 
 			return options;
@@ -55,17 +56,17 @@ namespace catapult { namespace disruptor {
 			const std::vector<DisruptorConsumer>& consumers,
 			const DisruptorInspector& inspector)
 			: NamedObjectMixin(CheckOptions(options).DispatcherName)
-			, m_elementTraceInterval(options.ElementTraceInterval)
-			, m_shouldThrowIfFull(options.ShouldThrowWhenFull)
+			, m_options(options)
 			, m_keepRunning(true)
 			, m_barriers(consumers.size() + 1)
-			, m_disruptor(options.DisruptorSize, options.ElementTraceInterval)
+			, m_disruptor(m_options.DisruptorSlotCount, m_options.ElementTraceInterval)
 			, m_inspector(inspector)
-			, m_numActiveElements(0) {
+			, m_numActiveElements(0)
+			, m_memorySize(0) {
 		auto currentLevel = 0u;
 		for (const auto& consumer : consumers) {
 			ConsumerEntry consumerEntry(currentLevel++);
-			m_threads.create_thread([pThis = this, consumerEntry, consumer]() mutable {
+			m_threads.spawn([pThis = this, consumerEntry, consumer]() mutable {
 				thread::SetThreadName(std::to_string(consumerEntry.level()) + " " + pThis->name());
 				while (pThis->m_keepRunning) {
 					auto* pDisruptorElement = pThis->tryNext(consumerEntry);
@@ -83,7 +84,7 @@ namespace catapult { namespace disruptor {
 			});
 		}
 
-		CATAPULT_LOG(info) << options.DispatcherName << " ConsumerDispatcher spawned " << m_threads.size() << " workers";
+		CATAPULT_LOG(info) << m_options.DispatcherName << " ConsumerDispatcher spawned " << m_threads.size() << " workers";
 	}
 
 	ConsumerDispatcher::~ConsumerDispatcher() {
@@ -92,7 +93,7 @@ namespace catapult { namespace disruptor {
 
 	void ConsumerDispatcher::shutdown() {
 		m_keepRunning = false;
-		m_threads.join_all();
+		m_threads.join();
 	}
 
 	bool ConsumerDispatcher::isRunning() const {
@@ -109,6 +110,10 @@ namespace catapult { namespace disruptor {
 
 	size_t ConsumerDispatcher::numActiveElements() const {
 		return m_numActiveElements.load();
+	}
+
+	utils::FileSize ConsumerDispatcher::memorySize() const {
+		return utils::FileSize::FromBytes(m_memorySize.load());
 	}
 
 	DisruptorElement* ConsumerDispatcher::tryNext(ConsumerEntry& consumerEntry) {
@@ -135,7 +140,7 @@ namespace catapult { namespace disruptor {
 			return;
 
 		auto& element = m_disruptor.elementAt(consumerPosition);
-		LogCompletion(element, m_barriers, m_elementTraceInterval);
+		LogCompletion(element, m_barriers, m_options.ElementTraceInterval);
 		m_inspector(element.input(), element.completionResult());
 		element.markProcessingComplete();
 	}
@@ -153,10 +158,12 @@ namespace catapult { namespace disruptor {
 		return requiredCapacity == totalCapacity;
 	}
 
-	ProcessingCompleteFunc ConsumerDispatcher::wrap(const ProcessingCompleteFunc& processingComplete) {
-		return [processingComplete, &numActiveElements = m_numActiveElements](auto elementId, const auto& result) {
+	ProcessingCompleteFunc ConsumerDispatcher::wrap(const ProcessingCompleteFunc& processingComplete, utils::FileSize inputMemorySize) {
+		return [this, processingComplete, inputMemorySize](auto elementId, const auto& result) {
 			processingComplete(elementId, result);
-			--numActiveElements;
+
+			m_memorySize -= inputMemorySize.bytes();
+			--m_numActiveElements;
 		};
 	}
 
@@ -166,17 +173,29 @@ namespace catapult { namespace disruptor {
 			return 0;
 		}
 
+		auto inputMemorySize = input.memorySize();
+
 		// need to atomically check spare capacity AND add element
 		utils::SpinLockGuard guard(m_addSpinLock);
-		if (!canProcessNextElement()) {
-			if (m_shouldThrowIfFull)
+		auto isFull = !canProcessNextElement();
+		if (m_options.DisruptorMaxMemorySize.bytes() - m_memorySize < inputMemorySize.bytes()) {
+			CATAPULT_LOG(warning)
+					<< "disruptor memory is full (max = " << m_options.DisruptorMaxMemorySize
+					<< ", current = " << utils::FileSize::FromBytes(m_memorySize) << ")";
+			isFull = true;
+		}
+
+		if (isFull) {
+			if (m_options.ShouldThrowWhenFull)
 				CATAPULT_THROW_RUNTIME_ERROR("consumer is too far behind");
 
 			return 0;
 		}
 
+		m_memorySize += inputMemorySize.bytes();
 		++m_numActiveElements;
-		auto id = m_disruptor.add(std::move(input), wrap(processingComplete));
+
+		auto id = m_disruptor.add(std::move(input), wrap(processingComplete, inputMemorySize));
 		m_barriers[0].advance();
 		return id;
 	}

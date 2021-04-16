@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,6 +20,7 @@
 **/
 
 #include "VerifiableEntity.h"
+#include "Address.h"
 #include "Block.h"
 #include "Transaction.h"
 
@@ -29,7 +31,14 @@ namespace catapult { namespace model {
 		return out;
 	}
 
+	Address GetSignerAddress(const VerifiableEntity& entity) {
+		return PublicKeyToAddress(entity.SignerPublicKey, entity.Network);
+	}
+
 	bool IsSizeValid(const VerifiableEntity& entity, const TransactionRegistry& registry) {
+		if (entity.Size < sizeof(VerifiableEntity))
+			return false;
+
 		switch (ToBasicEntityType(entity.Type)) {
 		case BasicEntityType::Block:
 			return IsSizeValid(static_cast<const Block&>(entity), registry);

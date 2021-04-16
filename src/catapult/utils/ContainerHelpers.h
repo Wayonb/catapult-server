@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -25,7 +26,7 @@ namespace catapult { namespace utils {
 	/// Removes all entries from \a map that fulfill the given \a predicate.
 	template<typename TMap, typename TPredicate>
 	void map_erase_if(TMap& map, TPredicate predicate) {
-		for (auto iter = map.cbegin(); map.cend() != iter;) {
+		for (auto iter = map.begin(); map.end() != iter;) {
 			if (predicate(*iter))
 				iter = map.erase(iter);
 			else

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -29,7 +30,6 @@ namespace {
 int main(int argc, const char** argv) {
 	using namespace catapult;
 
-	// reuse broker configuration, which contains all extensions needed for recovery
 	auto processOptions = process::ProcessOptions::Exit_After_Process_Host_Creation;
 	return process::ProcessMain(argc, argv, Process_Name, processOptions, [argc, argv](auto&& config, const auto&) {
 		// create bootstrapper

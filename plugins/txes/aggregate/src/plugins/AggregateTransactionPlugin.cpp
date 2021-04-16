@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -58,15 +59,14 @@ namespace catapult { namespace plugins {
 				return { version, version, m_maxTransactionLifetime };
 			}
 
-			uint64_t calculateRealSize(const Transaction& transaction) const override {
-				// if size is valid, the real size is the transaction size
-				// if size is invalid, return a size that can never be correct (transaction size is uint32_t)
-				return IsSizeValid(CastToDerivedType(transaction), m_transactionRegistry)
-						? transaction.Size
-						: std::numeric_limits<uint64_t>::max();
+			bool isSizeValid(const Transaction& transaction) const override {
+				return IsSizeValid(CastToDerivedType(transaction), m_transactionRegistry);
 			}
 
-			void publish(const WeakEntityInfoT<Transaction>& transactionInfo, NotificationSubscriber& sub) const override {
+			void publish(
+					const WeakEntityInfoT<Transaction>& transactionInfo,
+					const PublishContext&,
+					NotificationSubscriber& sub) const override {
 				const auto& aggregate = CastToDerivedType(transactionInfo.entity());
 
 				// publish aggregate notifications
@@ -92,7 +92,7 @@ namespace catapult { namespace plugins {
 					sub.notify(SourceChangeNotification(Relative, 0, Relative, 1));
 
 					// - signers and entity
-					model::PublishNotifications(subTransaction, sub);
+					PublishNotifications(subTransaction, sub);
 					const auto& plugin = m_transactionRegistry.findPlugin(subTransaction.Type)->embeddedPlugin();
 					auto subTransactionAttributes = plugin.attributes();
 
@@ -111,7 +111,9 @@ namespace catapult { namespace plugins {
 
 					// - specific sub-transaction notifications
 					//   (calculateRealSize would have failed if plugin is unknown or not embeddable)
-					plugin.publish(subTransaction, sub);
+					PublishContext subContext;
+					subContext.SignerAddress = GetSignerAddress(subTransaction);
+					plugin.publish(subTransaction, subContext, sub);
 				}
 
 				// publish all cosignatory information (as an optimization these are published with the source of the last sub-transaction)
@@ -120,9 +122,16 @@ namespace catapult { namespace plugins {
 					// - notice that all valid cosignatories must have been observed previously as part of either
 					//   (1) sub-transaction execution or (2) composite account setup
 					// - require the cosignatories to sign the aggregate indirectly via the hash of its data
+					sub.notify(InternalPaddingNotification(pCosignature->Version));
 					sub.notify(SignatureNotification(pCosignature->SignerPublicKey, pCosignature->Signature, transactionInfo.hash()));
 					++pCosignature;
 				}
+			}
+
+			uint32_t embeddedCount(const Transaction& transaction) const override {
+				const auto& aggregate = CastToDerivedType(transaction);
+				const auto& transactions = aggregate.Transactions();
+				return static_cast<uint32_t>(std::distance(transactions.cbegin(), transactions.cend()));
 			}
 
 			RawBuffer dataBuffer(const Transaction& transaction) const override {

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -70,7 +71,7 @@ namespace catapult { namespace local {
 			auto pBlock = utils::UniqueToShared(builder.asSingleBlock(transactionsBuilder));
 
 			// Act:
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			auto pIo = test::PushEntity(connection, ionet::PacketType::Push_Block, pBlock);
 
 			// - wait for the chain height to change and for all height readers to disconnect
@@ -167,7 +168,7 @@ namespace catapult { namespace local {
 				BlockChainBuilder builder(accounts, stateHashCalculator);
 				auto pBlock = utils::UniqueToShared(builder.asSingleBlock(transactionsBuilder));
 
-				test::ExternalSourceConnection connection;
+				test::ExternalSourceConnection connection(context.publicKey());
 				auto pIo = test::PushEntity(connection, ionet::PacketType::Push_Block, pBlock);
 
 				// - wait for the chain height to change and for all height readers to disconnect
@@ -183,7 +184,7 @@ namespace catapult { namespace local {
 			auto pTailBlock2 = CreateBlockWithTwoAliasesAndTransfers(context, accounts, *pBuilder1, seedBlocks, CreateTimeSpan(58), 2, 3);
 
 			// Act:
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			auto pIo1 = test::PushEntity(connection, ionet::PacketType::Push_Block, pTailBlock1);
 			auto pIo2 = test::PushEntity(connection, ionet::PacketType::Push_Block, pTailBlock2);
 

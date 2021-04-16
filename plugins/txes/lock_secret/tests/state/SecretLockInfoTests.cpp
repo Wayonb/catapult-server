@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -26,20 +27,28 @@ namespace catapult { namespace state {
 
 #define TEST_CLASS SecretLockInfoTests
 
+	namespace {
+		struct SecretLockInfoTraits {
+			static void SetLockIdentifier(SecretLockInfo& lockInfo, const Hash256& hash) {
+				lockInfo.CompositeHash = hash;
+			}
+		};
+	}
+
 	DEFINE_LOCK_INFO_TESTS(SecretLockInfo)
 
 	TEST(TEST_CLASS, SecretLockInfoConstructorSetsAllFields) {
 		// Arrange:
-		auto account = test::GenerateRandomByteArray<Key>();
+		auto owner = test::GenerateRandomByteArray<Address>();
 		auto algorithm = model::LockHashAlgorithm::Op_Hash_160;
 		auto secret = test::GenerateRandomByteArray<Hash256>();
 		auto recipient = test::GenerateRandomByteArray<Address>();
 
 		// Act:
-		SecretLockInfo lockInfo(account, MosaicId(123), Amount(234), Height(345), algorithm, secret, recipient);
+		SecretLockInfo lockInfo(owner, MosaicId(123), Amount(234), Height(345), algorithm, secret, recipient);
 
 		// Assert:
-		EXPECT_EQ(account, lockInfo.SenderPublicKey);
+		EXPECT_EQ(owner, lockInfo.OwnerAddress);
 		EXPECT_EQ(MosaicId(123), lockInfo.MosaicId);
 		EXPECT_EQ(Amount(234), lockInfo.Amount);
 		EXPECT_EQ(Height(345), lockInfo.EndHeight);

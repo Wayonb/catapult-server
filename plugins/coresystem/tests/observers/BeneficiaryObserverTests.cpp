@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,6 +20,7 @@
 **/
 
 #include "src/observers/Observers.h"
+#include "catapult/model/Address.h"
 #include "tests/test/core/NotificationTestUtils.h"
 #include "tests/test/plugins/AccountObserverTestContext.h"
 #include "tests/test/plugins/ObserverTestUtils.h"
@@ -36,7 +38,7 @@ namespace catapult { namespace observers {
 		constexpr auto Default_Beneficiary_Count = 200u;
 
 		void SeedAccount(state::AccountState& accountState) {
-			accountState.ActivityBuckets.update(Importance_Height, [](auto& bucket){
+			accountState.ActivityBuckets.update(Importance_Height, [](auto& bucket) {
 				bucket.BeneficiaryCount = Default_Beneficiary_Count;
 				bucket.TotalFeesPaid = Amount(1000);
 			});
@@ -49,21 +51,22 @@ namespace catapult { namespace observers {
 			{}
 
 		public:
-			auto addAccount(const Key& publicKey) {
+			template<typename TAccountIdentifier>
+			auto addAccount(const TAccountIdentifier& accountIdentifier) {
 				auto& accountStateCache = cache().sub<cache::AccountStateCache>();
-				accountStateCache.addAccount(publicKey, Height(123));
-				return accountStateCache.find(publicKey);
+				accountStateCache.addAccount(accountIdentifier, Height(123));
+				return accountStateCache.find(accountIdentifier);
 			}
 
-			auto setupRemote(const Key& publicKey, const Key& remoteKey) {
-				auto remoteAccountStateIter = addAccount(remoteKey);
+			auto setupRemote(const Key& mainPublicKey, const Key& remotePublicKey) {
+				auto remoteAccountStateIter = addAccount(remotePublicKey);
 				remoteAccountStateIter.get().AccountType = state::AccountType::Remote;
-				remoteAccountStateIter.get().LinkedAccountKey = publicKey;
+				remoteAccountStateIter.get().SupplementalPublicKeys.linked().set(mainPublicKey);
 
 				auto& accountStateCache = cache().sub<cache::AccountStateCache>();
-				auto accountStateIter = accountStateCache.find(publicKey);
+				auto accountStateIter = accountStateCache.find(mainPublicKey);
 				accountStateIter.get().AccountType = state::AccountType::Main;
-				accountStateIter.get().LinkedAccountKey = remoteKey;
+				accountStateIter.get().SupplementalPublicKeys.linked().set(remotePublicKey);
 
 				return remoteAccountStateIter;
 			}
@@ -122,27 +125,33 @@ namespace catapult { namespace observers {
 
 	// region unique beneficiary
 
+	namespace {
+		Address ToAddress(const Key& key) {
+			return model::PublicKeyToAddress(key, model::NetworkIdentifier::Zero);
+		}
+	}
+
 	BENEFICIARY_OBSERVER_TRAITS_BASED_TEST(BeneficiaryAccountIsUpdatedButSignerAccountIsNotUpdated) {
 		// Arrange:
 		RunBeneficiaryObserverTest(TTraits::Notify_Mode, [](auto& context, auto& observer) {
-			auto signerPublicKey = test::GenerateRandomByteArray<Key>();
-			auto beneficiaryPublicKey = test::GenerateRandomByteArray<Key>();
-			auto signerAccountStateIter = context.addAccount(signerPublicKey);
-			auto beneficiaryAccountStateIter = context.addAccount(beneficiaryPublicKey);
+			auto harvesterAddress = test::GenerateRandomByteArray<Address>();
+			auto beneficiaryAddress = test::GenerateRandomByteArray<Address>();
+			auto harvesterAccountStateIter = context.addAccount(harvesterAddress);
+			auto beneficiaryAccountStateIter = context.addAccount(beneficiaryAddress);
 			SeedAccount(beneficiaryAccountStateIter.get());
 
-			auto notification = test::CreateBlockNotification(signerPublicKey, beneficiaryPublicKey);
+			auto notification = test::CreateBlockNotification(harvesterAddress, beneficiaryAddress);
 			notification.TotalFee = Amount(123);
 
 			// Sanity:
-			AssertActivityUnset(signerAccountStateIter.get());
+			AssertActivityUnset(harvesterAccountStateIter.get());
 			AssertActivitySet(beneficiaryAccountStateIter.get(), Default_Beneficiary_Count);
 
 			// Act:
 			test::ObserveNotification(observer, notification, context);
 
 			// Assert:
-			AssertActivityUnset(signerAccountStateIter.get());
+			AssertActivityUnset(harvesterAccountStateIter.get());
 			AssertActivitySet(beneficiaryAccountStateIter.get(), TTraits::Expected_Count);
 		});
 	}
@@ -150,19 +159,19 @@ namespace catapult { namespace observers {
 	BENEFICIARY_OBSERVER_TRAITS_BASED_TEST(BeneficiaryAccountIsUpdatedWhenUsingRemote) {
 		// Arrange:
 		RunBeneficiaryObserverTest(TTraits::Notify_Mode, [](auto& context, auto& observer) {
-			auto signerPublicKey = test::GenerateRandomByteArray<Key>();
+			auto harvesterAddress = test::GenerateRandomByteArray<Address>();
 			auto beneficiaryPublicKey = test::GenerateRandomByteArray<Key>();
-			auto beneficiaryRemoteKey = test::GenerateRandomByteArray<Key>();
-			auto signerAccountStateIter = context.addAccount(signerPublicKey);
+			auto beneficiaryRemotePublicKey = test::GenerateRandomByteArray<Key>();
+			auto harvesterAccountStateIter = context.addAccount(harvesterAddress);
 			auto beneficiaryAccountStateIter = context.addAccount(beneficiaryPublicKey);
-			auto beneficiaryRemoteStateIter = context.setupRemote(beneficiaryPublicKey, beneficiaryRemoteKey);
+			auto beneficiaryRemoteStateIter = context.setupRemote(beneficiaryPublicKey, beneficiaryRemotePublicKey);
 			SeedAccount(beneficiaryAccountStateIter.get());
 
-			auto notification = test::CreateBlockNotification(signerPublicKey, beneficiaryRemoteKey);
+			auto notification = test::CreateBlockNotification(harvesterAddress, ToAddress(beneficiaryPublicKey));
 			notification.TotalFee = Amount(123);
 
 			// Sanity:
-			AssertActivityUnset(signerAccountStateIter.get());
+			AssertActivityUnset(harvesterAccountStateIter.get());
 			AssertActivitySet(beneficiaryAccountStateIter.get(), Default_Beneficiary_Count);
 			AssertActivityUnset(beneficiaryRemoteStateIter.get());
 
@@ -170,7 +179,7 @@ namespace catapult { namespace observers {
 			test::ObserveNotification(observer, notification, context);
 
 			// Assert:
-			AssertActivityUnset(signerAccountStateIter.get());
+			AssertActivityUnset(harvesterAccountStateIter.get());
 			AssertActivitySet(beneficiaryAccountStateIter.get(), TTraits::Expected_Count);
 			AssertActivityUnset(beneficiaryRemoteStateIter.get());
 		});
@@ -183,21 +192,21 @@ namespace catapult { namespace observers {
 	BENEFICIARY_OBSERVER_TRAITS_BASED_TEST(BeneficiaryAccountIsUpdatedWhenSameAsSigner) {
 		// Arrange:
 		RunBeneficiaryObserverTest(TTraits::Notify_Mode, [](auto& context, auto& observer) {
-			auto signerPublicKey = test::GenerateRandomByteArray<Key>();
-			auto signerAccountStateIter = context.addAccount(signerPublicKey);
-			SeedAccount(signerAccountStateIter.get());
+			auto harvesterAddress = test::GenerateRandomByteArray<Address>();
+			auto harvesterAccountStateIter = context.addAccount(harvesterAddress);
+			SeedAccount(harvesterAccountStateIter.get());
 
-			auto notification = test::CreateBlockNotification(signerPublicKey, signerPublicKey);
+			auto notification = test::CreateBlockNotification(harvesterAddress, harvesterAddress);
 			notification.TotalFee = Amount(123);
 
 			// Sanity:
-			AssertActivitySet(signerAccountStateIter.get(), Default_Beneficiary_Count);
+			AssertActivitySet(harvesterAccountStateIter.get(), Default_Beneficiary_Count);
 
 			// Act:
 			test::ObserveNotification(observer, notification, context);
 
 			// Assert:
-			AssertActivitySet(signerAccountStateIter.get(), TTraits::Expected_Count);
+			AssertActivitySet(harvesterAccountStateIter.get(), TTraits::Expected_Count);
 		});
 	}
 

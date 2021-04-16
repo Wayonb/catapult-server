@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,7 +23,6 @@
 #include "catapult/ionet/NetworkNode.h"
 #include "catapult/ionet/PacketSocket.h"
 #include "catapult/net/ServerConnector.h"
-#include "catapult/net/VerifyPeer.h"
 #include "nodediscovery/tests/test/NodeDiscoveryTestUtils.h"
 #include "tests/test/core/PacketPayloadTestUtils.h"
 #include "tests/test/core/ThreadPoolTestUtils.h"
@@ -34,6 +34,7 @@
 #include "tests/test/net/SocketTestUtils.h"
 #include "tests/test/net/mocks/MockPacketWriters.h"
 #include "tests/test/nodeps/KeyTestUtils.h"
+#include "tests/test/nodeps/Nemesis.h"
 #include "tests/TestHarness.h"
 
 namespace catapult { namespace nodediscovery {
@@ -162,20 +163,22 @@ namespace catapult { namespace nodediscovery {
 
 	namespace {
 		auto CreateNodePushPingPacket(const Key& identityKey, const std::string& host, const std::string& name) {
-			return test::CreateNodePushPingPacket(identityKey, ionet::NodeVersion(1234), host, name);
+			auto pPacket = test::CreateNodePushPingPacket(identityKey, ionet::NodeVersion(1234), host, name);
+			reinterpret_cast<ionet::NetworkNode*>(pPacket->Data())->NetworkGenerationHashSeed = test::GetNemesisGenerationHashSeed();
+			return pPacket;
 		}
 
 		auto CreateNodePullPingPacket(const Key& identityKey, const std::string& host, const std::string& name) {
-			auto pPacket = test::CreateNodePushPingPacket(identityKey, ionet::NodeVersion(1234), host, name);
+			auto pPacket = CreateNodePushPingPacket(identityKey, host, name);
 			pPacket->Type = ionet::PacketType::Node_Discovery_Pull_Ping;
 			return pPacket;
 		}
 
 		class PullPingServer : public test::RemotePullServer {
 		public:
-			void prepareValidResponse(const crypto::KeyPair& partnerKeyPair, const std::string& name) {
-				auto pResponsePacket = CreateNodePullPingPacket(partnerKeyPair.publicKey(), "127.0.0.1", name);
-				test::RemotePullServer::prepareValidResponse(partnerKeyPair, pResponsePacket);
+			void prepareValidResponse(const std::string& name) {
+				auto pResponsePacket = CreateNodePullPingPacket(caPublicKey(), "127.0.0.1", name);
+				test::RemotePullServer::prepareValidResponse(pResponsePacket);
 			}
 		};
 	}
@@ -215,12 +218,11 @@ namespace catapult { namespace nodediscovery {
 		context.boot();
 
 		// - simulate the remote node by responding with compatible (but slightly different) node information
-		auto partnerKeyPair = test::GenerateKeyPair();
 		PullPingServer pullPingServer;
-		pullPingServer.prepareValidResponse(partnerKeyPair, "the Legend");
+		pullPingServer.prepareValidResponse("the Legend");
 
 		// - prepare a packet that simulates peers pushed from another node (and uses the local node as the forwarded peer enpoint)
-		auto pRequestPacket = CreateNodePullPingPacket(partnerKeyPair.publicKey(), "127.0.0.1", "the GREAT");
+		auto pRequestPacket = CreateNodePullPingPacket(pullPingServer.caPublicKey(), "127.0.0.1", "the GREAT");
 		pRequestPacket->Type = ionet::PacketType::Node_Discovery_Push_Peers;
 		reinterpret_cast<ionet::NetworkNode&>(*pRequestPacket->Data()).Port = test::GetLocalHostPort();
 
@@ -238,7 +240,7 @@ namespace catapult { namespace nodediscovery {
 		ASSERT_EQ(1u, subscriber.nodeParams().params().size());
 
 		const auto& subscriberNode = subscriber.nodeParams().params()[0].NodeCopy;
-		EXPECT_EQ(partnerKeyPair.publicKey(), subscriberNode.identity().PublicKey);
+		EXPECT_EQ(pullPingServer.caPublicKey(), subscriberNode.identity().PublicKey);
 		EXPECT_EQ("127.0.0.1", subscriberNode.identity().Host);
 		EXPECT_EQ("127.0.0.1", subscriberNode.endpoint().Host);
 		EXPECT_EQ("the Legend", subscriberNode.metadata().Name);
@@ -254,12 +256,12 @@ namespace catapult { namespace nodediscovery {
 		context.boot();
 
 		// - add the remote node to the node container
-		auto partnerKeyPair = test::GenerateKeyPair();
+		PullPingServer pullPingServer;
 		auto& nodes = context.testState().state().nodes();
-		nodes.modifier().add(test::CreateNamedNode({ partnerKeyPair.publicKey(), "" }, "bob"), ionet::NodeSource::Static);
+		nodes.modifier().add(test::CreateNamedNode({ pullPingServer.caPublicKey(), "" }, "bob"), ionet::NodeSource::Static);
 
 		// - prepare a packet that simulates peers pushed from another node (and uses the local node as the forwarded peer enpoint)
-		auto pRequestPacket = CreateNodePullPingPacket(partnerKeyPair.publicKey(), "127.0.0.1", "the GREAT");
+		auto pRequestPacket = CreateNodePullPingPacket(pullPingServer.caPublicKey(), "127.0.0.1", "the GREAT");
 		pRequestPacket->Type = ionet::PacketType::Node_Discovery_Push_Peers;
 		reinterpret_cast<ionet::NetworkNode&>(*pRequestPacket->Data()).Port = test::GetLocalHostPort();
 
@@ -289,12 +291,11 @@ namespace catapult { namespace nodediscovery {
 		context.boot();
 
 		// - simulate the bad remote node by not responding to the challenge
-		auto partnerKeyPair = test::GenerateKeyPair();
 		PullPingServer pullPingServer;
 		pullPingServer.prepareNoResponse();
 
 		// - prepare a packet that simulates peers pushed from another node (and uses the local node as the forwarded peer enpoint)
-		auto pRequestPacket = CreateNodePullPingPacket(partnerKeyPair.publicKey(), "127.0.0.1", "the GREAT");
+		auto pRequestPacket = CreateNodePullPingPacket(pullPingServer.caPublicKey(), "127.0.0.1", "the GREAT");
 		pRequestPacket->Type = ionet::PacketType::Node_Discovery_Push_Peers;
 		reinterpret_cast<ionet::NetworkNode&>(*pRequestPacket->Data()).Port = test::GetLocalHostPort();
 
@@ -324,11 +325,15 @@ namespace catapult { namespace nodediscovery {
 
 	// endregion
 
-	// region ping task
+	// region tasks
 
-	TEST(TEST_CLASS, PingTaskIsScheduled) {
-		test::AssertRegisteredTask(TestContext(), Num_Expected_Tasks, Ping_Task_Name);
+	TEST(TEST_CLASS, TasksAreRegistered) {
+		test::AssertRegisteredTasks(TestContext(), { Ping_Task_Name, Peers_Task_Name });
 	}
+
+	// endregion
+
+	// region ping task
 
 	TEST(TEST_CLASS, PingTaskBroadcastsLocalNetworkNode) {
 		// Arrange:
@@ -367,8 +372,9 @@ namespace catapult { namespace nodediscovery {
 		template<typename TPrepareNodes, typename TAssert>
 		void AssertPeersTaskApiAction(ionet::SocketOperationCode readCode, TPrepareNodes prepareNodes, TAssert assertFunc) {
 			// Arrange: create a single picker that returns a packet io with a successful interaction
-			auto partnerKeyPair = test::GenerateKeyPair();
-			const auto& partnerKey = partnerKeyPair.publicKey();
+			PullPingServer pullPingServer;
+			const auto& partnerKey = pullPingServer.caPublicKey();
+
 			auto pPacketIo = std::make_shared<mocks::MockPacketIo>();
 			pPacketIo->queueWrite(ionet::SocketOperationCode::Success);
 			pPacketIo->queueRead(readCode, [&partnerKey](const auto*) {
@@ -379,10 +385,9 @@ namespace catapult { namespace nodediscovery {
 				return pPacket;
 			});
 
-			PullPingServer pullPingServer;
 			if (ionet::SocketOperationCode::Success == readCode) {
 				// - simulate the remote node by responding with compatible (but slightly different) node information
-				pullPingServer.prepareValidResponse(partnerKeyPair, "the Legend");
+				pullPingServer.prepareValidResponse("the Legend");
 			}
 
 			// - ensure the packet lifetime is extended by the task callback by
@@ -413,10 +418,6 @@ namespace catapult { namespace nodediscovery {
 				assertFunc(context, partnerKey, nodeIdentity);
 			});
 		}
-	}
-
-	TEST(TEST_CLASS, PeersTaskIsScheduled) {
-		test::AssertRegisteredTask(TestContext(), Num_Expected_Tasks, Peers_Task_Name);
 	}
 
 	TEST(TEST_CLASS, PeersTaskHasNoEffectWhenNoPacketIosAreAvailable) {

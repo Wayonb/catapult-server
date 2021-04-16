@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -48,7 +49,7 @@ namespace catapult { namespace local {
 		struct BasicTestContext {
 			using LocalNodeTestContext = TestContext;
 
-			static constexpr auto Num_Tasks = 8u;
+			static constexpr auto Num_Tasks = 9u;
 
 			static void AssertBoot(const test::BasicLocalNodeStats&)
 			{}
@@ -71,6 +72,7 @@ namespace catapult { namespace local {
 		EXPECT_TRUE(test::HasCounter(counters, "ACNTST C")) << "cache counters";
 		EXPECT_TRUE(test::HasCounter(counters, "TX ELEM TOT")) << "service local node counters";
 		EXPECT_TRUE(test::HasCounter(counters, "UT CACHE")) << "local node counters";
+		EXPECT_TRUE(test::HasCounter(counters, "UT CACHE MEM")) << "local node counters";
 		EXPECT_TRUE(test::HasCounter(counters, "TOT CONF TXES")) << "local node counters";
 		EXPECT_TRUE(test::HasCounter(counters, "MEM CUR RSS")) << "memory counters";
 		EXPECT_TRUE(test::HasCounter(counters, "NODES")) << "node container counters";
@@ -82,15 +84,11 @@ namespace catapult { namespace local {
 
 	// region connection tests
 
-	TEST(TEST_CLASS, CannotConnectToApiPort) {
-		test::AssertConnectionError<TestContext>(test::GetLocalNodeApiPort());
-	}
-
 	namespace {
 		template<typename THandler>
 		void RunExternalReaderTest(THandler handler) {
 			// Arrange: boot a partner node
-			TestContext context(NodeFlag::With_Partner, { test::CreateLocalPartnerNode() });
+			TestContext context(NodeFlag::With_Partner, {});
 			context.waitForNumActiveWriters(1);
 
 			// Act: create an external connection to the node

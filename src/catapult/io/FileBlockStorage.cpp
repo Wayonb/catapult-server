@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,176 +25,26 @@
 #include "BufferedFileStream.h"
 #include "FilesystemUtils.h"
 #include "PodIoUtils.h"
+#include "catapult/config/CatapultDataDirectory.h"
 #include "catapult/utils/MemoryUtils.h"
 #include "catapult/preprocessor.h"
-#include <boost/filesystem/path.hpp>
-#include <boost/filesystem.hpp>
-#include <inttypes.h>
 
 namespace catapult { namespace io {
 
-	namespace {
-		static constexpr uint64_t Unset_Directory_Id = std::numeric_limits<uint64_t>::max();
-		static constexpr uint32_t Files_Per_Directory = 65536u;
-		static constexpr auto Block_File_Extension = ".dat";
-		static constexpr auto Block_Statement_File_Extension = ".stmt";
-
-		// region path utils
-
-#ifdef _MSC_VER
-#define SPRINTF sprintf_s
-#else
-#define SPRINTF sprintf
-#endif
-
-		boost::filesystem::path GetDirectoryPath(const std::string& baseDirectory, Height height) {
-			char subDirectory[16];
-			SPRINTF(subDirectory, "%05" PRId64, height.unwrap() / Files_Per_Directory);
-			boost::filesystem::path path = baseDirectory;
-			path /= subDirectory;
-			if (!boost::filesystem::exists(path))
-				boost::filesystem::create_directory(path);
-
-			return path;
-		}
-
-		boost::filesystem::path GetBlockPath(const std::string& baseDirectory, Height height, const char* extension) {
-			auto path = GetDirectoryPath(baseDirectory, height);
-			char filename[16];
-			SPRINTF(filename, "%05" PRId64, height.unwrap() % Files_Per_Directory);
-			path /= filename;
-			path += extension;
-			return path;
-		}
-
-		boost::filesystem::path GetHashFilePath(const std::string& baseDirectory, Height height) {
-			auto path = GetDirectoryPath(baseDirectory, height);
-			path /= "hashes.dat";
-			return path;
-		}
-
-		boost::filesystem::path GetBlockStatementPath(const std::string& baseDirectory, Height height) {
-			return GetBlockPath(baseDirectory, height, Block_Statement_File_Extension);
-		}
-
-		// endregion
-
-		// region file utils
-
-		bool IsRegularFile(const boost::filesystem::path& path) {
-			return boost::filesystem::exists(path) && boost::filesystem::is_regular_file(path);
-		}
-
-		auto OpenBlockFile(const std::string& baseDirectory, Height height, OpenMode mode = OpenMode::Read_Only) {
-			auto blockPath = GetBlockPath(baseDirectory, height, Block_File_Extension);
-			return std::make_unique<RawFile>(blockPath.generic_string().c_str(), mode);
-		}
-
-		auto OpenBlockStatementFile(const std::string& baseDirectory, Height height, OpenMode mode = OpenMode::Read_Only) {
-			auto blockStatementPath = GetBlockStatementPath(baseDirectory, height);
-			return RawFile(blockStatementPath.generic_string().c_str(), mode);
-		}
-
-		// endregion
-	}
-
-	// region FileBlockStorage::HashFile
-
-	FileBlockStorage::HashFile::HashFile(const std::string& dataDirectory)
-			: m_dataDirectory(dataDirectory)
-			, m_cachedDirectoryId(Unset_Directory_Id)
-	{}
-
-	namespace {
-		std::unique_ptr<RawFile> OpenHashFile(const std::string& baseDirectory, Height height, OpenMode openMode) {
-			auto hashFilePath = GetHashFilePath(baseDirectory, height);
-			auto pHashFile = std::make_unique<RawFile>(hashFilePath.generic_string().c_str(), openMode, LockMode::None);
-			// check that first hash file has at least two hashes inside.
-			if (height.unwrap() < Files_Per_Directory && Hash256::Size * 2 > pHashFile->size())
-				CATAPULT_THROW_RUNTIME_ERROR_1("hashes.dat has invalid size", pHashFile->size());
-
-			return pHashFile;
-		}
-
-		void SeekHashFile(RawFile& hashFile, Height height) {
-			auto index = height.unwrap() % Files_Per_Directory;
-			hashFile.seek(index * Hash256::Size);
-		}
-	}
-
-	model::HashRange FileBlockStorage::HashFile::loadHashesFrom(Height height, size_t numHashes) const {
-		uint8_t* pData = nullptr;
-		auto range = model::HashRange::PrepareFixed(numHashes, &pData);
-
-		while (numHashes) {
-			auto pHashFile = OpenHashFile(m_dataDirectory, height, OpenMode::Read_Only);
-			SeekHashFile(*pHashFile, height);
-
-			auto count = Files_Per_Directory - (height.unwrap() % Files_Per_Directory);
-			count = std::min<size_t>(numHashes, count);
-
-			pHashFile->read(MutableRawBuffer(pData, count * Hash256::Size));
-
-			pData += count * Hash256::Size;
-			numHashes -= count;
-			height = height + Height(count);
-		}
-
-		return range;
-	}
-
-	void FileBlockStorage::HashFile::save(Height height, const Hash256& hash) {
-		auto currentId = height.unwrap() / Files_Per_Directory;
-		if (m_cachedDirectoryId != currentId) {
-			m_pCachedHashFile = OpenHashFile(m_dataDirectory, height, OpenMode::Read_Append);
-			m_cachedDirectoryId = currentId;
-		}
-
-		SeekHashFile(*m_pCachedHashFile, height);
-		m_pCachedHashFile->write(hash);
-	}
-
-	void FileBlockStorage::HashFile::reset() {
-		m_cachedDirectoryId = Unset_Directory_Id;
-		m_pCachedHashFile.reset();
-	}
-
-	// endregion
-
 	// region ctor
 
-	FileBlockStorage::FileBlockStorage(const std::string& dataDirectory, FileBlockStorageMode mode)
+	FileBlockStorage::FileBlockStorage(const std::string& dataDirectory, uint32_t fileDatabaseBatchSize, FileBlockStorageMode mode)
 			: m_dataDirectory(dataDirectory)
 			, m_mode(mode)
-			, m_hashFile(m_dataDirectory)
-			, m_indexFile((boost::filesystem::path(m_dataDirectory) / "index.dat").generic_string())
+			, m_blockDatabase(config::CatapultDirectory(dataDirectory), { fileDatabaseBatchSize, ".dat" })
+			, m_statementDatabase(config::CatapultDirectory(dataDirectory), { fileDatabaseBatchSize, ".stmt" })
+			, m_hashFile(dataDirectory, "hashes")
+			, m_indexFile((std::filesystem::path(dataDirectory) / "index.dat").generic_string())
 	{}
 
 	// endregion
 
 	// region LightBlockStorage
-
-	namespace {
-		// use RawFile adapter instead of BufferedFileStream because everything read/written is in consecutive memory,
-		// so there's no benefit to buffering
-		class RawFileOutputStreamAdapter : public OutputStream {
-		public:
-			explicit RawFileOutputStreamAdapter(RawFile& rawFile) : m_rawFile(rawFile)
-			{}
-
-		public:
-			void write(const RawBuffer& buffer) override {
-				m_rawFile.write(buffer);
-			}
-
-			void flush() override {
-				CATAPULT_THROW_INVALID_ARGUMENT("flush not supported");
-			}
-
-		private:
-			RawFile& m_rawFile;
-		};
-	}
 
 	Height FileBlockStorage::chainHeight() const {
 		return m_indexFile.exists() ? Height(m_indexFile.get()) : Height(0);
@@ -209,7 +60,7 @@ namespace catapult { namespace io {
 
 		auto numAvailableHashes = static_cast<size_t>((currentHeight - height).unwrap() + 1);
 		auto numHashes = std::min(maxHashes, numAvailableHashes);
-		return m_hashFile.loadHashesFrom(height, numHashes);
+		return m_hashFile.loadRangeFrom(height, numHashes);
 	}
 
 	void FileBlockStorage::saveBlock(const model::BlockElement& blockElement) {
@@ -224,15 +75,13 @@ namespace catapult { namespace io {
 
 		{
 			// write element
-			auto pBlockFile = OpenBlockFile(m_dataDirectory, height, OpenMode::Read_Write);
-			RawFileOutputStreamAdapter streamAdapter(*pBlockFile);
-			WriteBlockElement(blockElement, streamAdapter);
+			auto pBlockStream = m_blockDatabase.outputStream(height.unwrap());
+			WriteBlockElement(blockElement, *pBlockStream);
 
 			// write statements
 			if (blockElement.OptionalStatement) {
-				BufferedOutputFileStream blockStatementOutputStream(OpenBlockStatementFile(m_dataDirectory, height, OpenMode::Read_Write));
-				WriteBlockStatement(*blockElement.OptionalStatement, blockStatementOutputStream);
-				blockStatementOutputStream.flush();
+				auto pBlockStatementStream = m_statementDatabase.outputStream(height.unwrap());
+				WriteBlockStatement(*blockElement.OptionalStatement, *pBlockStatementStream);
 			}
 		}
 
@@ -252,47 +101,27 @@ namespace catapult { namespace io {
 	// region BlockStorage
 
 	namespace {
-		class RawFileInputStreamAdapter : public InputStream {
-		public:
-			explicit RawFileInputStreamAdapter(RawFile& rawFile) : m_rawFile(rawFile)
-			{}
-
-		public:
-			bool eof() const override {
-				CATAPULT_THROW_INVALID_ARGUMENT("eof not supported");
-			}
-
-			void read(const MutableRawBuffer& buffer) override {
-				m_rawFile.read(buffer);
-			}
-
-		private:
-			RawFile& m_rawFile;
-		};
-
-		std::shared_ptr<model::Block> ReadBlock(RawFile& blockFile) {
-			auto size = Read32(blockFile);
-			blockFile.seek(0);
-
+		std::shared_ptr<model::Block> ReadBlock(InputStream& blockStream) {
+			auto size = Read32(blockStream);
 			auto pBlock = utils::MakeSharedWithSize<model::Block>(size);
-			blockFile.read({ reinterpret_cast<uint8_t*>(pBlock.get()), size });
+			pBlock->Size = size;
+			blockStream.read({ reinterpret_cast<uint8_t*>(pBlock.get()) + sizeof(uint32_t), size - sizeof(uint32_t) });
 			return pBlock;
 		}
 	}
 
 	std::shared_ptr<const model::Block> FileBlockStorage::loadBlock(Height height) const {
 		requireHeight(height, "block");
-		auto pBlockFile = OpenBlockFile(m_dataDirectory, height);
-		return ReadBlock(*pBlockFile);
+		auto pBlockStream = m_blockDatabase.inputStream(height.unwrap());
+		return ReadBlock(*pBlockStream);
 	}
 
 	std::shared_ptr<const model::BlockElement> FileBlockStorage::loadBlockElement(Height height) const {
 		requireHeight(height, "block element");
-		auto pBlockFile = OpenBlockFile(m_dataDirectory, height);
-		RawFileInputStreamAdapter streamAdapter(*pBlockFile);
-		auto pBlockElement = ReadBlockElement(streamAdapter);
+		auto pBlockStream = m_blockDatabase.inputStream(height.unwrap());
+		auto pBlockElement = ReadBlockElement(*pBlockStream);
 
-		if (pBlockFile->position() != pBlockFile->size())
+		if (!pBlockStream->eof())
 			CATAPULT_THROW_RUNTIME_ERROR_1("additional data after block at height", height);
 
 		return PORTABLE_MOVE(pBlockElement);
@@ -300,14 +129,17 @@ namespace catapult { namespace io {
 
 	std::pair<std::vector<uint8_t>, bool> FileBlockStorage::loadBlockStatementData(Height height) const {
 		requireHeight(height, "block statement data");
-		auto path = GetBlockStatementPath(m_dataDirectory, height);
-		if (!IsRegularFile(path))
+
+		if (!m_statementDatabase.contains(height.unwrap()))
 			return std::make_pair(std::vector<uint8_t>(), false);
 
-		auto blockStatementFile = OpenBlockStatementFile(m_dataDirectory, height);
+		size_t streamSize = 0;
+		auto pBlockStatementStream = m_statementDatabase.inputStream(height.unwrap(), &streamSize);
+
 		std::vector<uint8_t> blockStatement;
-		blockStatement.resize(blockStatementFile.size());
-		blockStatementFile.read(blockStatement);
+		blockStatement.resize(streamSize);
+		pBlockStatementStream->read(blockStatement);
+
 		return std::make_pair(std::move(blockStatement), true);
 	}
 

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,7 +20,7 @@
 **/
 
 #pragma once
-#include "AccountLinkAction.h"
+#include "catapult/model/LinkAction.h"
 #include "catapult/model/Mosaic.h"
 #include "catapult/model/Notifications.h"
 
@@ -36,37 +37,17 @@ namespace catapult { namespace model {
 	/// New remote account was created.
 	DEFINE_ACCOUNT_LINK_NOTIFICATION(New_Remote_Account, 0x0002, Validator);
 
+	/// Account was un/linked to a node.
+	DEFINE_ACCOUNT_LINK_NOTIFICATION(Node, 0x0003, All);
+
 #undef DEFINE_ACCOUNTLINK_NOTIFICATION
 
 	// endregion
 
-	// region RemoteAccountLinkNotification
+	// region RemoteAccountKeyLinkNotification
 
-	/// Notification of a remote account link.
-	struct RemoteAccountLinkNotification : public Notification {
-	public:
-		/// Matching notification type.
-		static constexpr auto Notification_Type = AccountLink_Remote_Notification;
-
-	public:
-		/// Creates a notification around \a mainAccountKey, \a remoteAccountKey and \a linkAction.
-		RemoteAccountLinkNotification(const Key& mainAccountKey, const Key& remoteAccountKey, AccountLinkAction linkAction)
-				: Notification(Notification_Type, sizeof(RemoteAccountLinkNotification))
-				, MainAccountKey(mainAccountKey)
-				, RemoteAccountKey(remoteAccountKey)
-				, LinkAction(linkAction)
-		{}
-
-	public:
-		/// Main account key.
-		const Key& MainAccountKey;
-
-		/// Remote account key.
-		const Key& RemoteAccountKey;
-
-		/// Account link action.
-		AccountLinkAction LinkAction;
-	};
+	/// Notification of a remote account key link.
+	using RemoteAccountKeyLinkNotification = BasicKeyLinkNotification<Key, AccountLink_Remote_Notification>;
 
 	// endregion
 
@@ -79,16 +60,23 @@ namespace catapult { namespace model {
 		static constexpr auto Notification_Type = AccountLink_New_Remote_Account_Notification;
 
 	public:
-		/// Creates a notification around \a remoteAccountKey.
-		explicit NewRemoteAccountNotification(const Key& remoteAccountKey)
+		/// Creates a notification around \a linkedPublicKey.
+		explicit NewRemoteAccountNotification(const Key& linkedPublicKey)
 				: Notification(Notification_Type, sizeof(NewRemoteAccountNotification))
-				, RemoteAccountKey(remoteAccountKey)
+				, LinkedPublicKey(linkedPublicKey)
 		{}
 
 	public:
-		/// Remote account key.
-		const Key& RemoteAccountKey;
+		/// Linked public key.
+		const Key& LinkedPublicKey;
 	};
+
+	// endregion
+
+	// region NodeKeyLinkNotification
+
+	/// Notification of a node key link.
+	using NodeKeyLinkNotification = BasicKeyLinkNotification<Key, AccountLink_Node_Notification>;
 
 	// endregion
 }}

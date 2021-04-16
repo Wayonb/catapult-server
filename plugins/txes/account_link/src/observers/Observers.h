@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,7 +25,7 @@
 
 namespace catapult { namespace observers {
 
-	/// Observes changes triggered by remote account link notifications and:
+	/// Observes changes triggered by remote account key link notifications and:
 	/// - links/unlinks remote and main accounts
-	DECLARE_OBSERVER(AccountLink, model::RemoteAccountLinkNotification)();
+	DECLARE_OBSERVER(AccountKeyLink, model::RemoteAccountKeyLinkNotification)();
 }}

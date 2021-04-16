@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -118,7 +119,7 @@ namespace catapult { namespace disruptor {
 		auto str = test::ToString(element);
 
 		// Assert:
-		EXPECT_EQ("element 21 (2 txes [00DA2896] from Remote_Pull)", str);
+		EXPECT_EQ("element 21 (2 txes [00DA2896] from Remote_Pull with size 348B)", str);
 	}
 
 	namespace {

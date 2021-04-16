@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,7 +23,7 @@
 #include "catapult/model/Address.h"
 #include "catapult/utils/ConfigurationBag.h"
 #include "catapult/utils/HexFormatter.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 namespace catapult { namespace tools { namespace nemgen {
 
@@ -38,7 +39,7 @@ namespace catapult { namespace tools { namespace nemgen {
 				const auto& root = pair.second;
 				const auto& name = config.NamespaceNames.at(root.id());
 				OutputName(name, root.id());
-				CATAPULT_LOG(debug) << " - Owner: " << root.ownerPublicKey();
+				CATAPULT_LOG(debug) << " - Owner: " << root.ownerAddress();
 				CATAPULT_LOG(debug) << " - Start Height: " << root.lifetime().Start;
 				CATAPULT_LOG(debug) << " - End Height: " << root.lifetime().End;
 				if (!root.empty()) {
@@ -64,7 +65,7 @@ namespace catapult { namespace tools { namespace nemgen {
 				const auto& properties = definition.properties();
 				OutputName(name, id);
 				CATAPULT_LOG(debug)
-						<< " - Owner: " << definition.ownerPublicKey() << std::endl
+						<< " - Owner: " << definition.ownerAddress() << std::endl
 						<< " - Supply: " << mosaicEntry.supply() << std::endl
 						<< " - Divisibility: " << static_cast<uint32_t>(properties.divisibility()) << std::endl
 						<< " - Duration: " << properties.duration() << " blocks (0 = eternal)" << std::endl
@@ -101,7 +102,7 @@ namespace catapult { namespace tools { namespace nemgen {
 	}
 
 	NemesisConfiguration LoadNemesisConfiguration(const std::string& configPath) {
-		if (!boost::filesystem::exists(configPath)) {
+		if (!std::filesystem::exists(configPath)) {
 			auto message = "aborting load due to missing configuration file";
 			CATAPULT_LOG(fatal) << message << ": " << configPath;
 			CATAPULT_THROW_EXCEPTION(catapult_runtime_error(message));
@@ -114,8 +115,9 @@ namespace catapult { namespace tools { namespace nemgen {
 	bool LogAndValidateNemesisConfiguration(const NemesisConfiguration& config) {
 		CATAPULT_LOG(debug) << "--- Nemesis Configuration ---";
 		CATAPULT_LOG(debug) << "Network            : " << config.NetworkIdentifier;
-		CATAPULT_LOG(debug) << "Nemesis Gen Hash   : " << config.NemesisGenerationHash;
+		CATAPULT_LOG(debug) << "Gen Hash Seed      : " << config.NemesisGenerationHashSeed;
 		CATAPULT_LOG(debug) << "Nemesis Private Key: " << config.NemesisSignerPrivateKey;
+		CATAPULT_LOG(debug) << "Txes Directory     : " << config.TransactionsDirectory;
 		CATAPULT_LOG(debug) << "Cpp File Header    : " << config.CppFileHeader;
 		CATAPULT_LOG(debug) << "Cpp File           : " << config.CppFile;
 		CATAPULT_LOG(debug) << "Bin Directory      : " << config.BinDirectory;

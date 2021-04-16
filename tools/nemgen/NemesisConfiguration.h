@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,7 +20,7 @@
 **/
 
 #pragma once
-#include "catapult/model/NetworkInfo.h"
+#include "catapult/model/NetworkIdentifier.h"
 #include "catapult/state/MosaicEntry.h"
 #include "catapult/state/RootNamespace.h"
 #include "catapult/utils/Hashers.h"
@@ -58,8 +59,8 @@ namespace catapult { namespace tools { namespace nemgen {
 		/// Block chain network identifier.
 		model::NetworkIdentifier NetworkIdentifier;
 
-		/// Nemesis generation hash.
-		GenerationHash NemesisGenerationHash;
+		/// Nemesis generation hash seed.
+		GenerationHashSeed NemesisGenerationHashSeed;
 
 		/// Nemesis signer private key.
 		std::string NemesisSignerPrivateKey;
@@ -85,8 +86,14 @@ namespace catapult { namespace tools { namespace nemgen {
 		/// Map of nemesis account addresses to mosaic seeds.
 		AddressToMosaicSeedsMap NemesisAddressToMosaicSeeds;
 
+		/// Additional transactions directory.
+		std::string TransactionsDirectory;
+
 	public:
 		/// Loads a nemesis configuration from \a bag.
 		static NemesisConfiguration LoadFromBag(const utils::ConfigurationBag& bag);
 	};
+
+	/// Gets the nemesis signer address from \a config.
+	Address GetNemesisSignerAddress(const NemesisConfiguration& config);
 }}}

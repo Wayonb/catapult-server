@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -53,7 +54,7 @@ namespace catapult { namespace utils {
 				break;
 
 			auto byte = value % Counter_Name_Alphabet_Size;
-			m_name.insert(m_name.begin(), 0 == byte ? ' ' : static_cast<char>(byte - 1) + 'A');
+			m_name.insert(m_name.begin(), 0 == byte ? ' ' : static_cast<char>(byte - 1 + 'A'));
 			value /= Counter_Name_Alphabet_Size;
 		}
 

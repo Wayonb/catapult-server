@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -30,41 +31,53 @@
 namespace catapult { namespace syncsource {
 
 	namespace {
+		struct HandlersConfiguration {
+			uint32_t MaxHashes;
+			handlers::PullBlocksHandlerConfiguration BlocksHandlerConfig;
+
+			handlers::BlockRangeHandler PushBlockCallback;
+			model::ChainScoreSupplier ChainScoreSupplier;
+			handlers::UtRetriever UtRetriever;
+		};
+
 		void SetConfig(handlers::PullBlocksHandlerConfiguration& blocksHandlerConfig, const config::NodeConfiguration& nodeConfig) {
 			blocksHandlerConfig.MaxBlocks = nodeConfig.MaxBlocksPerSyncAttempt;
 			blocksHandlerConfig.MaxResponseBytes = nodeConfig.MaxChainBytesPerSyncAttempt.bytes32();
 		}
 
-		struct HandlersConfiguration {
-			handlers::BlockRangeHandler PushBlockCallback;
-			model::ChainScoreSupplier ChainScoreSupplier;
-			handlers::PullBlocksHandlerConfiguration BlocksHandlerConfig;
-			handlers::UtRetriever UtRetriever;
-		};
+		void SetConfig(HandlersConfiguration& config, const config::NodeConfiguration& nodeConfig) {
+			config.MaxHashes = nodeConfig.MaxHashesPerSyncAttempt;
+			SetConfig(config.BlocksHandlerConfig, nodeConfig);
+		}
 
 		HandlersConfiguration CreateHandlersConfiguration(const extensions::ServiceState& state) {
 			HandlersConfiguration config;
-			config.PushBlockCallback = extensions::CreateBlockPushEntityCallback(state.hooks());
+			SetConfig(config, state.config().Node);
 
+			config.PushBlockCallback = extensions::CreateBlockPushEntityCallback(state.hooks());
 			config.ChainScoreSupplier = [&chainScore = state.score()]() { return chainScore.get(); };
-			config.UtRetriever = [&cache = state.utCache()](auto minFeeMultiplier, const auto& shortHashes) {
-				return cache.view().unknownTransactions(minFeeMultiplier, shortHashes);
+			config.UtRetriever = [&cache = state.utCache()](auto minDeadline, auto minFeeMultiplier, const auto& shortHashes) {
+				return cache.view().unknownTransactions(minDeadline, minFeeMultiplier, shortHashes);
 			};
 
-			SetConfig(config.BlocksHandlerConfig, state.config().Node);
 			return config;
 		}
 
-		void RegisterAllHandlers(
-				ionet::ServerPacketHandlers& handlers,
-				const io::BlockStorageCache& storage,
-				const model::TransactionRegistry& registry,
-				const HandlersConfiguration& config) {
+		void RegisterAllHandlers(extensions::ServiceState& state) {
+			auto& handlers = state.packetHandlers();
+			const auto& storage = state.storage();
+			const auto& registry = state.pluginManager().transactionRegistry();
+			auto config = CreateHandlersConfiguration(state);
+
 			handlers::RegisterPushBlockHandler(handlers, registry, config.PushBlockCallback);
 			handlers::RegisterPullBlockHandler(handlers, storage);
 
-			handlers::RegisterChainInfoHandler(handlers, storage, config.ChainScoreSupplier);
-			handlers::RegisterBlockHashesHandler(handlers, storage, static_cast<uint32_t>(config.BlocksHandlerConfig.MaxBlocks));
+			handlers::RegisterChainStatisticsHandler(
+					handlers,
+					storage,
+					config.ChainScoreSupplier,
+					extensions::CreateLocalFinalizedHeightSupplier(state));
+			handlers::RegisterBlockHashesHandler(handlers, storage, config.MaxHashes);
 			handlers::RegisterPullBlocksHandler(handlers, storage, config.BlocksHandlerConfig);
 
 			handlers::RegisterPullTransactionsHandler(handlers, config.UtRetriever);
@@ -82,11 +95,7 @@ namespace catapult { namespace syncsource {
 
 			void registerServices(extensions::ServiceLocator&, extensions::ServiceState& state) override {
 				// add handlers
-				RegisterAllHandlers(
-						state.packetHandlers(),
-						state.storage(),
-						state.pluginManager().transactionRegistry(),
-						CreateHandlersConfiguration(state));
+				RegisterAllHandlers(state);
 			}
 		};
 	}

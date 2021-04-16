@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -59,6 +60,9 @@ namespace catapult { namespace ionet {
 		}
 
 	public:
+		/// Appends \a byte to the end of the working buffer.
+		void append(uint8_t byte);
+
 		/// Creates an append context that can be used to append data to the working buffer.
 		AppendContext prepareAppend();
 

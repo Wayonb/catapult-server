@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -66,7 +67,22 @@ namespace catapult { namespace net {
 				return activeIdentities;
 			}
 
-			bool insert(
+		public:
+			struct InsertOperation {
+			public:
+				explicit InsertOperation(bool isPending)
+						: IsPending(isPending)
+						, Abort([]() {})
+				{}
+
+			public:
+				bool IsPending;
+				action Commit;
+				action Abort;
+			};
+
+		public:
+			InsertOperation insert(
 					const model::NodeIdentity& identity,
 					const PacketSocketPointer& pSocket,
 					const ChainedSocketReaderFactory& readerFactory) {
@@ -76,9 +92,11 @@ namespace catapult { namespace net {
 
 				utils::SpinLockGuard guard(m_lock);
 
+				std::pair<model::NodeIdentity, uint32_t> qualifiedReaderId;
 				auto insertedReaderIter = m_readers.end();
 				for (auto i = 0u; i < m_maxConnectionsPerIdentity; ++i) {
-					auto emplaceResult = m_readers.emplace(std::make_pair(state.Identity, i), state);
+					qualifiedReaderId = std::make_pair(state.Identity, i);
+					auto emplaceResult = m_readers.emplace(qualifiedReaderId, state);
 					if (emplaceResult.second) {
 						insertedReaderIter = emplaceResult.first;
 						break;
@@ -89,14 +107,25 @@ namespace catapult { namespace net {
 					// all available connections for the current identity are used up
 					CATAPULT_LOG(warning) << "rejecting incoming connection from " << identity << " (max connections in use)";
 					pSocket->close();
-					return false;
+					return InsertOperation(false);
 				}
 
 				// the reader takes ownership of the socket
 				auto pReader = readerFactory(pSocket, insertedReaderIter->first.second);
-				pReader->start();
 				insertedReaderIter->second.pReader = pReader;
-				return true;
+
+				InsertOperation operation(true);
+				operation.Commit = [pReader]() {
+					pReader->start();
+				};
+				operation.Abort = [this, qualifiedReaderId]() {
+					CATAPULT_LOG(warning) << "aborting incoming connection from " << qualifiedReaderId.first;
+
+					utils::SpinLockGuard guard2(m_lock);
+					closeSingle(qualifiedReaderId.first, qualifiedReaderId.second);
+				};
+
+				return operation;
 			}
 
 			bool close(const model::NodeIdentity& identity) {
@@ -131,6 +160,7 @@ namespace catapult { namespace net {
 				pReader->stop();
 			}
 
+			// closeSingle needs to be called with lock
 			bool closeSingle(const model::NodeIdentity& identity, uint32_t id) {
 				auto iter = m_readers.find(std::make_pair(identity, id));
 				if (m_readers.end() == iter)
@@ -186,13 +216,13 @@ namespace catapult { namespace net {
 		class DefaultPacketReaders : public PacketReaders, public std::enable_shared_from_this<DefaultPacketReaders> {
 		public:
 			DefaultPacketReaders(
-					const std::shared_ptr<thread::IoThreadPool>& pPool,
+					thread::IoThreadPool& pool,
 					const ionet::ServerPacketHandlers& handlers,
-					const crypto::KeyPair& keyPair,
+					const Key& serverPublicKey,
 					const ConnectionSettings& settings,
 					uint32_t maxConnectionsPerIdentity)
 					: m_handlers(handlers)
-					, m_pClientConnector(CreateClientConnector(pPool, keyPair, settings, "readers"))
+					, m_pClientConnector(CreateClientConnector(pool, serverPublicKey, settings, "readers"))
 					, m_readers(maxConnectionsPerIdentity, settings.NodeIdentityEqualityStrategy)
 			{}
 
@@ -211,19 +241,30 @@ namespace catapult { namespace net {
 
 		public:
 			void accept(const ionet::PacketSocketInfo& socketInfo, const AcceptCallback& callback) override {
-				m_pClientConnector->accept(socketInfo.socket(), [pThis = shared_from_this(), host = socketInfo.host(), callback](
+				m_pClientConnector->accept(socketInfo, [pThis = shared_from_this(), host = socketInfo.host(), callback](
 						auto connectCode,
 						const auto& pVerifiedSocket,
 						const auto& identityKey) {
-					ionet::PacketSocketInfo verifiedSocketInfo(host, pVerifiedSocket);
-					if (PeerConnectCode::Accepted == connectCode) {
-						if (!pThis->addReader(identityKey, verifiedSocketInfo))
-							connectCode = PeerConnectCode::Already_Connected;
-						else
-							CATAPULT_LOG(debug) << "accepted connection from '" << verifiedSocketInfo.host() << "' as " << identityKey;
+					auto connectResult = PeerConnectResult{ connectCode, { identityKey, host } };
+					if (PeerConnectCode::Accepted != connectCode) {
+						callback(connectResult);
+						return;
 					}
 
-					return callback({ connectCode, { identityKey, host } });
+					ionet::PacketSocketInfo verifiedSocketInfo(host, identityKey, pVerifiedSocket);
+					auto operation = pThis->tryAddReader(identityKey, verifiedSocketInfo);
+					if (operation.IsPending) {
+						if (callback(connectResult)) {
+							CATAPULT_LOG(debug) << "accepted connection from '" << verifiedSocketInfo.host() << "' as " << identityKey;
+							operation.Commit();
+							return;
+						}
+					} else {
+						connectResult.Code = PeerConnectCode::Already_Connected;
+						callback(connectResult);
+					}
+
+					operation.Abort();
 				});
 			}
 
@@ -239,7 +280,7 @@ namespace catapult { namespace net {
 			}
 
 		private:
-			bool addReader(const Key& identityKey, const ionet::PacketSocketInfo& socketInfo) {
+			ReaderContainer::InsertOperation tryAddReader(const Key& identityKey, const ionet::PacketSocketInfo& socketInfo) {
 				auto identity = model::NodeIdentity{ identityKey, socketInfo.host() };
 				return m_readers.insert(identity, socketInfo.socket(), [this, &identity](const auto& pSocket, auto id) {
 					return this->createReader(pSocket, identity, id);
@@ -268,11 +309,11 @@ namespace catapult { namespace net {
 	}
 
 	std::shared_ptr<PacketReaders> CreatePacketReaders(
-			const std::shared_ptr<thread::IoThreadPool>& pPool,
+			thread::IoThreadPool& pool,
 			const ionet::ServerPacketHandlers& handlers,
-			const crypto::KeyPair& keyPair,
+			const Key& serverPublicKey,
 			const ConnectionSettings& settings,
 			uint32_t maxConnectionsPerIdentity) {
-		return std::make_shared<DefaultPacketReaders>(pPool, handlers, keyPair, settings, maxConnectionsPerIdentity);
+		return std::make_shared<DefaultPacketReaders>(pool, handlers, serverPublicKey, settings, maxConnectionsPerIdentity);
 	}
 }}

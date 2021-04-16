@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -136,7 +137,7 @@ namespace catapult { namespace handlers {
 				auto packetSize = utils::checked_cast<size_t, uint32_t>(blockStatementPair.first.size());
 				auto pResponsePacket = ionet::CreateSharedPacket<ionet::Packet>(packetSize);
 				pResponsePacket->Type = RequestType::Packet_Type;
-				memcpy(pResponsePacket->Data(), blockStatementPair.first.data(), blockStatementPair.first.size());
+				std::memcpy(pResponsePacket->Data(), blockStatementPair.first.data(), blockStatementPair.first.size());
 				context.response(ionet::PacketPayload(pResponsePacket));
 			};
 		}

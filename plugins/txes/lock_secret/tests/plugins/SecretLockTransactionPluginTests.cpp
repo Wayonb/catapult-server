@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -67,7 +68,9 @@ namespace catapult { namespace plugins {
 
 		typename test::TransactionPluginTestUtils<TTraits>::PublishTestBuilder builder;
 		builder.template addExpectation<AccountAddressNotification>([&transaction](const auto& notification) {
-			EXPECT_EQ(transaction.RecipientAddress, notification.Address);
+			EXPECT_FALSE(notification.Address.isResolved());
+
+			EXPECT_EQ(transaction.RecipientAddress, notification.Address.unresolved());
 		});
 		builder.template addExpectation<SecretLockDurationNotification>([&transaction](const auto& notification) {
 			EXPECT_EQ(transaction.Duration, notification.Duration);
@@ -76,13 +79,12 @@ namespace catapult { namespace plugins {
 			EXPECT_EQ(transaction.HashAlgorithm, notification.HashAlgorithm);
 		});
 		builder.template addExpectation<AddressInteractionNotification>([&transaction](const auto& notification) {
-			EXPECT_EQ(transaction.SignerPublicKey, notification.Source);
+			EXPECT_EQ(GetSignerAddress(transaction), notification.Source);
 			EXPECT_EQ(transaction.Type, notification.TransactionType);
-			EXPECT_EQ(model::UnresolvedAddressSet{ transaction.RecipientAddress }, notification.ParticipantsByAddress);
-			EXPECT_EQ(utils::KeySet(), notification.ParticipantsByKey);
+			EXPECT_EQ(UnresolvedAddressSet{ transaction.RecipientAddress }, notification.ParticipantsByAddress);
 		});
 		builder.template addExpectation<BalanceDebitNotification>([&transaction](const auto& notification) {
-			EXPECT_EQ(transaction.SignerPublicKey, notification.Sender);
+			EXPECT_EQ(GetSignerAddress(transaction), notification.Sender);
 			EXPECT_EQ(transaction.Mosaic.MosaicId, notification.MosaicId);
 			EXPECT_EQ(transaction.Mosaic.Amount, notification.Amount);
 		});
@@ -93,7 +95,7 @@ namespace catapult { namespace plugins {
 			EXPECT_EQ(transaction.RecipientAddress, notification.Recipient);
 		});
 		builder.template addExpectation<BalanceTransferNotification>([&transaction](const auto& notification) {
-			EXPECT_EQ(transaction.SignerPublicKey, notification.Sender);
+			EXPECT_EQ(GetSignerAddress(transaction), notification.Sender);
 			EXPECT_EQ(transaction.RecipientAddress, notification.Recipient);
 			EXPECT_EQ(transaction.Mosaic.MosaicId, notification.MosaicId);
 			EXPECT_EQ(Amount(0), notification.Amount);

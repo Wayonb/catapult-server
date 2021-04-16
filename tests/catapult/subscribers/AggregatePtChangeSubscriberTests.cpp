@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,9 +20,11 @@
 **/
 
 #include "catapult/subscribers/AggregatePtChangeSubscriber.h"
+#include "catapult/model/Cosignature.h"
 #include "tests/catapult/subscribers/test/AggregateSubscriberTestContext.h"
 #include "tests/catapult/subscribers/test/UnsupportedSubscribers.h"
 #include "tests/test/core/TransactionInfoTestUtils.h"
+#include "tests/test/core/TransactionTestUtils.h"
 #include "tests/TestHarness.h"
 
 namespace catapult { namespace subscribers {
@@ -57,20 +60,18 @@ namespace catapult { namespace subscribers {
 		class MockPtChangeSubscriber : public UnsupportedPtChangeSubscriber {
 		public:
 			struct Param {
-				Param(const model::TransactionInfo& parentTransactionInfo, const Key& signer, const Signature& signature)
+				Param(const model::TransactionInfo& parentTransactionInfo, const model::Cosignature& cosignature)
 						: ParentTransactionInfo(parentTransactionInfo)
-						, Signer(signer)
-						, Signature(signature)
+						, Cosignature(cosignature)
 				{}
 
 				const model::TransactionInfo& ParentTransactionInfo;
-				const Key& Signer;
-				const catapult::Signature& Signature;
+				const model::Cosignature& Cosignature;
 			};
 
 		public:
-			void notifyAddCosignature(const model::TransactionInfo& parentInfo, const Key& signer, const Signature& signature) override {
-				CapturedParams.emplace_back(parentInfo, signer, signature);
+			void notifyAddCosignature(const model::TransactionInfo& parentInfo, const model::Cosignature& cosignature) override {
+				CapturedParams.emplace_back(parentInfo, cosignature);
 			}
 
 		public:
@@ -79,14 +80,13 @@ namespace catapult { namespace subscribers {
 
 		TestContext<MockPtChangeSubscriber> context;
 		auto transactionInfo = test::CreateRandomTransactionInfo();
-		auto signer = test::GenerateRandomByteArray<Key>();
-		auto signature = test::GenerateRandomByteArray<Signature>();
+		auto cosignature = test::CreateRandomDetachedCosignature();
 
 		// Sanity:
 		EXPECT_EQ(3u, context.subscribers().size());
 
 		// Act:
-		context.aggregate().notifyAddCosignature(transactionInfo, signer, signature);
+		context.aggregate().notifyAddCosignature(transactionInfo, cosignature);
 
 		// Assert:
 		auto i = 0u;
@@ -95,8 +95,7 @@ namespace catapult { namespace subscribers {
 			const auto& capturedParams = pSubscriber->CapturedParams;
 			ASSERT_EQ(1u, capturedParams.size()) << message;
 			EXPECT_EQ(&transactionInfo, &capturedParams[0].ParentTransactionInfo) << message;
-			EXPECT_EQ(&signer, &capturedParams[0].Signer) << message;
-			EXPECT_EQ(&signature, &capturedParams[0].Signature) << message;
+			EXPECT_EQ(&cosignature, &capturedParams[0].Cosignature) << message;
 		}
 	}
 

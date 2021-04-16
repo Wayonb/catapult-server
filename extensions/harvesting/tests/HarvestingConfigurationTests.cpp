@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,7 +20,9 @@
 **/
 
 #include "harvesting/src/HarvestingConfiguration.h"
+#include "catapult/model/Address.h"
 #include "tests/test/nodeps/ConfigurationTestUtils.h"
+#include "tests/test/nodeps/TestNetworkConstants.h"
 #include "tests/TestHarness.h"
 
 namespace catapult { namespace harvesting {
@@ -27,6 +30,8 @@ namespace catapult { namespace harvesting {
 #define TEST_CLASS HarvestingConfigurationTests
 
 	namespace {
+		constexpr auto Beneficiary_Address = "SCWHKRXVBV63IDBFN4X4KQM5LBN42SYEV42TB3A";
+
 		struct HarvestingConfigurationTraits {
 			using ConfigurationType = HarvestingConfiguration;
 
@@ -35,11 +40,13 @@ namespace catapult { namespace harvesting {
 					{
 						"harvesting",
 						{
-							{ "harvesterPrivateKey", "harvester-key" },
+							{ "harvesterSigningPrivateKey", "signing-key" },
+							{ "harvesterVrfPrivateKey", "vrf-key" },
+
 							{ "enableAutoHarvesting", "true" },
 							{ "maxUnlockedAccounts", "2" },
 							{ "delegatePrioritizationPolicy", "Importance" },
-							{ "beneficiaryPublicKey", "beneficiary-key" }
+							{ "beneficiaryAddress", Beneficiary_Address }
 						}
 					}
 				};
@@ -51,25 +58,48 @@ namespace catapult { namespace harvesting {
 
 			static void AssertZero(const HarvestingConfiguration& config) {
 				// Assert:
-				EXPECT_EQ("", config.HarvesterPrivateKey);
+				EXPECT_EQ("", config.HarvesterSigningPrivateKey);
+				EXPECT_EQ("", config.HarvesterVrfPrivateKey);
+
 				EXPECT_FALSE(config.EnableAutoHarvesting);
 				EXPECT_EQ(0u, config.MaxUnlockedAccounts);
 				EXPECT_EQ(DelegatePrioritizationPolicy::Age, config.DelegatePrioritizationPolicy);
-				EXPECT_EQ("", config.BeneficiaryPublicKey);
+				EXPECT_EQ(Address(), config.BeneficiaryAddress);
 			}
 
 			static void AssertCustom(const HarvestingConfiguration& config) {
 				// Assert:
-				EXPECT_EQ("harvester-key", config.HarvesterPrivateKey);
+				EXPECT_EQ("signing-key", config.HarvesterSigningPrivateKey);
+				EXPECT_EQ("vrf-key", config.HarvesterVrfPrivateKey);
+
 				EXPECT_TRUE(config.EnableAutoHarvesting);
 				EXPECT_EQ(2u, config.MaxUnlockedAccounts);
 				EXPECT_EQ(DelegatePrioritizationPolicy::Importance, config.DelegatePrioritizationPolicy);
-				EXPECT_EQ("beneficiary-key", config.BeneficiaryPublicKey);
+				EXPECT_EQ(model::StringToAddress(Beneficiary_Address), config.BeneficiaryAddress);
 			}
 		};
 	}
 
 	DEFINE_CONFIGURATION_TESTS(HarvestingConfigurationTests, Harvesting)
+
+	// region custom parsing
+
+	TEST(TEST_CLASS, CanParseEmptyBeneficiaryAddress) {
+		// Arrange: clear beneficiary address
+		auto properties = HarvestingConfigurationTraits::CreateProperties();
+		for (auto& pair : properties["harvesting"]) {
+			if ("beneficiaryAddress" == pair.first)
+				pair.second = "";
+		}
+
+		// Act:
+		auto config = HarvestingConfiguration::LoadFromBag(utils::ConfigurationBag(std::move(properties)));
+
+		// Assert:
+		EXPECT_EQ(Address(), config.BeneficiaryAddress);
+	}
+
+	// endregion
 
 	// region file io
 
@@ -83,11 +113,13 @@ namespace catapult { namespace harvesting {
 		auto config = HarvestingConfiguration::LoadFromPath("../resources");
 
 		// Assert:
-		EXPECT_EQ("", config.HarvesterPrivateKey);
-		EXPECT_FALSE(config.EnableAutoHarvesting);
+		EXPECT_EQ(test::Test_Network_Private_Keys[0], config.HarvesterSigningPrivateKey);
+		EXPECT_EQ(test::Test_Network_Vrf_Private_Keys[0], config.HarvesterVrfPrivateKey);
+
+		EXPECT_TRUE(config.EnableAutoHarvesting);
 		EXPECT_EQ(5u, config.MaxUnlockedAccounts);
 		EXPECT_EQ(DelegatePrioritizationPolicy::Importance, config.DelegatePrioritizationPolicy);
-		EXPECT_EQ("0000000000000000000000000000000000000000000000000000000000000000", config.BeneficiaryPublicKey);
+		EXPECT_EQ(Address(), config.BeneficiaryAddress);
 	}
 
 	// endregion

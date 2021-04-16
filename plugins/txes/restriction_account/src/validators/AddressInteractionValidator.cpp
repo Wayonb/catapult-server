@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -53,20 +54,12 @@ namespace catapult { namespace validators {
 	}
 
 	DEFINE_STATEFUL_VALIDATOR(AddressInteraction, [](const Notification& notification, const ValidatorContext& context) {
-		auto networkIdentifier = context.Network.Identifier;
-		auto sourceAddress = model::PublicKeyToAddress(notification.Source, networkIdentifier);
 		for (const auto& address : notification.ParticipantsByAddress) {
 			auto participant = context.Resolvers.resolve(address);
-			if (!IsInteractionAllowed(context.Cache, sourceAddress, participant))
-				return Failure_RestrictionAccount_Address_Interaction_Prohibited;
-		}
-
-		for (const auto& key : notification.ParticipantsByKey) {
-			auto participant = model::PublicKeyToAddress(key, networkIdentifier);
-			if (!IsInteractionAllowed(context.Cache, sourceAddress, participant))
+			if (!IsInteractionAllowed(context.Cache, notification.Source, participant))
 				return Failure_RestrictionAccount_Address_Interaction_Prohibited;
 		}
 
 		return ValidationResult::Success;
-	});
+	})
 }}

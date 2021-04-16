@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -30,10 +31,14 @@ namespace catapult { namespace local {
 	namespace {
 		class TestContext {
 		public:
-			TestContext() : m_context(test::NodeFlag::With_Partner | test::NodeFlag::Simulated_Api, { test::CreateLocalPartnerNode() })
+			TestContext() : m_context(test::NodeFlag::With_Partner | test::NodeFlag::Simulated_Api, {})
 			{}
 
 		public:
+			auto publicKey() const {
+				return m_context.publicKey();
+			}
+
 			auto stats() const {
 				return m_context.stats();
 			}
@@ -41,12 +46,6 @@ namespace catapult { namespace local {
 		private:
 			test::LocalNodeTestContext<test::LocalNodeApiTraits> m_context;
 		};
-
-		void AssertReaderConnection(const test::BasicLocalNodeStats& stats) {
-			// Assert: the external reader connection is still active
-			EXPECT_EQ(1u, stats.NumActiveReaders);
-			EXPECT_EQ(1u, stats.NumActiveWriters);
-		}
 
 		void AssertNoReaderConnection(const test::BasicLocalNodeStats& stats) {
 			// Assert: the external reader connection is not active
@@ -64,7 +63,7 @@ namespace catapult { namespace local {
 
 		// Act:
 		// - note that push valid block will create a new reader connection, increasing the number of readers from 1 (self) to 2
-		test::ExternalSourceConnection connection;
+		test::ExternalSourceConnection connection(context.publicKey());
 		auto pIo = test::PushValidBlock(connection);
 
 		// - wait for the external reader to be closed by the server
@@ -85,7 +84,7 @@ namespace catapult { namespace local {
 		test::WaitForBoot(context);
 
 		// Act:
-		test::ExternalSourceConnection connection;
+		test::ExternalSourceConnection connection(context.publicKey());
 		auto pIo = test::PushValidTransaction(connection);
 		WAIT_FOR_ONE_EXPR(context.stats().NumAddedTransactionElements);
 
@@ -94,8 +93,9 @@ namespace catapult { namespace local {
 		EXPECT_EQ(0u, stats.NumAddedBlockElements);
 		EXPECT_EQ(1u, stats.NumAddedTransactionElements);
 
-		// - the connection is still active
-		AssertReaderConnection(stats);
+		// - the connection is no longer active because after sending the transaction, PushPayload (called by PushValidTransaction)
+		//   initiates a Chain_Statistics request, which is not supported and causes the connection to be closed
+		AssertNoReaderConnection(stats);
 	}
 
 	// endregion

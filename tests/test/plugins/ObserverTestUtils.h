@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -32,7 +33,7 @@ namespace catapult { namespace test {
 			const observers::ObserverState& state,
 			Height height,
 			observers::NotifyMode mode) {
-		return observers::ObserverContext(state, height, mode, CreateResolverContextXor());
+		return observers::ObserverContext(model::NotificationContext(height, CreateResolverContextXor()), state, mode);
 	}
 
 	/// Creates an observer context around \a cache at \a height with specified \a mode.

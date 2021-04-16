@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -25,7 +26,7 @@
 #include "SubCachePluginAdapter.h"
 #include "catapult/crypto/Hashes.h"
 #include "catapult/model/BlockChainConfiguration.h"
-#include "catapult/model/NetworkInfo.h"
+#include "catapult/model/NetworkIdentifier.h"
 #include "catapult/state/CatapultState.h"
 #include "catapult/utils/StackLogger.h"
 
@@ -80,7 +81,7 @@ namespace catapult { namespace cache {
 
 		template<typename TSubCacheViews, typename TUpdateMerkleRoot>
 		StateHashInfo CalculateStateHashInfo(const TSubCacheViews& subViews, TUpdateMerkleRoot updateMerkleRoot) {
-			utils::SlowOperationLogger logger("CalculateStateHashInfo", utils::LogLevel::Warning);
+			utils::SlowOperationLogger logger("CalculateStateHashInfo", utils::LogLevel::warning);
 
 			StateHashInfo stateHashInfo;
 			stateHashInfo.SubCacheMerkleRoots = CollectSubCacheMerkleRoots(subViews, updateMerkleRoot);
@@ -126,8 +127,12 @@ namespace catapult { namespace cache {
 
 	// region CatapultCacheDelta
 
-	CatapultCacheDelta::CatapultCacheDelta(state::CatapultState& dependentState, std::vector<std::unique_ptr<SubCacheView>>&& subViews)
-			: m_pDependentState(&dependentState)
+	CatapultCacheDelta::CatapultCacheDelta(
+			Disposition disposition,
+			state::CatapultState& dependentState,
+			std::vector<std::unique_ptr<SubCacheView>>&& subViews)
+			: m_disposition(disposition)
+			, m_pDependentState(&dependentState)
 			, m_subViews(std::move(subViews))
 	{}
 
@@ -136,6 +141,10 @@ namespace catapult { namespace cache {
 	CatapultCacheDelta::CatapultCacheDelta(CatapultCacheDelta&&) = default;
 
 	CatapultCacheDelta& CatapultCacheDelta::operator=(CatapultCacheDelta&&) = default;
+
+	CatapultCacheDelta::Disposition CatapultCacheDelta::disposition() const {
+		return m_disposition;
+	}
 
 	const state::CatapultState& CatapultCacheDelta::dependentState() const {
 		return *m_pDependentState;
@@ -167,6 +176,24 @@ namespace catapult { namespace cache {
 					"wrong number of sub cache merkle roots were passed (expected, actual)",
 					merkleRootIndex,
 					subCacheMerkleRoots.size());
+		}
+	}
+
+	void CatapultCacheDelta::prune(Height height) {
+		for (const auto& pSubView : m_subViews) {
+			if (!pSubView)
+				continue;
+
+			pSubView->prune(height);
+		}
+	}
+
+	void CatapultCacheDelta::prune(Timestamp time) {
+		for (const auto& pSubView : m_subViews) {
+			if (!pSubView)
+				continue;
+
+			pSubView->prune(time);
 		}
 	}
 
@@ -231,7 +258,7 @@ namespace catapult { namespace cache {
 			subViews.push_back(std::move(pSubView));
 		}
 
-		return std::make_unique<CatapultCacheDelta>(*m_pDependentState, std::move(subViews));
+		return std::make_unique<CatapultCacheDelta>(CatapultCacheDelta::Disposition::Detached, *m_pDependentState, std::move(subViews));
 	}
 
 	// endregion
@@ -281,7 +308,7 @@ namespace catapult { namespace cache {
 
 		// make a copy of the dependent state after all caches are locked with outstanding deltas
 		m_pDependentStateDelta = std::make_unique<state::CatapultState>(*m_pDependentState);
-		return CatapultCacheDelta(*m_pDependentStateDelta, std::move(subViews));
+		return CatapultCacheDelta(CatapultCacheDelta::Disposition::Attached, *m_pDependentStateDelta, std::move(subViews));
 	}
 
 	CatapultCacheDetachableDelta CatapultCache::createDetachableDelta() const {

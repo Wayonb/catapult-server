@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,6 +37,7 @@
 #include "catapult/extensions/ServiceState.h"
 #include "catapult/io/BlockStorageCache.h"
 #include "catapult/io/FileQueue.h"
+#include "catapult/io/FilesystemUtils.h"
 #include "catapult/ionet/NodeContainer.h"
 #include "catapult/local/HostUtils.h"
 #include "catapult/utils/StackLogger.h"
@@ -43,11 +45,110 @@
 namespace catapult { namespace local {
 
 	namespace {
-		std::unique_ptr<io::PrunableBlockStorage> CreateStagingBlockStorage(const config::CatapultDataDirectory& dataDirectory) {
-			auto stagingDirectory = dataDirectory.spoolDir("block_sync").str();
-			boost::filesystem::create_directory(stagingDirectory);
-			return std::make_unique<io::FileBlockStorage>(stagingDirectory, io::FileBlockStorageMode::None);
+		// region data directory preparation
+
+		void MakeWriteable(const std::filesystem::path& filepath) {
+			std::filesystem::permissions(filepath, std::filesystem::perms::owner_write, std::filesystem::perm_options::add);
 		}
+
+		void ImportRootFilesFromSeed(const std::string& seedDirectory, const config::CatapultDataDirectory& dataDirectory) {
+			auto begin = std::filesystem::directory_iterator(seedDirectory);
+			auto end = std::filesystem::directory_iterator();
+
+			for (auto iter = begin; end != iter; ++iter) {
+				if (!iter->is_regular_file())
+					continue;
+
+				auto destinationFilename = dataDirectory.rootDir().file(iter->path().filename().generic_string());
+				std::filesystem::copy_file(iter->path(), destinationFilename);
+
+				if (std::string::npos != destinationFilename.find(".dat"))
+					MakeWriteable(destinationFilename);
+			}
+		}
+
+		void ImportVersionedFilesFromSeed(
+				const std::string& seedDirectory,
+				const config::CatapultDataDirectory& dataDirectory,
+				uint32_t fileDatabaseBatchSize) {
+			auto outputDirectory = dataDirectory.dir("00000");
+			outputDirectory.create();
+
+			auto begin = std::filesystem::directory_iterator(seedDirectory + "/00000");
+			auto end = std::filesystem::directory_iterator();
+
+			for (auto iter = begin; end != iter; ++iter) {
+				auto filename = iter->path().filename().generic_string();
+				if (0 != filename.find("00001") || 1 == fileDatabaseBatchSize) {
+					// copy plain file
+					auto destinationFilename = outputDirectory.file(filename);
+					std::filesystem::copy_file(iter->path(), destinationFilename);
+					MakeWriteable(destinationFilename);
+					continue;
+				}
+
+				// import file database
+				auto outputFilename = "00000" + iter->path().extension().generic_string();
+				io::RawFile inputFile(iter->path().generic_string(), io::OpenMode::Read_Only);
+				io::RawFile outputFile(outputDirectory.file(outputFilename), io::OpenMode::Read_Write);
+
+				// write file database header
+				auto headerSize = fileDatabaseBatchSize * sizeof(uint64_t);
+				outputFile.write(std::vector<uint8_t>(headerSize));
+				outputFile.seek(sizeof(uint64_t));
+				Write64(outputFile, headerSize);
+				outputFile.seek(headerSize);
+
+				// copy input file contents
+				std::vector<uint8_t> inputBuffer(inputFile.size());
+				inputFile.read(inputBuffer);
+				outputFile.write(inputBuffer);
+			}
+		}
+
+		config::CatapultDataDirectory PrepareDataDirectory(const config::CatapultConfiguration& config) {
+			auto dataDirectory = config::CatapultDataDirectoryPreparer::Prepare(config.User.DataDirectory);
+
+			if (!std::filesystem::exists(dataDirectory.rootDir().file("index.dat"))) {
+				CATAPULT_LOG(info) << "importing seed directory";
+				ImportRootFilesFromSeed(config.User.SeedDirectory, dataDirectory);
+				ImportVersionedFilesFromSeed(config.User.SeedDirectory, dataDirectory, config.Node.FileDatabaseBatchSize);
+			}
+
+			return dataDirectory;
+		}
+
+		// endregion
+
+		// region storage and subscriber factories
+
+		std::unique_ptr<io::PrunableBlockStorage> CreateStagingBlockStorage(
+				const config::CatapultDataDirectory& dataDirectory,
+				uint32_t fileDatabaseBatchSize) {
+			auto stagingDirectory = dataDirectory.spoolDir("block_sync").str();
+			config::CatapultDirectory(stagingDirectory).create();
+			return std::make_unique<io::FileBlockStorage>(stagingDirectory, fileDatabaseBatchSize, io::FileBlockStorageMode::None);
+		}
+
+		class CommitImportanceFilesStateChangeSubscriber : public subscribers::StateChangeSubscriber {
+		public:
+			explicit CommitImportanceFilesStateChangeSubscriber(const config::CatapultDataDirectory& dataDirectory)
+					: m_dataDirectory(dataDirectory)
+			{}
+
+		public:
+			void notifyScoreChange(const model::ChainScore&) override
+			{}
+
+			void notifyStateChange(const subscribers::StateChangeInfo&) override {
+				// when state is committed, move importance files from wip to base
+				auto destDirectory = m_dataDirectory.dir("importance");
+				io::MoveAllFiles(destDirectory.dir("wip").str(), destDirectory.str());
+			}
+
+		private:
+			config::CatapultDataDirectory m_dataDirectory;
+		};
 
 		std::unique_ptr<subscribers::StateChangeSubscriber> CreateStateChangeSubscriber(
 				subscribers::SubscriptionManager& subscriptionManager,
@@ -56,16 +157,22 @@ namespace catapult { namespace local {
 			subscriptionManager.addStateChangeSubscriber(CreateFileStateChangeStorage(
 					std::make_unique<io::FileQueueWriter>(dataDirectory.spoolDir("state_change").str(), "index_server.dat"),
 					[&catapultCache]() { return catapultCache.changesStorages(); }));
+			subscriptionManager.addStateChangeSubscriber(std::make_unique<CommitImportanceFilesStateChangeSubscriber>(dataDirectory));
 			return subscriptionManager.createStateChangeSubscriber();
 		}
 
 		std::unique_ptr<subscribers::NodeSubscriber> CreateNodeSubscriber(
 				subscribers::SubscriptionManager& subscriptionManager,
 				ionet::NodeContainer& nodes,
-				const std::unordered_set<std::string>& localNetworks) {
-			subscriptionManager.addNodeSubscriber(CreateNodeContainerSubscriberAdapter(nodes, localNetworks));
+				const std::unordered_set<std::string>& localNetworks,
+				const extensions::BannedNodeIdentitySink& bannedNodeIdentitySink) {
+			subscriptionManager.addNodeSubscriber(CreateNodeContainerSubscriberAdapter(nodes, localNetworks, bannedNodeIdentitySink));
 			return subscriptionManager.createNodeSubscriber();
 		}
+
+		// endregion
+
+		// region utils
 
 		void AddNodeCounters(std::vector<utils::DiagnosticCounter>& counters, const ionet::NodeContainer& nodes) {
 			counters.emplace_back(utils::DiagnosticCounterId("NODES"), [&nodes]() {
@@ -80,29 +187,39 @@ namespace catapult { namespace local {
 			});
 		}
 
+		// endregion
+
 		class DefaultLocalNode final : public LocalNode {
 		public:
-			DefaultLocalNode(std::unique_ptr<extensions::ProcessBootstrapper>&& pBootstrapper, const crypto::KeyPair& keyPair)
+			DefaultLocalNode(std::unique_ptr<extensions::ProcessBootstrapper>&& pBootstrapper, const config::CatapultKeys& keys)
 					: m_pBootstrapper(std::move(pBootstrapper))
-					, m_serviceLocator(keyPair)
+					, m_serviceLocator(keys)
 					, m_config(m_pBootstrapper->config())
-					, m_dataDirectory(config::CatapultDataDirectoryPreparer::Prepare(m_config.User.DataDirectory))
+					, m_dataDirectory(PrepareDataDirectory(m_config))
 					, m_nodes(
 							m_config.Node.MaxTrackedNodes,
 							m_config.BlockChain.Network.NodeEqualityStrategy,
 							GetBanSettings(m_config.Node.Banning),
-							m_pBootstrapper->extensionManager().networkTimeSupplier(m_config.BlockChain.Network.EpochAdjustment))
+							m_pBootstrapper->extensionManager().networkTimeSupplier(m_config.BlockChain.Network.EpochAdjustment),
+							ionet::CreateRangeNodeVersionPredicate(
+									m_config.Node.MinPartnerNodeVersion,
+									m_config.Node.MaxPartnerNodeVersion))
 					, m_catapultCache({}) // note that sub caches are added in boot
 					, m_storage(
 							m_pBootstrapper->subscriptionManager().createBlockStorage(m_pBlockChangeSubscriber),
-							CreateStagingBlockStorage(m_dataDirectory))
+							CreateStagingBlockStorage(m_dataDirectory, m_config.Node.FileDatabaseBatchSize))
 					, m_pUtCache(m_pBootstrapper->subscriptionManager().createUtCache(extensions::GetUtCacheOptions(m_config.Node)))
-					, m_pTransactionStatusSubscriber(m_pBootstrapper->subscriptionManager().createTransactionStatusSubscriber())
+					, m_pFinalizationSubscriber(m_pBootstrapper->subscriptionManager().createFinalizationSubscriber())
+					, m_pNodeSubscriber(CreateNodeSubscriber(
+							m_pBootstrapper->subscriptionManager(),
+							m_nodes,
+							m_config.Node.LocalNetworks,
+							m_bannedNodeIdentitySink))
 					, m_pStateChangeSubscriber(CreateStateChangeSubscriber(
 							m_pBootstrapper->subscriptionManager(),
 							m_catapultCache,
 							m_dataDirectory))
-					, m_pNodeSubscriber(CreateNodeSubscriber(m_pBootstrapper->subscriptionManager(), m_nodes, m_config.Node.LocalNetworks))
+					, m_pTransactionStatusSubscriber(m_pBootstrapper->subscriptionManager().createTransactionStatusSubscriber())
 					, m_pluginManager(m_pBootstrapper->pluginManager())
 					, m_isBooted(false) {
 				ValidateNodes(m_pBootstrapper->staticNodes());
@@ -124,7 +241,7 @@ namespace catapult { namespace local {
 				CATAPULT_LOG(debug) << "registering counters";
 				registerCounters();
 
-				utils::StackLogger stackLogger("booting local node", utils::LogLevel::Info);
+				utils::StackLogger stackLogger("booting local node", utils::LogLevel::info);
 				auto isFirstBoot = executeAndNotifyNemesis();
 				loadStateFromDisk();
 
@@ -137,11 +254,12 @@ namespace catapult { namespace local {
 						m_catapultCache,
 						m_storage,
 						m_score,
-						m_pUtCache->get(),
+						*m_pUtCache,
 						extensionManager.networkTimeSupplier(m_config.BlockChain.Network.EpochAdjustment),
-						*m_pTransactionStatusSubscriber,
-						*m_pStateChangeSubscriber,
+						*m_pFinalizationSubscriber,
 						*m_pNodeSubscriber,
+						*m_pStateChangeSubscriber,
+						*m_pTransactionStatusSubscriber,
 						m_counters,
 						m_pluginManager,
 						m_pBootstrapper->pool());
@@ -149,6 +267,9 @@ namespace catapult { namespace local {
 				for (const auto& counter : m_serviceLocator.counters())
 					m_counters.push_back(counter);
 
+				// notice that CreateNodeContainerSubscriberAdapter takes reference to m_bannedNodeIdentitySink,
+				// otherwise this would not work
+				m_bannedNodeIdentitySink = serviceState.hooks().bannedNodeIdentitySink();
 				m_isBooted = true;
 
 				// save nemesis state on first boot so that state directory is created and NemesisBlockNotifier
@@ -169,6 +290,9 @@ namespace catapult { namespace local {
 				m_counters.emplace_back(utils::DiagnosticCounterId("UT CACHE"), [&source = *m_pUtCache]() {
 					return source.view().size();
 				});
+				m_counters.emplace_back(utils::DiagnosticCounterId("UT CACHE MEM"), [&source = *m_pUtCache]() {
+					return source.view().memorySize().megabytes();
+				});
 
 				AddNodeCounters(m_counters, m_nodes);
 			}
@@ -183,6 +307,7 @@ namespace catapult { namespace local {
 				if (m_pBlockChangeSubscriber)
 					notifier.raise(*m_pBlockChangeSubscriber);
 
+				notifier.raise(*m_pFinalizationSubscriber);
 				notifier.raise(*m_pStateChangeSubscriber);
 
 				// indicate the nemesis block is fully updated so that it can be processed downstream immediately
@@ -211,7 +336,7 @@ namespace catapult { namespace local {
 
 		public:
 			void shutdown() override {
-				utils::StackLogger stackLogger("shutting down local node", utils::LogLevel::Info);
+				utils::StackLogger stackLogger("shutting down local node", utils::LogLevel::info);
 
 				m_pBootstrapper->pool().shutdown();
 				saveStateToDisk();
@@ -270,19 +395,21 @@ namespace catapult { namespace local {
 			extensions::LocalNodeChainScore m_score;
 			std::unique_ptr<cache::MemoryUtCacheProxy> m_pUtCache;
 
-			std::unique_ptr<subscribers::TransactionStatusSubscriber> m_pTransactionStatusSubscriber;
-			std::unique_ptr<subscribers::StateChangeSubscriber> m_pStateChangeSubscriber;
+			std::unique_ptr<subscribers::FinalizationSubscriber> m_pFinalizationSubscriber;
 			std::unique_ptr<subscribers::NodeSubscriber> m_pNodeSubscriber;
+			std::unique_ptr<subscribers::StateChangeSubscriber> m_pStateChangeSubscriber;
+			std::unique_ptr<subscribers::TransactionStatusSubscriber> m_pTransactionStatusSubscriber;
 
 			plugins::PluginManager& m_pluginManager;
 			std::vector<utils::DiagnosticCounter> m_counters;
+			extensions::BannedNodeIdentitySink m_bannedNodeIdentitySink;
 			bool m_isBooted;
 		};
 	}
 
 	std::unique_ptr<LocalNode> CreateLocalNode(
-			const crypto::KeyPair& keyPair,
+			const config::CatapultKeys& keys,
 			std::unique_ptr<extensions::ProcessBootstrapper>&& pBootstrapper) {
-		return CreateAndBootHost<DefaultLocalNode>(std::move(pBootstrapper), keyPair);
+		return CreateAndBootHost<DefaultLocalNode>(std::move(pBootstrapper), keys);
 	}
 }}

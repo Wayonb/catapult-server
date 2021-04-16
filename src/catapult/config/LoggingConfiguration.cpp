@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -55,7 +56,7 @@ namespace catapult { namespace config {
 		config.Console.ComponentLevels = bag.getAll<utils::LogLevel>("console.component.levels");
 		config.File.ComponentLevels = bag.getAll<utils::LogLevel>("file.component.levels");
 
-		utils::VerifyBagSizeLte(bag, 10 + config.Console.ComponentLevels.size() + config.File.ComponentLevels.size());
+		utils::VerifyBagSizeExact(bag, 10 + config.Console.ComponentLevels.size() + config.File.ComponentLevels.size());
 		return config;
 	}
 

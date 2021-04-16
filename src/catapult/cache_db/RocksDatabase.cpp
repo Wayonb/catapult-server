@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,11 +22,11 @@
 #include "RocksDatabase.h"
 #include "RocksInclude.h"
 #include "RocksPruningFilter.h"
+#include "catapult/config/CatapultDataDirectory.h"
 #include "catapult/utils/HexFormatter.h"
 #include "catapult/utils/PathUtils.h"
 #include "catapult/utils/StackLogger.h"
 #include "catapult/exceptions.h"
-#include <boost/filesystem.hpp>
 
 namespace catapult { namespace cache {
 
@@ -77,21 +78,72 @@ namespace catapult { namespace cache {
 
 	// region RocksDatabaseSettings
 
-	RocksDatabaseSettings::RocksDatabaseSettings() : PruningMode(FilterPruningMode::Disabled)
+	RocksDatabaseSettings::RocksDatabaseSettings()
+			: RocksDatabaseSettings(std::string(), std::vector<std::string>(), FilterPruningMode::Disabled)
 	{}
 
 	RocksDatabaseSettings::RocksDatabaseSettings(
 			const std::string& databaseDirectory,
 			const std::vector<std::string>& columnFamilyNames,
-			utils::FileSize maxDatabaseWriteBatchSize,
+			FilterPruningMode pruningMode)
+			: RocksDatabaseSettings(
+					databaseDirectory,
+					config::NodeConfiguration::CacheDatabaseSubConfiguration(),
+					columnFamilyNames,
+					pruningMode)
+	{}
+
+	RocksDatabaseSettings::RocksDatabaseSettings(
+			const std::string& databaseDirectory,
+			const config::NodeConfiguration::CacheDatabaseSubConfiguration& databaseConfig,
+			const std::vector<std::string>& columnFamilyNames,
 			FilterPruningMode pruningMode)
 			: DatabaseDirectory(databaseDirectory)
+			, DatabaseConfig(databaseConfig)
 			, ColumnFamilyNames(columnFamilyNames)
-			, MaxDatabaseWriteBatchSize(maxDatabaseWriteBatchSize)
 			, PruningMode(pruningMode)
 	{}
 
 	// endregion
+
+	// region RocksDatabase
+
+	namespace {
+		rocksdb::Options CreateDatabaseOptions(const config::NodeConfiguration::CacheDatabaseSubConfiguration& config) {
+			rocksdb::Options dbOptions;
+			dbOptions.create_if_missing = true;
+			dbOptions.create_missing_column_families = true;
+
+			if (config.MaxOpenFiles > 0)
+				dbOptions.max_open_files = static_cast<int>(config.MaxOpenFiles);
+
+			if (config.MaxBackgroundThreads > 0)
+				dbOptions.IncreaseParallelism(static_cast<int>(config.MaxBackgroundThreads));
+
+			if (config.MaxSubcompactionThreads > 0)
+				dbOptions.max_subcompactions = config.MaxSubcompactionThreads;
+
+			if (config.EnableStatistics)
+				dbOptions.statistics = rocksdb::CreateDBStatistics();
+
+			return dbOptions;
+		}
+
+		rocksdb::ColumnFamilyOptions CreateColumnFamilyOptions(
+				const config::NodeConfiguration::CacheDatabaseSubConfiguration& config,
+				rocksdb::CompactionFilter* pCompactionFilter) {
+			rocksdb::ColumnFamilyOptions columnFamilyOptions;
+			columnFamilyOptions.compaction_filter = pCompactionFilter;
+
+			if (utils::FileSize() != config.BlockCacheSize)
+				columnFamilyOptions.OptimizeForPointLookup(config.BlockCacheSize.megabytes());
+
+			if (utils::FileSize() != config.MemtableMemoryBudget)
+				columnFamilyOptions.OptimizeLevelStyleCompaction(config.MemtableMemoryBudget.bytes());
+
+			return columnFamilyOptions;
+		}
+	}
 
 	RocksDatabase::RocksDatabase() = default;
 
@@ -99,29 +151,18 @@ namespace catapult { namespace cache {
 			: m_settings(settings)
 			, m_pruningFilter(m_settings.PruningMode)
 			, m_pWriteBatch(std::make_unique<rocksdb::WriteBatch>()) {
-		if (settings.ColumnFamilyNames.empty())
+		if (m_settings.ColumnFamilyNames.empty())
 			CATAPULT_THROW_INVALID_ARGUMENT("missing column family names");
 
-		if (0 != settings.MaxDatabaseWriteBatchSize.bytes() && settings.MaxDatabaseWriteBatchSize < utils::FileSize::FromKilobytes(100))
-			CATAPULT_THROW_INVALID_ARGUMENT("too small setting of DatabaseWriteBatchSize");
+		config::CatapultDirectory(m_settings.DatabaseDirectory).createAll();
 
-		boost::system::error_code ec;
-		boost::filesystem::create_directories(m_settings.DatabaseDirectory, ec);
-
-		m_pruningFilter.setPruningBoundary(0);
+		auto columnFamilyOptions = CreateColumnFamilyOptions(m_settings.DatabaseConfig, m_pruningFilter.compactionFilter());
+		std::vector<rocksdb::ColumnFamilyDescriptor> columnFamilies;
+		for (const auto& columnFamilyName : m_settings.ColumnFamilyNames)
+			columnFamilies.push_back(rocksdb::ColumnFamilyDescriptor(columnFamilyName, columnFamilyOptions));
 
 		rocksdb::DB* pDb;
-		rocksdb::Options dbOptions;
-		dbOptions.create_if_missing = true;
-		dbOptions.create_missing_column_families = true;
-
-		rocksdb::ColumnFamilyOptions defaultColumnOptions;
-		defaultColumnOptions.compaction_filter = m_pruningFilter.compactionFilter();
-
-		std::vector<rocksdb::ColumnFamilyDescriptor> columnFamilies;
-		for (const auto& columnFamilyName : settings.ColumnFamilyNames)
-			columnFamilies.push_back(rocksdb::ColumnFamilyDescriptor(columnFamilyName, defaultColumnOptions));
-
+		auto dbOptions = CreateDatabaseOptions(m_settings.DatabaseConfig);
 		auto status = rocksdb::DB::Open(dbOptions, m_settings.DatabaseDirectory, columnFamilies, &m_handles, &pDb);
 		m_pDb.reset(pDb);
 		if (!status.ok())
@@ -207,7 +248,7 @@ namespace catapult { namespace cache {
 		writeOptions.sync = true;
 
 		auto directory = m_settings.DatabaseDirectory + "/";
-		utils::SlowOperationLogger logger(utils::ExtractDirectoryName(directory.c_str()).pData, utils::LogLevel::Warning);
+		utils::SlowOperationLogger logger(utils::ExtractDirectoryName(directory.c_str()).pData, utils::LogLevel::warning);
 		auto status = m_pDb->Write(writeOptions, m_pWriteBatch.get());
 		if (!status.ok())
 			CATAPULT_THROW_RUNTIME_ERROR_1("could not store batch in db", status.ToString());
@@ -216,9 +257,11 @@ namespace catapult { namespace cache {
 	}
 
 	void RocksDatabase::saveIfBatchFull() {
-		if (m_pWriteBatch->GetDataSize() < m_settings.MaxDatabaseWriteBatchSize.bytes())
+		if (m_pWriteBatch->GetDataSize() < m_settings.DatabaseConfig.MaxWriteBatchSize.bytes())
 			return;
 
 		flush();
 	}
+
+	// endregion
 }}

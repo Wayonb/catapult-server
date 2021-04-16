@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,6 +22,7 @@
 #include "src/MessagingConfiguration.h"
 #include "src/ZeroMqBlockChangeSubscriber.h"
 #include "src/ZeroMqEntityPublisher.h"
+#include "src/ZeroMqFinalizationSubscriber.h"
 #include "src/ZeroMqPtChangeSubscriber.h"
 #include "src/ZeroMqTransactionStatusSubscriber.h"
 #include "src/ZeroMqUtChangeSubscriber.h"
@@ -34,6 +36,7 @@ namespace catapult { namespace zeromq {
 		void RegisterExtension(extensions::ProcessBootstrapper& bootstrapper) {
 			auto config = MessagingConfiguration::LoadFromPath(bootstrapper.resourcesPath());
 			auto pZeroEntityPublisher = std::make_shared<ZeroMqEntityPublisher>(
+					config.ListenInterface,
 					config.SubscriberPort,
 					bootstrapper.pluginManager().createNotificationPublisher());
 
@@ -46,8 +49,9 @@ namespace catapult { namespace zeromq {
 			// register subscriptions
 			auto& subscriptionManager = bootstrapper.subscriptionManager();
 			subscriptionManager.addBlockChangeSubscriber(CreateZeroMqBlockChangeSubscriber(*pZeroEntityPublisher));
-			subscriptionManager.addUtChangeSubscriber(CreateZeroMqUtChangeSubscriber(*pZeroEntityPublisher));
 			subscriptionManager.addPtChangeSubscriber(CreateZeroMqPtChangeSubscriber(*pZeroEntityPublisher));
+			subscriptionManager.addUtChangeSubscriber(CreateZeroMqUtChangeSubscriber(*pZeroEntityPublisher));
+			subscriptionManager.addFinalizationSubscriber(CreateZeroMqFinalizationSubscriber(*pZeroEntityPublisher));
 			subscriptionManager.addTransactionStatusSubscriber(CreateZeroMqTransactionStatusSubscriber(*pZeroEntityPublisher));
 		}
 	}

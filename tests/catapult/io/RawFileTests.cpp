@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -463,6 +464,38 @@ namespace catapult { namespace io {
 
 		// Act + Assert:
 		EXPECT_THROW(rawFile.seek(inputData.size() + 1), catapult_file_io_error);
+	}
+
+	// endregion
+
+	// region truncate
+
+	WRITING_TRAITS_BASED_TEST(CanTruncateFile) {
+		// Arrange:
+		TempFileGuard guard("test.dat");
+		auto inputData = test::GenerateRandomVector(Default_Bytes_Written);
+		RawFile rawFile(guard.name(), TTraits::Mode);
+		rawFile.write(inputData);
+
+		// Sanity:
+		EXPECT_LT(10ull, rawFile.size());
+
+		// Act:
+		rawFile.seek(10ull);
+		rawFile.truncate();
+
+		// Assert:
+		EXPECT_EQ(10ull, rawFile.size());
+		EXPECT_EQ(10ull, rawFile.position());
+
+		// - remaining data should be unchanged by truncate operation
+		std::vector<uint8_t> fileBuffer(rawFile.size());
+		rawFile.seek(0);
+		rawFile.read(fileBuffer);
+		EXPECT_EQ_MEMORY(inputData.data(), fileBuffer.data(), fileBuffer.size());
+
+		// - file was truncated on disk
+		EXPECT_EQ(10ull, std::filesystem::file_size(guard.name()));
 	}
 
 	// endregion

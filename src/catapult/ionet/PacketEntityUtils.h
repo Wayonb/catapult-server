@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,12 +37,6 @@ namespace catapult { namespace ionet {
 		}
 
 		return packet.Size - Min_Size;
-	}
-
-	/// Checks the real size of \a entity against its reported size and returns \c true if the sizes match.
-	template<typename TEntity>
-	bool IsSizeValid(const TEntity& entity) {
-		return TEntity::CalculateRealSize(entity) == entity.Size;
 	}
 
 	/// Extracts entities from \a packet with a validity check (\a isValid).

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -25,10 +26,9 @@
 #include "sdk/src/extensions/ConversionExtensions.h"
 #include "sdk/src/extensions/TransactionExtensions.h"
 #include "plugins/txes/namespace/src/model/NamespaceIdGenerator.h"
-#include "catapult/crypto/KeyPair.h"
 #include "catapult/crypto/Signer.h"
 #include "catapult/model/Address.h"
-#include "catapult/model/NetworkInfo.h"
+#include "catapult/model/NetworkIdentifier.h"
 #include "catapult/preprocessor.h"
 #include "tests/test/core/AddressTestUtils.h"
 #include "tests/test/core/BlockTestUtils.h"
@@ -40,10 +40,14 @@
 namespace catapult { namespace test {
 
 	namespace {
-		constexpr auto Network_Identifier = model::NetworkIdentifier::Mijin_Test;
+		constexpr auto Network_Identifier = model::NetworkIdentifier::Private_Test;
 	}
 
 	// region transfer transaction
+
+	size_t GetTransferTransactionSize() {
+		return sizeof(model::TransferTransaction);
+	}
 
 	namespace {
 		std::unique_ptr<model::Transaction> CreateUnsignedTransferTransaction(
@@ -80,7 +84,7 @@ namespace catapult { namespace test {
 			const UnresolvedAddress& recipient,
 			Amount amount) {
 		auto pTransaction = CreateUnsignedTransferTransaction(signer.publicKey(), recipient, amount);
-		extensions::TransactionExtensions(GetNemesisGenerationHash()).sign(signer, *pTransaction);
+		extensions::TransactionExtensions(GetNemesisGenerationHashSeed()).sign(signer, *pTransaction);
 		return pTransaction;
 	}
 
@@ -105,7 +109,7 @@ namespace catapult { namespace test {
 		builder.setDuration(duration);
 		auto pTransaction = builder.build();
 
-		extensions::TransactionExtensions(GetNemesisGenerationHash()).sign(signer, *pTransaction);
+		extensions::TransactionExtensions(GetNemesisGenerationHashSeed()).sign(signer, *pTransaction);
 		return PORTABLE_MOVE(pTransaction);
 	}
 
@@ -120,7 +124,7 @@ namespace catapult { namespace test {
 		builder.setAliasAction(model::AliasAction::Link);
 		auto pTransaction = builder.build();
 
-		extensions::TransactionExtensions(GetNemesisGenerationHash()).sign(signer, *pTransaction);
+		extensions::TransactionExtensions(GetNemesisGenerationHashSeed()).sign(signer, *pTransaction);
 		return PORTABLE_MOVE(pTransaction);
 	}
 

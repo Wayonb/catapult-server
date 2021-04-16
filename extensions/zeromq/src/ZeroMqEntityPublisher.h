@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,17 +22,28 @@
 #pragma once
 #include "catapult/model/NotificationPublisher.h"
 #include "catapult/functions.h"
+
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4267) /* "conversion from 'size_t' to 'uint32_t', possible loss of data" */
+#endif
 #include <zmq_addon.hpp>
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 namespace catapult {
 	namespace model {
 		struct BlockElement;
+		struct Cosignature;
+		struct FinalizationRound;
 		struct Transaction;
 		struct TransactionElement;
 		struct TransactionInfo;
 		class TransactionRegistry;
 		struct TransactionStatus;
 	}
+	namespace zeromq { struct PackedFinalizedBlockHeader; }
 }
 
 namespace catapult { namespace zeromq {
@@ -41,8 +53,11 @@ namespace catapult { namespace zeromq {
 		/// Block.
 		Block_Marker = 0x9FF2D8E480CA6A49,
 
-		/// Dropped block.
-		Drop_Blocks_Marker = 0x5C20D68AEE25B0B0
+		/// Dropped block(s).
+		Drop_Blocks_Marker = 0x5C20D68AEE25B0B0,
+
+		/// Finalized block.
+		Finalized_Block_Marker = 0x4D4832A031CE7954
 	};
 
 	/// Markers for publishing transaction related messages.
@@ -72,8 +87,11 @@ namespace catapult { namespace zeromq {
 	/// Zeromq entity publisher.
 	class ZeroMqEntityPublisher {
 	public:
-		/// Creates a zeromq entity publisher around \a port and \a pNotificationPublisher.
-		ZeroMqEntityPublisher(unsigned short port, std::unique_ptr<model::NotificationPublisher>&& pNotificationPublisher);
+		/// Creates a zeromq entity publisher around \a listenInterface, \a port and \a pNotificationPublisher.
+		ZeroMqEntityPublisher(
+				const std::string& listenInterface,
+				unsigned short port,
+				std::unique_ptr<const model::NotificationPublisher>&& pNotificationPublisher);
 
 		~ZeroMqEntityPublisher();
 
@@ -83,6 +101,9 @@ namespace catapult { namespace zeromq {
 
 		/// Publishes the \a height after which all blocks were dropped.
 		void publishDropBlocks(Height height);
+
+		/// Publishes a finalized block \a header.
+		void publishFinalizedBlock(const PackedFinalizedBlockHeader& header);
 
 		/// Publishes a transaction using \a topicMarker, \a transactionElement and \a height.
 		void publishTransaction(TransactionMarker topicMarker, const model::TransactionElement& transactionElement, Height height);
@@ -96,8 +117,8 @@ namespace catapult { namespace zeromq {
 		/// Publishes a transaction status composed of \a transaction, \a hash and \a status.
 		void publishTransactionStatus(const model::Transaction& transaction, const Hash256& hash, uint32_t status);
 
-		/// Publishes a cosignature composed of transaction info (\a parentTransactionInfo), \a signer and \a signature.
-		void publishCosignature(const model::TransactionInfo& parentTransactionInfo, const Key& signer, const Signature& signature);
+		/// Publishes \a cosignature associated with parent transaction info (\a parentTransactionInfo).
+		void publishCosignature(const model::TransactionInfo& parentTransactionInfo, const model::Cosignature& cosignature);
 
 	private:
 		struct WeakTransactionInfo;
@@ -112,7 +133,7 @@ namespace catapult { namespace zeromq {
 
 	private:
 		class SynchronizedPublisher;
-		std::unique_ptr<model::NotificationPublisher> m_pNotificationPublisher;
+		std::unique_ptr<const model::NotificationPublisher> m_pNotificationPublisher;
 		std::unique_ptr<SynchronizedPublisher> m_pSynchronizedPublisher;
 	};
 }}

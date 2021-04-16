@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -37,7 +38,7 @@ namespace catapult { namespace extensions {
 
 			static std::unique_ptr<StorageType> OpenStorage(const std::string&) {
 				// load and copy the nemesis into storage
-				auto nemesisBlockElement = test::BlockToBlockElement(test::GetNemesisBlock(), test::GetNemesisGenerationHash());
+				auto nemesisBlockElement = test::BlockToBlockElement(test::GetNemesisBlock(), test::GetNemesisGenerationHashSeed());
 				return std::make_unique<StorageType>(nemesisBlockElement);
 			}
 

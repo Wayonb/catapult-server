@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -42,15 +43,22 @@ namespace catapult { namespace extensions {
 			return m_score;
 		}
 
-		/// Sets the current chain score to \a chainScore.
-		void set(const model::ChainScore& chainScore) {
+		/// Sets the current chain score to \a score.
+		void set(const model::ChainScore& score) {
 			auto writeLock = m_lock.acquireWriter();
-			m_score = chainScore;
+			m_score = score;
 		}
 
 	public:
 		/// Adds \a rhs to this chain score.
 		LocalNodeChainScore& operator+=(const model::ChainScore& rhs) {
+			auto writeLock = m_lock.acquireWriter();
+			m_score += rhs;
+			return *this;
+		}
+
+		/// Adds \a rhs to this chain score.
+		LocalNodeChainScore& operator+=(model::ChainScore::Delta rhs) {
 			auto writeLock = m_lock.acquireWriter();
 			m_score += rhs;
 			return *this;

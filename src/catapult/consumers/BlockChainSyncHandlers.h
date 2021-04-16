@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,6 +21,7 @@
 
 #pragma once
 #include "BlockChainProcessor.h"
+#include "catapult/model/HeightHashPair.h"
 #include "catapult/subscribers/StateChangeInfo.h"
 #include "catapult/utils/ArraySet.h"
 
@@ -76,6 +78,9 @@ namespace catapult { namespace consumers {
 		/// Prototype for checking block difficulties.
 		using DifficultyCheckerFunc = predicate<const std::vector<const model::Block*>&, const cache::CatapultCache&>;
 
+		/// Prototype for retrieving a finalized height hash pair.
+		using FinalizedHeightHashPairSupplierFunc = supplier<model::HeightHashPair>;
+
 		/// Prototype for undoing a block.
 		/// \note This is called with all rolled back blocks and the (new) common block.
 		using UndoBlockFunc = consumer<const model::BlockElement&, observers::ObserverState&, UndoBlockType>;
@@ -95,6 +100,12 @@ namespace catapult { namespace consumers {
 	public:
 		/// Checks all difficulties in a block chain for correctness.
 		DifficultyCheckerFunc DifficultyChecker;
+
+		/// Supplies the local finalized height hash pair.
+		FinalizedHeightHashPairSupplierFunc LocalFinalizedHeightHashPairSupplier;
+
+		/// Supplies the network finalized height hash pair.
+		FinalizedHeightHashPairSupplierFunc NetworkFinalizedHeightHashPairSupplier;
 
 		/// Processes (validates and executes) a block chain.
 		BlockChainProcessor Processor;

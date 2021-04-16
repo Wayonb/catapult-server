@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -39,9 +40,10 @@ namespace catapult { namespace timesync {
 	/// Brief server requestor for requesting node network time information.
 	using NodeNetworkTimeRequestor = net::BriefServerRequestor<NodeNetworkTimeRequestPolicy>;
 
-	/// Creates a node network time requestor for a server with a key pair of \a keyPair using \a pPool and configured with \a settings.
+	/// Creates a node network time requestor for a server with specified \a serverPublicKey using \a pool and configured
+	/// with \a settings.
 	std::shared_ptr<NodeNetworkTimeRequestor> CreateNodeNetworkTimeRequestor(
-			const std::shared_ptr<thread::IoThreadPool>& pPool,
-			const crypto::KeyPair& keyPair,
+			thread::IoThreadPool& pool,
+			const Key& serverPublicKey,
 			const net::ConnectionSettings& settings);
 }}

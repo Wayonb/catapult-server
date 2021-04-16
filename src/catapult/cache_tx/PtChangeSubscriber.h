@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,6 +23,8 @@
 #include "catapult/model/ContainerTypes.h"
 #include "catapult/model/EntityInfo.h"
 
+namespace catapult { namespace model { struct Cosignature; } }
+
 namespace catapult { namespace cache {
 
 	/// Partial transactions change subscriber.
@@ -37,11 +40,8 @@ namespace catapult { namespace cache {
 		/// \note This is only aggregate part and will not have any cosignatures.
 		virtual void notifyAddPartials(const TransactionInfos& transactionInfos) = 0;
 
-		/// Indicates a cosignature (composed of \a signer and \a signature) was added to a partial transaction (\a parentTransactionInfo).
-		virtual void notifyAddCosignature(
-				const model::TransactionInfo& parentTransactionInfo,
-				const Key& signer,
-				const Signature& signature) = 0;
+		/// Indicates \a cosignature was added to a partial transaction (\a parentTransactionInfo).
+		virtual void notifyAddCosignature(const model::TransactionInfo& parentTransactionInfo, const model::Cosignature& cosignature) = 0;
 
 		/// Indicates transaction infos (\a transactionInfos) were removed from partial transactions.
 		/// \note This is only aggregate part and will not have any cosignatures.

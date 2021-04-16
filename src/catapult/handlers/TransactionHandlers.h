@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,15 +32,15 @@ namespace catapult { namespace handlers {
 	/// Transactions returned by the unconfirmed transactions retriever.
 	using UnconfirmedTransactions = std::vector<std::shared_ptr<const model::Transaction>>;
 
+	/// Prototype for a function that retrieves unconfirmed transactions given a filter and a set of short hashes.
+	using UtRetriever = std::function<UnconfirmedTransactions (Timestamp, BlockFeeMultiplier, const utils::ShortHashesSet&)>;
+
 	/// Registers a push transactions handler in \a handlers that forwards transactions to \a transactionRangeHandler
 	/// given a transaction \a registry composed of known transactions.
 	void RegisterPushTransactionsHandler(
 			ionet::ServerPacketHandlers& handlers,
 			const model::TransactionRegistry& registry,
 			const TransactionRangeHandler& transactionRangeHandler);
-
-	/// Prototype for a function that retrieves unconfirmed transactions given a set of short hashes.
-	using UtRetriever = std::function<UnconfirmedTransactions (BlockFeeMultiplier, const utils::ShortHashesSet&)>;
 
 	/// Registers a pull transactions handler in \a handlers that responds with unconfirmed transactions
 	/// returned by the retriever (\a utRetriever).

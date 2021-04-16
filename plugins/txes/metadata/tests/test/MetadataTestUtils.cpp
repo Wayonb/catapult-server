@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -35,7 +36,7 @@ namespace catapult { namespace test {
 	}
 
 	model::PartialMetadataKey GenerateRandomPartialMetadataKey(uint64_t scopedMetadataKey) {
-		return { GenerateRandomByteArray<Key>(), GenerateRandomByteArray<Key>(), scopedMetadataKey };
+		return { GenerateRandomByteArray<Address>(), GenerateRandomByteArray<Address>(), scopedMetadataKey };
 	}
 
 	// endregion
@@ -93,7 +94,7 @@ namespace catapult { namespace test {
 			targetId = UnresolveXor(MosaicId(targetId)).unwrap();
 
 		return model::MetadataValueNotification(
-				{ metadataKey.sourcePublicKey(), metadataKey.targetPublicKey(), metadataKey.scopedMetadataKey() },
+				{ metadataKey.sourceAddress(), UnresolveXor(metadataKey.targetAddress()), metadataKey.scopedMetadataKey() },
 				{ metadataKey.metadataType(), targetId },
 				valueSizeDelta,
 				valueSize,

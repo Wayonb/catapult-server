@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,6 +24,7 @@
 #include "catapult/io/Stream.h"
 #include "catapult/io/TransactionInfoSerializer.h"
 #include "catapult/subscribers/SubscriberOperationTypes.h"
+#include "tests/test/core/FinalizationTestUtils.h"
 #include "tests/test/core/TransactionInfoTestUtils.h"
 #include "tests/test/core/TransactionStatusTestUtils.h"
 #include "tests/test/core/TransactionTestUtils.h"
@@ -37,14 +39,12 @@ namespace catapult { namespace test {
 		}
 
 		void WriteCosignature(io::OutputStream& outputStream) {
-			auto signer = GenerateRandomByteArray<Key>();
-			auto signature = GenerateRandomByteArray<Signature>();
+			auto cosignature = CreateRandomDetachedCosignature();
 			auto transactionInfo = CreateRandomTransactionInfo();
 			transactionInfo.OptionalExtractedAddresses = GenerateRandomUnresolvedAddressSetPointer(Random() % 2 + 1);
 
 			io::Write8(outputStream, utils::to_underlying_type(subscribers::PtChangeOperationType::Add_Cosignature));
-			outputStream.write(signer);
-			outputStream.write(signature);
+			outputStream.write({ reinterpret_cast<const uint8_t*>(&cosignature), sizeof(model::Cosignature) });
 			io::WriteTransactionInfo(transactionInfo, outputStream);
 		}
 	}
@@ -67,6 +67,11 @@ namespace catapult { namespace test {
 				? subscribers::PtChangeOperationType::Add_Partials
 				: subscribers::PtChangeOperationType::Remove_Partials;
 		WriteTransactionInfos(outputStream, utils::to_underlying_type(operationType));
+	}
+
+	void WriteRandomFinalization(io::OutputStream& outputStream) {
+		auto notification = GenerateRandomFinalizationNotification();
+		WriteFinalizationNotification(outputStream, notification);
 	}
 
 	void WriteRandomTransactionStatus(io::OutputStream& outputStream) {

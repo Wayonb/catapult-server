@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,19 +37,19 @@ namespace catapult { namespace cache {
 			};
 
 			static auto CreateId(uint8_t id) {
-				return Key{ { id } };
+				return Address{ { id } };
 			}
 
-			static auto CreateValue(const Key& key) {
-				state::MultisigEntry entry(key);
+			static auto CreateValue(const Address& address) {
+				state::MultisigEntry entry(address);
 				entry.setMinApproval(23);
 				entry.setMinRemoval(34);
 
 				for (auto i = 0u; i < 3u; ++i)
-					entry.cosignatoryPublicKeys().insert(test::GenerateRandomByteArray<Key>());
+					entry.cosignatoryAddresses().insert(test::GenerateRandomByteArray<Address>());
 
 				for (auto i = 0u; i < 4u; ++i)
-					entry.multisigPublicKeys().insert(test::GenerateRandomByteArray<Key>());
+					entry.multisigAddresses().insert(test::GenerateRandomByteArray<Address>());
 
 				return entry;
 			}

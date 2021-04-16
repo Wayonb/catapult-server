@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -27,7 +28,6 @@
 #include "src/model/MosaicReceiptType.h"
 #include "src/observers/Observers.h"
 #include "src/validators/Validators.h"
-#include "catapult/model/Address.h"
 #include "catapult/observers/ObserverUtils.h"
 #include "catapult/observers/RentalFeeObserver.h"
 #include "catapult/plugins/CacheHandlers.h"
@@ -41,14 +41,12 @@ namespace catapult { namespace plugins {
 				UnresolvedMosaicId currencyMosaicId,
 				const config::MosaicConfiguration& config) {
 			MosaicRentalFeeConfiguration rentalFeeConfig;
-			rentalFeeConfig.SinkPublicKey = config.MosaicRentalFeeSinkPublicKey;
 			rentalFeeConfig.CurrencyMosaicId = currencyMosaicId;
 			rentalFeeConfig.Fee = config.MosaicRentalFee;
-			rentalFeeConfig.NemesisPublicKey = network.PublicKey;
+			rentalFeeConfig.NemesisSignerPublicKey = network.NemesisSignerPublicKey;
 
 			// sink address is already resolved but needs to be passed as unresolved into notification
-			auto sinkAddress = PublicKeyToAddress(rentalFeeConfig.SinkPublicKey, network.Identifier);
-			std::memcpy(rentalFeeConfig.SinkAddress.data(), sinkAddress.data(), sinkAddress.size());
+			rentalFeeConfig.SinkAddress = config.MosaicRentalFeeSinkAddress.copyTo<UnresolvedAddress>();
 			return rentalFeeConfig;
 		}
 
@@ -74,24 +72,24 @@ namespace catapult { namespace plugins {
 			counters.emplace_back(utils::DiagnosticCounterId("MOSAIC C"), [&cache]() { return GetMosaicView(cache)->size(); });
 		});
 
-		auto maxDuration = config.MaxMosaicDuration.blocks(manager.config().BlockGenerationTargetTime);
-		manager.addStatelessValidatorHook([config, maxDuration](auto& builder) {
+		manager.addStatelessValidatorHook([](auto& builder) {
 			builder
-				.add(validators::CreateMosaicPropertiesValidator(config.MaxMosaicDivisibility, maxDuration))
+				.add(validators::CreateMosaicFlagsValidator())
 				.add(validators::CreateMosaicIdValidator())
 				.add(validators::CreateMosaicSupplyChangeValidator());
 		});
 
-		auto maxMosaics = config.MaxMosaicsPerAccount;
+		auto maxDuration = config.MaxMosaicDuration.blocks(manager.config().BlockGenerationTargetTime);
 		auto maxAtomicUnits = manager.config().MaxMosaicAtomicUnits;
-		manager.addStatefulValidatorHook([maxMosaics, maxAtomicUnits, maxDuration, unresolvedCurrencyMosaicId](auto& builder) {
+		manager.addStatefulValidatorHook([config, maxDuration, maxAtomicUnits, unresolvedCurrencyMosaicId](auto& builder) {
 			builder
 				.add(validators::CreateRequiredMosaicValidator())
 				.add(validators::CreateMosaicAvailabilityValidator())
+				.add(validators::CreateMosaicDivisibilityValidator(config.MaxMosaicDivisibility))
 				.add(validators::CreateMosaicDurationValidator(maxDuration))
 				.add(validators::CreateMosaicTransferValidator(unresolvedCurrencyMosaicId))
-				.add(validators::CreateMaxMosaicsBalanceTransferValidator(maxMosaics))
-				.add(validators::CreateMaxMosaicsSupplyChangeValidator(maxMosaics))
+				.add(validators::CreateMaxMosaicsBalanceTransferValidator(config.MaxMosaicsPerAccount))
+				.add(validators::CreateMaxMosaicsSupplyChangeValidator(config.MaxMosaicsPerAccount))
 				// note that the following validator depends on RequiredMosaicValidator
 				.add(validators::CreateMosaicSupplyChangeAllowedValidator(maxAtomicUnits));
 		});

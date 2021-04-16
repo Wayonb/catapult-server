@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,6 +24,7 @@
 #include "InputSource.h"
 #include "catapult/model/AnnotatedEntityRange.h"
 #include "catapult/model/RangeTypes.h"
+#include "catapult/utils/FileSize.h"
 
 namespace catapult { namespace disruptor {
 
@@ -67,6 +69,9 @@ namespace catapult { namespace disruptor {
 		/// Gets the (optional) source identity.
 		const model::NodeIdentity& sourceIdentity() const;
 
+		/// Gets the memory size of all elements associated with this input.
+		utils::FileSize memorySize() const;
+
 	public:
 		/// Detaches the block range associated with this input.
 		model::BlockRange detachBlockRange();
@@ -89,6 +94,7 @@ namespace catapult { namespace disruptor {
 
 		InputSource m_source;
 		model::NodeIdentity m_sourceIdentity;
+		utils::FileSize m_memorySize;
 
 		// used by formatting
 		Height m_startHeight;

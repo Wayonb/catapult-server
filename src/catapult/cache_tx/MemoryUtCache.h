@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -44,10 +45,11 @@ namespace catapult { namespace cache {
 		using TransactionInfoConsumer = predicate<const model::TransactionInfo&>;
 
 	public:
-		/// Creates a view around a maximum response size (\a maxResponseSize), a transaction data container
-		/// (\a transactionDataContainer) and an id lookup (\a idLookup) with lock context \a readLock.
+		/// Creates a view around a maximum response size (\a maxResponseSize), current cache size (\a cacheSize),
+		/// a transaction data container (\a transactionDataContainer) and an id lookup (\a idLookup) with lock context \a readLock.
 		MemoryUtCacheView(
-				uint64_t maxResponseSize,
+				utils::FileSize maxResponseSize,
+				utils::FileSize cacheSize,
 				const TransactionDataContainer& transactionDataContainer,
 				const IdLookup& idLookup,
 				utils::SpinReaderWriterLock::ReaderLockGuard&& readLock);
@@ -56,6 +58,9 @@ namespace catapult { namespace cache {
 		/// Gets the number of unconfirmed transactions in the cache.
 		size_t size() const;
 
+		/// Gets the memory size of all unconfirmed transactions in the cache.
+		utils::FileSize memorySize() const;
+
 		/// Returns \c true if the cache contains an unconfirmed transaction with associated \a hash, \c false otherwise.
 		bool contains(const Hash256& hash) const;
 
@@ -63,15 +68,19 @@ namespace catapult { namespace cache {
 		void forEach(const TransactionInfoConsumer& consumer) const;
 
 		/// Gets a range of short hashes of all transactions in the cache.
-		/// Each short hash consists of the first 4 bytes of the complete hash.
+		/// \note Each short hash consists of the first 4 bytes of the complete hash.
 		model::ShortHashRange shortHashes() const;
 
-		/// Gets a vector of all transactions in the cache that have a fee multiplier at least \a minFeeMultiplier
-		/// and do not have a short hash in \a knownShortHashes.
-		UnknownTransactions unknownTransactions(BlockFeeMultiplier minFeeMultiplier, const utils::ShortHashesSet& knownShortHashes) const;
+		/// Gets a vector of all transactions in the cache that have a deadline at least \a minDeadline,
+		/// a fee multiplier at least \a minFeeMultiplier and do not have a short hash in \a knownShortHashes.
+		UnknownTransactions unknownTransactions(
+				Timestamp minDeadline,
+				BlockFeeMultiplier minFeeMultiplier,
+				const utils::ShortHashesSet& knownShortHashes) const;
 
 	private:
-		uint64_t m_maxResponseSize;
+		utils::FileSize m_maxResponseSize;
+		utils::FileSize m_cacheSize;
 		const TransactionDataContainer& m_transactionDataContainer;
 		const IdLookup& m_idLookup;
 		utils::SpinReaderWriterLock::ReaderLockGuard m_readLock;

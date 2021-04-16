@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -25,15 +26,11 @@
 
 namespace catapult { namespace validators {
 
-	/// Validator that applies to remote account link notifications and validates that:
-	/// - account link action is valid
-	DECLARE_STATELESS_VALIDATOR(AccountLinkAction, model::RemoteAccountLinkNotification)();
-
-	/// Validator that applies to remote account link notifications and validates that:
+	/// Validator that applies to remote account key link notifications and validates that:
 	/// - link action is consistent with current state
 	/// - only main account can unlink
 	/// - unlink data matches current state
-	DECLARE_STATEFUL_VALIDATOR(AccountLinkAvailability, model::RemoteAccountLinkNotification)();
+	DECLARE_STATEFUL_VALIDATOR(AccountKeyLink, model::RemoteAccountKeyLinkNotification)();
 
 	/// Validator that applies to new remote account notifications and validates that:
 	/// - remote account does not exist

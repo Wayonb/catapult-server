@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -35,7 +36,8 @@ namespace catapult { namespace timesync {
 					{
 						"timesynchronization",
 						{
-							{ "maxNodes", "123" }
+							{ "maxNodes", "123" },
+							{ "minImportance", "987" }
 						}
 					}
 				};
@@ -48,11 +50,13 @@ namespace catapult { namespace timesync {
 			static void AssertZero(const TimeSynchronizationConfiguration& config) {
 				// Assert:
 				EXPECT_EQ(0u, config.MaxNodes);
+				EXPECT_EQ(Importance(0), config.MinImportance);
 			}
 
 			static void AssertCustom(const TimeSynchronizationConfiguration& config) {
 				// Assert:
 				EXPECT_EQ(123u, config.MaxNodes);
+				EXPECT_EQ(Importance(987), config.MinImportance);
 			}
 		};
 	}
@@ -72,6 +76,7 @@ namespace catapult { namespace timesync {
 
 		// Assert:
 		EXPECT_EQ(20u, config.MaxNodes);
+		EXPECT_EQ(Importance(3'750), config.MinImportance);
 	}
 
 	// endregion

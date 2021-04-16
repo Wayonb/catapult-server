@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,6 +21,7 @@
 
 #include "catapult/chain/UtUpdater.h"
 #include "catapult/cache/CatapultCache.h"
+#include "catapult/cache_tx/AggregateUtCache.h"
 #include "catapult/cache_tx/MemoryUtCache.h"
 #include "catapult/chain/ChainResults.h"
 #include "catapult/model/FeeUtils.h"
@@ -27,6 +29,7 @@
 #include "tests/test/cache/UtTestUtils.h"
 #include "tests/test/core/TransactionTestUtils.h"
 #include "tests/test/other/MockExecutionConfiguration.h"
+#include "tests/test/other/mocks/MockUtChangeSubscriber.h"
 #include "tests/TestHarness.h"
 
 using catapult::validators::ValidationResult;
@@ -122,7 +125,12 @@ namespace catapult { namespace chain {
 					ThrottleMode throttleMode = ThrottleMode::Off,
 					BlockFeeMultiplier minFeeMultiplier = BlockFeeMultiplier())
 					: m_cache(CreateCacheWithDefaultHeight())
-					, m_transactionsCache(cache::MemoryCacheOptions(1024, 1000))
+					, m_pUtChangeSubscriber(std::make_unique<mocks::MockUtChangeSubscriber>())
+					, m_utChangeSubscriber(*m_pUtChangeSubscriber)
+					, m_transactionsCache(
+							cache::MemoryCacheOptions(utils::FileSize(), utils::FileSize::FromKilobytes(2)),
+							cache::CreateAggregateUtCache,
+							std::move(m_pUtChangeSubscriber))
 					, m_updater(
 							m_transactionsCache,
 							m_cache,
@@ -131,7 +139,7 @@ namespace catapult { namespace chain {
 							[]() { return Default_Time; },
 							[this](const auto& transaction, const auto& hash, auto result) {
 								// notice that transaction.Deadline is used as transaction marker
-								m_failedTransactionStatuses.emplace_back(hash, utils::to_underlying_type(result), transaction.Deadline);
+								m_failedTransactionStatuses.emplace_back(hash, transaction.Deadline, utils::to_underlying_type(result));
 							},
 							[this, throttleMode](const auto& transactionInfo, const auto& context) {
 								m_throttleParams.emplace_back(transactionInfo, context);
@@ -140,7 +148,7 @@ namespace catapult { namespace chain {
 			{}
 
 		public:
-			cache::MemoryUtCache& transactionsCache() {
+			cache::MemoryUtCacheProxy& transactionsCache() {
 				return m_transactionsCache;
 			}
 
@@ -154,6 +162,10 @@ namespace catapult { namespace chain {
 
 			void setPartialUndoFailureIndexes(const std::unordered_set<size_t>& partialUndoFailureIndexes) {
 				m_partialUndoFailureIndexes = partialUndoFailureIndexes;
+			}
+
+			void resetSubscriber() {
+				m_utChangeSubscriber.reset();
 			}
 
 		private:
@@ -413,10 +425,48 @@ namespace catapult { namespace chain {
 
 			// endregion
 
+			// region assertSubscriberCalls
+
+			void assertSubscriberCalls(const std::set<Timestamp::ValueType>& addedDeadlines) {
+				assertSubscriberCalls(addedDeadlines, {});
+			}
+
+			void assertSubscriberCalls(
+					const std::set<Timestamp::ValueType>& addedDeadlines,
+					const std::set<Timestamp::ValueType>& removedDeadlines) {
+				const auto& addedInfos = m_utChangeSubscriber.addedInfos();
+				ASSERT_EQ(addedDeadlines.size(), addedInfos.size());
+
+				auto i = 0u;
+				for (const auto& info : addedInfos) {
+					auto message = std::string("added info at ") + std::to_string(i);
+					EXPECT_CONTAINS_MESSAGE(addedDeadlines, info.pEntity->Deadline.unwrap(), message);
+					++i;
+				}
+
+				const auto& removedInfos = m_utChangeSubscriber.removedInfos();
+				ASSERT_EQ(removedDeadlines.size(), removedInfos.size());
+
+				i = 0u;
+				for (const auto& info : removedInfos) {
+					auto message = std::string("removed info at ") + std::to_string(i);
+					EXPECT_CONTAINS_MESSAGE(removedDeadlines, info.pEntity->Deadline.unwrap(), message);
+					++i;
+				}
+
+				ASSERT_EQ(1u, m_utChangeSubscriber.flushInfos().size());
+				EXPECT_EQ(addedDeadlines.size(), m_utChangeSubscriber.flushInfos()[0].NumAdds);
+				EXPECT_EQ(removedDeadlines.size(), m_utChangeSubscriber.flushInfos()[0].NumRemoves);
+			}
+
+			// endregion
+
 		private:
 			test::MockExecutionConfiguration m_executionConfig;
 			cache::CatapultCache m_cache;
-			cache::MemoryUtCache m_transactionsCache;
+			std::unique_ptr<mocks::MockUtChangeSubscriber> m_pUtChangeSubscriber;
+			mocks::MockUtChangeSubscriber& m_utChangeSubscriber;
+			cache::MemoryUtCacheProxy m_transactionsCache;
 			UtUpdater m_updater;
 
 			std::unordered_set<size_t> m_partialUndoFailureIndexes;
@@ -453,6 +503,8 @@ namespace catapult { namespace chain {
 		}
 	}
 
+	// region traits
+
 #define NON_SUCCESS_VALIDATION_TRAITS_BASED_TEST(TEST_NAME) \
 	template<ValidationResult TResult> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)(); \
 	TEST(TEST_CLASS, TEST_NAME##_Neutral) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<ValidationResult::Neutral>(); } \
@@ -460,20 +512,34 @@ namespace catapult { namespace chain {
 	template<ValidationResult TResult> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)()
 
 	namespace {
+		constexpr auto New = UtUpdateResult::UpdateType::New;
+		constexpr auto Neutral = UtUpdateResult::UpdateType::Neutral;
+		constexpr auto Invalid = UtUpdateResult::UpdateType::Invalid;
+
 		struct NewTransactionsTraits {
 			static constexpr auto TransactionSource = UtUpdater::TransactionSource::New;
 
-			static void Update(UtUpdater& updater, const std::vector<model::TransactionInfo>& transactionInfos) {
-				updater.update(transactionInfos);
+			static std::vector<UtUpdateResult> Update(UtUpdater& updater, const std::vector<model::TransactionInfo>& transactionInfos) {
+				return updater.update(transactionInfos);
+			}
+
+			static void CheckResults(const std::vector<UtUpdateResult>& actual, const std::vector<UtUpdateResult::UpdateType>& expected) {
+				ASSERT_EQ(expected.size(), actual.size());
+				for (auto i = 0u; i < expected.size(); ++i)
+					EXPECT_EQ(expected[i], actual[i].Type) << "at " << i;
 			}
 		};
 
 		struct RevertedTransactionsTraits {
 			static constexpr auto TransactionSource = UtUpdater::TransactionSource::Reverted;
 
-			static void Update(UtUpdater& updater, const std::vector<model::TransactionInfo>& transactionInfos) {
+			static std::vector<UtUpdateResult> Update(UtUpdater& updater, const std::vector<model::TransactionInfo>& transactionInfos) {
 				updater.update({}, transactionInfos);
+				return std::vector<UtUpdateResult>();
 			}
+
+			static void CheckResults(const std::vector<UtUpdateResult>&, const std::vector<UtUpdateResult::UpdateType>&)
+			{}
 		};
 	}
 
@@ -487,9 +553,19 @@ namespace catapult { namespace chain {
 	NEW_TRANSACTIONS_TRAITS_BASED_TEST(TEST_NAME##_Neutral) { Assert##TEST_NAME<TTraits>(ValidationResult::Neutral); } \
 	NEW_TRANSACTIONS_TRAITS_BASED_TEST(TEST_NAME##_Failure) { Assert##TEST_NAME<TTraits>(ValidationResult::Failure); }
 
+	// endregion
+
 	// region shared tests - apply new transactions to cache
 
 	namespace {
+		auto GenerateRawDeadlines(size_t count) {
+			std::set<Timestamp::ValueType> rawDeadlines;
+			for (auto i = 0u; i < count; ++i)
+				rawDeadlines.insert(i * i);
+
+			return rawDeadlines;
+		}
+
 		template<typename TTraits>
 		void AssertCanApplyNewTransactionsToCache(size_t numTransactions) {
 			// Arrange:
@@ -500,14 +576,18 @@ namespace catapult { namespace chain {
 			EXPECT_EQ(0u, context.transactionsCache().view().size());
 
 			// Act:
-			TTraits::Update(context.updater(), transactionData.UtInfos);
+			auto updateResults = TTraits::Update(context.updater(), transactionData.UtInfos);
 
 			// Assert:
+			TTraits::CheckResults(updateResults, std::vector<UtUpdateResult::UpdateType>(numTransactions, New));
+
 			EXPECT_EQ(numTransactions, context.transactionsCache().view().size());
 			test::AssertContainsAll(context.transactionsCache(), transactionData.Hashes);
 
 			context.assertContexts(TTraits::TransactionSource);
 			context.assertEntityInfos(transactionData.EntityInfos);
+
+			context.assertSubscriberCalls(GenerateRawDeadlines(numTransactions));
 		}
 	}
 
@@ -544,14 +624,18 @@ namespace catapult { namespace chain {
 		EXPECT_EQ(0u, context.transactionsCache().view().size());
 
 		// Act:
-		TTraits::Update(context.updater(), transactionData.UtInfos);
+		auto updateResults = TTraits::Update(context.updater(), transactionData.UtInfos);
 
 		// Assert: only transactions with multiples of at least 20 were added
+		TTraits::CheckResults(updateResults, { Neutral, New, Neutral, New, New, New, New, Neutral, Neutral, New });
+
 		EXPECT_EQ(6u, context.transactionsCache().view().size());
 		test::AssertContainsAll(context.transactionsCache(), Select(transactionData.Hashes, { 1, 3, 4, 5, 6, 9 }));
 
 		context.assertContexts(TTraits::TransactionSource);
 		context.assertEntityInfos(Select(transactionData.EntityInfos, { 1, 3, 4, 5, 6, 9 }));
+
+		context.assertSubscriberCalls({ 1, 9, 16, 25, 36, 81 });
 	}
 
 	// endregion
@@ -567,9 +651,11 @@ namespace catapult { namespace chain {
 		EXPECT_EQ(0u, context.transactionsCache().view().size());
 
 		// Act:
-		TTraits::Update(context.updater(), transactionData.UtInfos);
+		auto updateResults = TTraits::Update(context.updater(), transactionData.UtInfos);
 
 		// Assert: the throttled transactions were not added
+		TTraits::CheckResults(updateResults, { Neutral, New, Neutral, New, Neutral });
+
 		EXPECT_EQ(2u, context.transactionsCache().view().size());
 		test::AssertContainsAll(context.transactionsCache(), Select(transactionData.Hashes, { 1, 3 }));
 
@@ -578,6 +664,8 @@ namespace catapult { namespace chain {
 
 		auto result = Failure_Chain_Unconfirmed_Cache_Too_Full;
 		context.assertEntityInfosWithDuplicates(transactionData.EntityInfos, { 1, 3 }, { { 0, result }, { 2, result }, { 4, result } });
+
+		context.assertSubscriberCalls({ 1, 9 });
 	}
 
 	// endregion
@@ -599,9 +687,11 @@ namespace catapult { namespace chain {
 			EXPECT_EQ(0u, context.transactionsCache().view().size());
 
 			// Act:
-			TTraits::Update(context.updater(), transactionData.UtInfos);
+			auto updateResults = TTraits::Update(context.updater(), transactionData.UtInfos);
 
 			// Assert:
+			TTraits::CheckResults(updateResults, { New, Invalid, New, New, Invalid, New });
+
 			EXPECT_EQ(4u, context.transactionsCache().view().size());
 			test::AssertContainsAll(context.transactionsCache(), Select(transactionData.Hashes, { 0, 2, 3, 5 }));
 
@@ -613,6 +703,8 @@ namespace catapult { namespace chain {
 					{ 0, 0, 1, 2, 2, 3, 3, 4, 5, 5 },
 					{ 0, 0, 2, 2, 3, 3, 5, 5 },
 					GetFailedIndexes(result, { { 1, result }, { 4, Modify(result) } }));
+
+			context.assertSubscriberCalls({ 0, 4, 9, 25 });
 		}
 	}
 
@@ -633,9 +725,11 @@ namespace catapult { namespace chain {
 			EXPECT_EQ(0u, context.transactionsCache().view().size());
 
 			// Act:
-			TTraits::Update(context.updater(), transactionData.UtInfos);
+			auto updateResults = TTraits::Update(context.updater(), transactionData.UtInfos);
 
 			// Assert:
+			TTraits::CheckResults(updateResults, { New, Invalid, New, New, Invalid, New });
+
 			EXPECT_EQ(4u, context.transactionsCache().view().size());
 			test::AssertContainsAll(context.transactionsCache(), Select(transactionData.Hashes, { 0, 2, 3, 5 }));
 
@@ -645,6 +739,8 @@ namespace catapult { namespace chain {
 			context.setPartialUndoFailureIndexes({ 3, 9 });
 			context.assertContexts(TTraits::TransactionSource);
 			context.assertEntityInfos(transactionData.EntityInfos, GetFailedIndexes(result, { { 1, Modify(result) }, { 4, result } }));
+
+			context.assertSubscriberCalls({ 0, 4, 9, 25 });
 		}
 	}
 
@@ -661,8 +757,9 @@ namespace catapult { namespace chain {
 		void AssertCanUpdateCacheWithMultipleTransactions(const AssertContextFunc& assertContext) {
 			// Arrange: initialize the UT cache with 3 transactions
 			UpdaterTestContext context;
-			auto originalTransactionData = CreateTransactionData(3);
+			auto originalTransactionData = CreateTransactionData(3, 4);
 			test::AddAll(context.transactionsCache(), originalTransactionData.UtInfos);
+			context.resetSubscriber();
 
 			// - prepare 4 new transactions
 			auto transactionData = CreateTransactionData(4);
@@ -671,15 +768,19 @@ namespace catapult { namespace chain {
 			EXPECT_EQ(3u, context.transactionsCache().view().size());
 
 			// Act:
-			TTraits::Update(context.updater(), transactionData.UtInfos);
+			auto updateResults = TTraits::Update(context.updater(), transactionData.UtInfos);
 
 			// Assert: the cache contains original and new transactions
+			TTraits::CheckResults(updateResults, { New, New, New, New });
+
 			EXPECT_EQ(7u, context.transactionsCache().view().size());
 			test::AssertContainsAll(context.transactionsCache(), originalTransactionData.Hashes);
 			test::AssertContainsAll(context.transactionsCache(), transactionData.Hashes);
 
 			// - check the context
 			assertContext(context, originalTransactionData.EntityInfos, transactionData.EntityInfos);
+
+			context.assertSubscriberCalls(GenerateRawDeadlines(4));
 		}
 	}
 
@@ -714,7 +815,7 @@ namespace catapult { namespace chain {
 		void AssertTransactionsAlreadyInCacheDoNotGetExecuted(const AssertContextFunc& assertContext) {
 			// Arrange: initialize the UT cache with 3 transactions
 			UpdaterTestContext context;
-			auto originalTransactionData = CreateTransactionData(3);
+			auto originalTransactionData = CreateTransactionData(3, 5);
 
 			// - create 5 transactions, including 2 that have already been seen
 			auto transactionData = CreateTransactionData(5);
@@ -722,20 +823,25 @@ namespace catapult { namespace chain {
 			SetAt(transactionData, originalTransactionData.UtInfos[0], 3);
 
 			test::AddAll(context.transactionsCache(), originalTransactionData.UtInfos);
+			context.resetSubscriber();
 
 			// Sanity:
 			EXPECT_EQ(3u, context.transactionsCache().view().size());
 
 			// Act:
-			TTraits::Update(context.updater(), transactionData.UtInfos);
+			auto updateResults = TTraits::Update(context.updater(), transactionData.UtInfos);
 
 			// Assert: the duplicate transactions were not added
+			TTraits::CheckResults(updateResults, { New, Neutral, New, Neutral, New });
+
 			EXPECT_EQ(6u, context.transactionsCache().view().size());
 			test::AssertContainsAll(context.transactionsCache(), originalTransactionData.Hashes);
 			test::AssertContainsAll(context.transactionsCache(), transactionData.Hashes);
 
 			// - check the context
 			assertContext(context, originalTransactionData.EntityInfos, transactionData.EntityInfos);
+
+			context.assertSubscriberCalls({ 0, 4, 16 });
 		}
 	}
 
@@ -777,8 +883,9 @@ namespace catapult { namespace chain {
 	TEST(TEST_CLASS, NewTransactionsValidationIsSkippedWhenUnconfirmedCacheIsStale) {
 		// Arrange: initialize the UT cache with 3 transactions
 		UpdaterTestContext context;
-		auto originalTransactionData = CreateTransactionData(3);
+		auto originalTransactionData = CreateTransactionData(3, 4);
 		test::AddAll(context.transactionsCache(), originalTransactionData.UtInfos);
+		context.resetSubscriber();
 
 		// - modify the catapult cache after creating the updater
 		context.seedStatistics(7);
@@ -790,9 +897,11 @@ namespace catapult { namespace chain {
 		EXPECT_EQ(3u, context.transactionsCache().view().size());
 
 		// Act:
-		context.updater().update(transactionData.UtInfos);
+		auto updateResults = context.updater().update(transactionData.UtInfos);
 
 		// Assert: the cache contains original and new transactions
+		NewTransactionsTraits::CheckResults(updateResults, { Neutral, Neutral, Neutral, Neutral });
+
 		EXPECT_EQ(7u, context.transactionsCache().view().size());
 		test::AssertContainsAll(context.transactionsCache(), originalTransactionData.Hashes);
 		test::AssertContainsAll(context.transactionsCache(), transactionData.Hashes);
@@ -800,6 +909,8 @@ namespace catapult { namespace chain {
 		// - neither the validator nor observer were passed any entities
 		context.assertContexts({});
 		context.assertEntityInfos({});
+
+		context.assertSubscriberCalls(GenerateRawDeadlines(4));
 	}
 
 	// endregion
@@ -809,8 +920,9 @@ namespace catapult { namespace chain {
 	TEST(TEST_CLASS, RevertedTransactionsUpdateRebasesUnconfirmedCache) {
 		// Arrange: initialize the UT cache with 3 transactions
 		UpdaterTestContext context;
-		auto originalTransactionData = CreateTransactionData(3);
+		auto originalTransactionData = CreateTransactionData(3, 4);
 		test::AddAll(context.transactionsCache(), originalTransactionData.UtInfos);
+		context.resetSubscriber();
 
 		// - modify the catapult cache after creating the updater
 		context.seedStatistics(7);
@@ -834,6 +946,8 @@ namespace catapult { namespace chain {
 		//    a cache with 7 - instead of 0 - block statistics)
 		context.assertContexts(CreateRevertedAndExistingSources(4, 3), 7);
 		context.assertEntityInfos(ConcatContainers(transactionData.EntityInfos, originalTransactionData.EntityInfos));
+
+		context.assertSubscriberCalls(GenerateRawDeadlines(4));
 	}
 
 	NON_SUCCESS_VALIDATION_TRAITS_BASED_TEST(OriginalTransactionsThatFailValidationDoNotGetAddedToCache) {
@@ -845,6 +959,7 @@ namespace catapult { namespace chain {
 		auto originalTransactionData = CreateTransactionData(6, 3);
 		const auto& originalHashes = originalTransactionData.Hashes;
 		test::AddAll(context.transactionsCache(), originalTransactionData.UtInfos);
+		context.resetSubscriber();
 
 		// - prepare 3 new transactions
 		auto transactionData = CreateTransactionData(3);
@@ -875,6 +990,8 @@ namespace catapult { namespace chain {
 				ConcatIds({ 0, 0, 1, 1, 2, 2 }, { 0, 0, 1, 2, 2, 3, 3, 4, 5, 5 }, 3),
 				ConcatIds({ 0, 0, 1, 1, 2, 2 }, { 0, 0, 2, 2, 3, 3, 5, 5 }, 3),
 				GetFailedIndexes(TResult, { { 3 + 1, TResult }, { 3 + 4, Modify(TResult) } }));
+
+		context.assertSubscriberCalls({ 0, 1, 4 }, { 16, 49 });
 	}
 
 	NON_SUCCESS_VALIDATION_TRAITS_BASED_TEST(OriginalTransactionsThatPartiallyFailValidationAreUndone) {
@@ -886,6 +1003,7 @@ namespace catapult { namespace chain {
 		auto originalTransactionData = CreateTransactionData(6, 3);
 		const auto& originalHashes = originalTransactionData.Hashes;
 		test::AddAll(context.transactionsCache(), originalTransactionData.UtInfos);
+		context.resetSubscriber();
 
 		// - prepare 3 new transactions
 		auto transactionData = CreateTransactionData(3);
@@ -914,13 +1032,16 @@ namespace catapult { namespace chain {
 		context.assertEntityInfos(
 				ConcatContainers(transactionData.EntityInfos, originalTransactionData.EntityInfos),
 				GetFailedIndexes(TResult, { { 3 + 1, Modify(TResult) }, { 3 + 4, TResult } }));
+
+		context.assertSubscriberCalls({ 0, 1, 4 }, { 16, 49 });
 	}
 
 	TEST(TEST_CLASS, CommittedRevertedTransactionsAreAddedToCache) {
 		// Arrange: initialize the UT cache with 3 transactions
 		UpdaterTestContext context;
-		auto originalTransactionData = CreateTransactionData(3);
+		auto originalTransactionData = CreateTransactionData(3, 6);
 		test::AddAll(context.transactionsCache(), originalTransactionData.UtInfos);
+		context.resetSubscriber();
 
 		// - prepare 6 new transactions
 		auto transactionData = CreateTransactionData(6);
@@ -939,14 +1060,17 @@ namespace catapult { namespace chain {
 
 		context.assertContexts(CreateRevertedAndExistingSources(6, 3));
 		context.assertEntityInfos(ConcatContainers(transactionData.EntityInfos, originalTransactionData.EntityInfos));
+
+		context.assertSubscriberCalls(GenerateRawDeadlines(6));
 	}
 
 	TEST(TEST_CLASS, CommittedOriginalTransactionsAreNotAddedToCache) {
 		// Arrange: initialize the UT cache with 6 transactions
 		UpdaterTestContext context;
-		auto originalTransactionData = CreateTransactionData(6);
+		auto originalTransactionData = CreateTransactionData(6, 3);
 		const auto& originalHashes = originalTransactionData.Hashes;
 		test::AddAll(context.transactionsCache(), originalTransactionData.UtInfos);
+		context.resetSubscriber();
 
 		// - prepare 3 new transactions
 		auto transactionData = CreateTransactionData(3);
@@ -969,6 +1093,8 @@ namespace catapult { namespace chain {
 				transactionData.EntityInfos,
 				Select(originalTransactionData.EntityInfos, { 0, 1, 3, 5 }));
 		context.assertEntityInfos(unconfirmedEntityInfos);
+
+		context.assertSubscriberCalls({ 0, 1, 4 }, { 25, 49 });
 	}
 
 	// endregion

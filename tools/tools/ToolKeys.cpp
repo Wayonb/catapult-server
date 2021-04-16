@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,14 +22,12 @@
 #include "ToolKeys.h"
 #include "Random.h"
 #include "catapult/crypto/Hashes.h"
+#include "catapult/model/Address.h"
 #include <random>
 
 namespace catapult { namespace tools {
 
 	namespace {
-		// a nemesis recipient account
-		constexpr auto Mijin_Test_Private_Key = "8473645728B15F007385CE2889D198D26369D2806DCDED4A9B219FD0DE23A505";
-
 		void NextKey(Key& key) {
 			Hash256 hash;
 			crypto::Sha3_256(key, hash);
@@ -46,26 +45,17 @@ namespace catapult { namespace tools {
 		}
 	}
 
-	crypto::KeyPair LoadServerKeyPair() {
-		return crypto::KeyPair::FromString(Mijin_Test_Private_Key);
-	}
-
 	crypto::KeyPair GenerateRandomKeyPair() {
 		return crypto::KeyPair::FromPrivate(crypto::PrivateKey::Generate(RandomByte));
 	}
 
 	crypto::KeyPair GetDeterministicKeyPair(const Key& baseKey, uint64_t keyId) {
 		auto key = GetDeterministicKey(baseKey, keyId);
-		return crypto::KeyPair::FromPrivate(crypto::PrivateKey::Generate([iter = key.cbegin()]() mutable { return *iter++; }));
+		return crypto::KeyPair::FromPrivate(crypto::PrivateKey::FromBuffer(key));
 	}
 
 	crypto::KeyPair CopyKeyPair(const crypto::KeyPair& keyPair) {
-		auto iter = keyPair.privateKey().begin();
-		return crypto::KeyPair::FromPrivate(crypto::PrivateKey::Generate([&iter]() { return *iter++; }));
-	}
-
-	crypto::KeyPair ExtractKeyPair(const std::string& privateKey) {
-		return privateKey.empty() ? GenerateRandomKeyPair() : crypto::KeyPair::FromString(privateKey);
+		return crypto::KeyPair::FromPrivate(crypto::PrivateKey::FromBuffer(keyPair.privateKey()));
 	}
 
 	std::vector<Address> PrepareAddresses(size_t count) {
@@ -75,7 +65,7 @@ namespace catapult { namespace tools {
 		addresses.reserve(count);
 		while (count != addresses.size()) {
 			NextKey(seedKey);
-			auto address = model::PublicKeyToAddress(seedKey, model::NetworkIdentifier::Mijin_Test);
+			auto address = model::PublicKeyToAddress(seedKey, model::NetworkIdentifier::Private_Test);
 
 			// just to have addresses starting with 'SA'
 			if (0 == (address[1] & 0xF8))

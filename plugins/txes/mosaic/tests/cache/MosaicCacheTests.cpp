@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -56,15 +57,15 @@ namespace catapult { namespace cache {
 			}
 
 			static ValueType CreateWithId(uint8_t id) {
-				auto key = Key{ { static_cast<uint8_t>(id * 2) }};
-				auto definition = state::MosaicDefinition(Height(), key, 3, model::MosaicProperties());
+				auto owner = Address{ { static_cast<uint8_t>(id * 2) }};
+				auto definition = state::MosaicDefinition(Height(), owner, 3, model::MosaicProperties());
 				return state::MosaicEntry(MakeId(id), definition);
 			}
 
 			static ValueType CreateWithIdAndExpiration(uint8_t id, Height height) {
 				// simulate behavior of lock info cache activation (so expiration is at specified height)
 				auto properties = test::CreateMosaicPropertiesWithDuration(BlockDuration(height.unwrap() - 1));
-				auto definition = state::MosaicDefinition(Height(1), Key(), 3, properties);
+				auto definition = state::MosaicDefinition(Height(1), Address(), 3, properties);
 				return state::MosaicEntry(MakeId(id), definition);
 			}
 		};
@@ -108,7 +109,7 @@ namespace catapult { namespace cache {
 
 		void PopulateCache(LockedCacheDelta<MosaicCacheDelta>& delta) {
 			for (uint8_t i = 0; i < Default_Cache_Size; ++i)
-				delta->insert(MosaicCacheMixinTraits::CreateWithIdAndExpiration(i + 1, Height(i + 1)));
+				delta->insert(MosaicCacheMixinTraits::CreateWithIdAndExpiration(static_cast<uint8_t>(i + 1), Height(i + 1)));
 		}
 	}
 

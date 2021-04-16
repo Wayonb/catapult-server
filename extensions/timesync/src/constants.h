@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -38,10 +39,6 @@ namespace catapult { namespace timesync {
 	/// Value that indicates how large the change in network time must be in order to update the node's network time.
 	/// \note This constant is used to prevent slow shifts in network time. The unit of this constant is milliseconds.
 	constexpr uint64_t Clock_Adjustment_Threshold = 75;
-
-	/// Minimum importance a node must have in order to be considered as a synchronization partner.
-	/// \note The value corresponds to having a vested balance of 1 NEM stake.
-	constexpr double Required_Minimum_Importance = 0.00025;
 
 	/// Minimum offset from remote to local node to trigger logging a warning.
 	constexpr int64_t Warning_Threshold_Millis = 100;

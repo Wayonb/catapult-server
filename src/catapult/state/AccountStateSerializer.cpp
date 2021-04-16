@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,9 +32,7 @@ namespace catapult { namespace state {
 		enum class AccountStateFormat : uint8_t { Regular = 0, High_Value = 1 };
 
 		AccountStateFormat GetFormat(const AccountState& accountState) {
-			return Importance() == accountState.ImportanceSnapshots.current()
-					? AccountStateFormat::Regular
-					: AccountStateFormat::High_Value;
+			return accountState.ImportanceSnapshots.active() ? AccountStateFormat::High_Value : AccountStateFormat::Regular;
 		}
 
 		// endregion
@@ -76,15 +75,19 @@ namespace catapult { namespace state {
 		public:
 			void apply(AccountState& accountState) {
 				for (const auto& snapshot : m_snapshots) {
-					if (model::ImportanceHeight() == snapshot.Height)
+					if (model::ImportanceHeight() == snapshot.Height) {
+						accountState.ImportanceSnapshots.push();
 						continue;
+					}
 
 					accountState.ImportanceSnapshots.set(snapshot.Importance, snapshot.Height);
 				}
 
 				for (const auto& bucket : m_buckets) {
-					if (model::ImportanceHeight() == bucket.StartHeight)
+					if (model::ImportanceHeight() == bucket.StartHeight) {
+						accountState.ActivityBuckets.push();
 						continue;
+					}
 
 					accountState.ActivityBuckets.update(bucket.StartHeight, [&bucket](auto& accountStateBucket) {
 						accountStateBucket = bucket;
@@ -120,6 +123,25 @@ namespace catapult { namespace state {
 			}
 		}
 
+		void WriteSupplementalPublicKeys(io::OutputStream& output, const AccountPublicKeys& accountPublicKeys) {
+			io::Write8(output, utils::to_underlying_type(accountPublicKeys.mask()));
+			io::Write8(output, static_cast<uint8_t>(accountPublicKeys.voting().size()));
+
+			if (HasFlag(AccountPublicKeys::KeyType::Linked, accountPublicKeys.mask()))
+				output.write(accountPublicKeys.linked().get());
+
+			if (HasFlag(AccountPublicKeys::KeyType::Node, accountPublicKeys.mask()))
+				output.write(accountPublicKeys.node().get());
+
+			if (HasFlag(AccountPublicKeys::KeyType::VRF, accountPublicKeys.mask()))
+				output.write(accountPublicKeys.vrf().get());
+
+			for (auto i = 0u; i < accountPublicKeys.voting().size(); ++i) {
+				const auto& pinnedVotingKey = accountPublicKeys.voting().get(i);
+				output.write({ reinterpret_cast<const uint8_t*>(&pinnedVotingKey), model::PinnedVotingKey::Size });
+			}
+		}
+
 		void WriteSnapshots(io::OutputStream& output, const AccountImportanceSnapshots& snapshots, size_t start, size_t count) {
 			ProcessRange(snapshots, start, count, [&output](const auto& snapshot) {
 				io::Write(output, snapshot.Importance);
@@ -148,20 +170,22 @@ namespace catapult { namespace state {
 		output.write(accountState.PublicKey);
 		io::Write(output, accountState.PublicKeyHeight);
 
-		// write link information
+		// write account attributes
 		io::Write8(output, utils::to_underlying_type(accountState.AccountType));
-		output.write(accountState.LinkedAccountKey);
 
-		// write importance information for high value accounts
 		auto format = GetFormat(accountState);
 		io::Write8(output, utils::to_underlying_type(format));
+
+		// write supplemental public keys
+		WriteSupplementalPublicKeys(output, accountState.SupplementalPublicKeys);
+
+		// write importance information for high value accounts
 		if (AccountStateFormat::High_Value == format) {
 			WriteSnapshots(output, accountState.ImportanceSnapshots, 0, Importance_History_Size - Rollback_Buffer_Size);
 			WriteBuckets(output, accountState.ActivityBuckets, 0, Activity_Bucket_History_Size - Rollback_Buffer_Size);
 		}
 
 		// write mosaics
-		io::Write(output, accountState.Balances.optimizedMosaicId());
 		io::Write16(output, static_cast<uint16_t>(accountState.Balances.size()));
 		for (const auto& pair : accountState.Balances) {
 			io::Write(output, pair.first);
@@ -170,6 +194,37 @@ namespace catapult { namespace state {
 	}
 
 	namespace {
+		void ReadSupplementalPublicKey(io::InputStream& input, AccountPublicKeys::PublicKeyAccessor<Key>& publicKeyAccessor) {
+			Key key;
+			input.read(key);
+			publicKeyAccessor.set(key);
+		}
+
+		void ReadSupplementalPublicKey(
+				io::InputStream& input,
+				AccountPublicKeys::PublicKeysAccessor<model::PinnedVotingKey>& publicKeysAccessor) {
+			model::PinnedVotingKey key;
+			input.read({ reinterpret_cast<uint8_t*>(&key), model::PinnedVotingKey::Size });
+			publicKeysAccessor.add(key);
+		}
+
+		void ReadSupplementalPublicKeys(io::InputStream& input, AccountPublicKeys& accountPublicKeys) {
+			auto accountPublicKeysMask = static_cast<AccountPublicKeys::KeyType>(io::Read8(input));
+			auto numVotingKeys = io::Read8(input);
+
+			if (HasFlag(AccountPublicKeys::KeyType::Linked, accountPublicKeysMask))
+				ReadSupplementalPublicKey(input, accountPublicKeys.linked());
+
+			if (HasFlag(AccountPublicKeys::KeyType::Node, accountPublicKeysMask))
+				ReadSupplementalPublicKey(input, accountPublicKeys.node());
+
+			if (HasFlag(AccountPublicKeys::KeyType::VRF, accountPublicKeysMask))
+				ReadSupplementalPublicKey(input, accountPublicKeys.vrf());
+
+			for (auto i = 0u; i < numVotingKeys; ++i)
+				ReadSupplementalPublicKey(input, accountPublicKeys.voting());
+		}
+
 		AccountState LoadAccountStateWithoutHistory(io::InputStream& input, ImportanceReader& importanceReader) {
 			// read identifying information
 			Address address;
@@ -181,12 +236,14 @@ namespace catapult { namespace state {
 			input.read(accountState.PublicKey);
 			accountState.PublicKeyHeight = io::Read<Height>(input);
 
-			// read link information
-			accountState.AccountType = static_cast<state::AccountType>(io::Read8(input));
-			input.read(accountState.LinkedAccountKey);
+			// read account attributes
+			accountState.AccountType = static_cast<AccountType>(io::Read8(input));
+			auto format = static_cast<AccountStateFormat>(io::Read8(input));
+
+			// read supplemental public keys
+			ReadSupplementalPublicKeys(input, accountState.SupplementalPublicKeys);
 
 			// read importance information for high value accounts
-			auto format = static_cast<AccountStateFormat>(io::Read8(input));
 			if (AccountStateFormat::High_Value == format) {
 				importanceReader.readSnapshots(input, Importance_History_Size - Rollback_Buffer_Size);
 				importanceReader.readBuckets(input, Activity_Bucket_History_Size - Rollback_Buffer_Size);
@@ -195,12 +252,14 @@ namespace catapult { namespace state {
 			}
 
 			// read mosaics
-			accountState.Balances.optimize(io::Read<MosaicId>(input));
 			auto numMosaics = io::Read16(input);
 			for (auto i = 0u; i < numMosaics; ++i) {
 				auto mosaicId = io::Read<MosaicId>(input);
 				auto amount = io::Read<Amount>(input);
 				accountState.Balances.credit(mosaicId, amount);
+
+				if (0 == i)
+					accountState.Balances.optimize(mosaicId);
 			}
 
 			return accountState;

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -37,7 +38,7 @@ namespace catapult { namespace tree {
 				if (0 == i % 2) {
 					byte = static_cast<uint8_t>(path.nibbleAt(i) << 4);
 				} else {
-					byte |= path.nibbleAt(i);
+					byte = static_cast<uint8_t>(byte | path.nibbleAt(i));
 					io::Write8(out, byte);
 				}
 			}
@@ -63,8 +64,10 @@ namespace catapult { namespace tree {
 			SerializePath(out, node.path());
 
 			LinksMaskType linksMask = 0;
-			for (auto i = 0u; i < utils::GetNumBits<LinksMaskType>(); ++i)
-				linksMask |= static_cast<LinksMaskType>((node.hasLink(i) ? 1 : 0) << i);
+			for (auto i = 0u; i < utils::GetNumBits<LinksMaskType>(); ++i) {
+				auto linksMaskBit = static_cast<LinksMaskType>((node.hasLink(i) ? 1 : 0) << i);
+				linksMask = static_cast<LinksMaskType>(linksMask | linksMaskBit);
+			}
 
 			io::Write16(out, linksMask);
 			for (auto i = 0u; i < utils::GetNumBits<LinksMaskType>(); ++i) {

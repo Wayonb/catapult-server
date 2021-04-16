@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -148,10 +149,10 @@ namespace catapult { namespace test {
 		const auto& accountStateCache = cacheView.sub<cache::AccountStateCache>();
 
 		for (const auto& expectedBalance : expectedBalances) {
-			const auto& address = accounts.getAddress(expectedBalance.AccountId);
+			const auto& address = accounts.getAddress(expectedBalance.AccountShortId);
 
 			std::ostringstream out;
-			out << "account id " << expectedBalance.AccountId << " (" << model::AddressToString(address) << ")";
+			out << "account id " << expectedBalance.AccountShortId << " (" << model::AddressToString(address) << ")";
 			auto message = out.str();
 
 			// Assert:

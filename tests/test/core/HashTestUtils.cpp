@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -26,7 +27,7 @@ namespace catapult { namespace test {
 
 	namespace {
 		template<typename TData>
-		model::HashRange CopyHashes(TData pData, size_t numHashes) {
+		model::HashRange CopyHashes(const TData* pData, size_t numHashes) {
 			return model::HashRange::CopyFixed(reinterpret_cast<const uint8_t*>(pData), numHashes);
 		}
 	}

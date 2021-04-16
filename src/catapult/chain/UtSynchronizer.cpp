@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -34,16 +35,18 @@ namespace catapult { namespace chain {
 		public:
 			UtTraits(
 					BlockFeeMultiplier minFeeMultiplier,
+					const TimeSupplier& timeSupplier,
 					const ShortHashesSupplier& shortHashesSupplier,
 					const handlers::TransactionRangeHandler& transactionRangeConsumer)
 					: m_minFeeMultiplier(minFeeMultiplier)
+					, m_timeSupplier(timeSupplier)
 					, m_shortHashesSupplier(shortHashesSupplier)
 					, m_transactionRangeConsumer(transactionRangeConsumer)
 			{}
 
 		public:
 			thread::future<model::TransactionRange> apiCall(const RemoteApiType& api) const {
-				return api.unconfirmedTransactions(m_minFeeMultiplier, m_shortHashesSupplier());
+				return api.unconfirmedTransactions(m_timeSupplier(), m_minFeeMultiplier, m_shortHashesSupplier());
 			}
 
 			void consume(model::TransactionRange&& range, const model::NodeIdentity& sourceIdentity) const {
@@ -52,6 +55,7 @@ namespace catapult { namespace chain {
 
 		private:
 			BlockFeeMultiplier m_minFeeMultiplier;
+			TimeSupplier m_timeSupplier;
 			ShortHashesSupplier m_shortHashesSupplier;
 			handlers::TransactionRangeHandler m_transactionRangeConsumer;
 		};
@@ -59,10 +63,12 @@ namespace catapult { namespace chain {
 
 	RemoteNodeSynchronizer<api::RemoteTransactionApi> CreateUtSynchronizer(
 			BlockFeeMultiplier minFeeMultiplier,
+			const TimeSupplier& timeSupplier,
 			const ShortHashesSupplier& shortHashesSupplier,
-			const handlers::TransactionRangeHandler& transactionRangeConsumer) {
-		auto traits = UtTraits(minFeeMultiplier, shortHashesSupplier, transactionRangeConsumer);
+			const handlers::TransactionRangeHandler& transactionRangeConsumer,
+			const predicate<>& shouldExecute) {
+		auto traits = UtTraits(minFeeMultiplier, timeSupplier, shortHashesSupplier, transactionRangeConsumer);
 		auto pSynchronizer = std::make_shared<EntitiesSynchronizer<UtTraits>>(std::move(traits));
-		return CreateRemoteNodeSynchronizer(pSynchronizer);
+		return CreateConditionalRemoteNodeSynchronizer(pSynchronizer, shouldExecute);
 	}
 }}

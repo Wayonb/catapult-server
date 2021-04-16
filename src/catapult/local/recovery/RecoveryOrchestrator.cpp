@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,15 +23,17 @@
 #include "CatapultSystemState.h"
 #include "MultiBlockLoader.h"
 #include "RecoveryStorageAdapter.h"
+#include "RepairImportance.h"
 #include "RepairSpooling.h"
 #include "RepairState.h"
 #include "StateChangeRepairingSubscriber.h"
+#include "StateRecoveryMode.h"
 #include "StorageStart.h"
 #include "catapult/cache/ReadOnlyCatapultCache.h"
+#include "catapult/cache_core/BlockStatisticCache.h"
 #include "catapult/chain/BlockExecutor.h"
 #include "catapult/config/CatapultDataDirectory.h"
 #include "catapult/extensions/LocalNodeChainScore.h"
-#include "catapult/extensions/LocalNodeStateFileStorage.h"
 #include "catapult/extensions/LocalNodeStateRef.h"
 #include "catapult/extensions/ProcessBootstrapper.h"
 #include "catapult/io/BlockStorageCache.h"
@@ -40,6 +43,7 @@
 #include "catapult/observers/NotificationObserverAdapter.h"
 #include "catapult/subscribers/BlockChangeReader.h"
 #include "catapult/subscribers/BrokerMessageReaders.h"
+#include "catapult/subscribers/FinalizationReader.h"
 #include "catapult/subscribers/TransactionStatusReader.h"
 #include "catapult/utils/StackLogger.h"
 
@@ -73,22 +77,27 @@ namespace catapult { namespace local {
 
 		// endregion
 
-		std::unique_ptr<io::PrunableBlockStorage> CreateStagingBlockStorage(const config::CatapultDataDirectory& dataDirectory) {
+		std::unique_ptr<io::PrunableBlockStorage> CreateStagingBlockStorage(
+				const config::CatapultDataDirectory& dataDirectory,
+				uint32_t fileDatabaseBatchSize) {
 			auto stagingDirectory = dataDirectory.spoolDir("block_recover").str();
-			boost::filesystem::create_directory(stagingDirectory);
-			return std::make_unique<io::FileBlockStorage>(stagingDirectory, io::FileBlockStorageMode::None);
+			config::CatapultDirectory(stagingDirectory).create();
+			return std::make_unique<io::FileBlockStorage>(stagingDirectory, fileDatabaseBatchSize, io::FileBlockStorageMode::None);
 		}
 
 		void MoveSupplementalDataFiles(const config::CatapultDataDirectory& dataDirectory) {
-			if (!boost::filesystem::exists(dataDirectory.dir("state.tmp").path()))
+			if (!std::filesystem::exists(dataDirectory.dir("state.tmp").path()))
 				return;
 
 			extensions::LocalNodeStateSerializer serializer(dataDirectory.dir("state.tmp"));
 			serializer.moveTo(dataDirectory.dir("state"));
 		}
 
-		Height MoveBlockFiles(const config::CatapultDirectory& stagingDirectory, io::BlockStorage& destinationStorage) {
-			io::FileBlockStorage staging(stagingDirectory.str());
+		Height MoveBlockFiles(
+				const config::CatapultDirectory& stagingDirectory,
+				io::BlockStorage& destinationStorage,
+				uint32_t fileDatabaseBatchSize) {
+			io::FileBlockStorage staging(stagingDirectory.str(), fileDatabaseBatchSize);
 			if (Height(0) == staging.chainHeight())
 				return Height(0);
 
@@ -107,9 +116,12 @@ namespace catapult { namespace local {
 					, m_dataDirectory(config::CatapultDataDirectoryPreparer::Prepare(m_config.User.DataDirectory))
 					, m_catapultCache({}) // note that sub caches are added in boot
 					, m_pBlockStorage(m_pBootstrapper->subscriptionManager().createBlockStorage(m_pBlockChangeSubscriber))
-					, m_storage(CreateReadOnlyStorageAdapter(*m_pBlockStorage), CreateStagingBlockStorage(m_dataDirectory))
-					, m_pTransactionStatusSubscriber(m_pBootstrapper->subscriptionManager().createTransactionStatusSubscriber())
+					, m_storage(
+							CreateReadOnlyStorageAdapter(*m_pBlockStorage),
+							CreateStagingBlockStorage(m_dataDirectory, m_config.Node.FileDatabaseBatchSize))
+					, m_pFinalizationSubscriber(m_pBootstrapper->subscriptionManager().createFinalizationSubscriber())
 					, m_pStateChangeSubscriber(m_pBootstrapper->subscriptionManager().createStateChangeSubscriber())
+					, m_pTransactionStatusSubscriber(m_pBootstrapper->subscriptionManager().createTransactionStatusSubscriber())
 					, m_pluginManager(m_pBootstrapper->pluginManager())
 					, m_stateSavingRequired(true)
 			{}
@@ -126,7 +138,7 @@ namespace catapult { namespace local {
 				CATAPULT_LOG(debug) << "initializing cache";
 				m_catapultCache = m_pluginManager.createCache();
 
-				utils::StackLogger stackLogger("running recovery operations", utils::LogLevel::Info);
+				utils::StackLogger stackLogger("running recovery operations", utils::LogLevel::info);
 				recover();
 			}
 
@@ -137,16 +149,19 @@ namespace catapult { namespace local {
 				CATAPULT_LOG(info) << "repairing spooling, commit step " << utils::to_underlying_type(systemState.commitStep());
 				RepairSpooling(m_dataDirectory, systemState.commitStep());
 
+				CATAPULT_LOG(info) << "repairing importance";
+				RepairImportance(m_dataDirectory, systemState.commitStep());
+
 				CATAPULT_LOG(info) << "repairing messages";
 				repairSubscribers();
 
 				CATAPULT_LOG(info) << "loading state";
 				auto heights = extensions::LoadStateFromDirectory(m_dataDirectory.dir("state"), stateRef(), m_pluginManager);
-				if (heights.Cache > heights.Storage)
-					CATAPULT_THROW_RUNTIME_ERROR_2("cache height is larger than storage height", heights.Cache, heights.Storage);
-
-				if (!stateRef().Config.Node.EnableCacheDatabaseStorage)
+				auto stateRecoveryMode = CalculateStateRecoveryMode(m_config.Node, heights);
+				if (StateRecoveryMode::Repair == stateRecoveryMode)
 					repairStateFromStorage(heights);
+				else if (StateRecoveryMode::Reseed == stateRecoveryMode)
+					CATAPULT_THROW_INVALID_ARGUMENT("reseed operation detected - please use the importer tool");
 
 				CATAPULT_LOG(info) << "loaded block chain (height = " << heights.Storage << ", score = " << m_score.get() << ")";
 
@@ -162,6 +177,7 @@ namespace catapult { namespace local {
 				if (m_pBlockChangeSubscriber)
 					processMessages("block_change", *m_pBlockChangeSubscriber, subscribers::ReadNextBlockChange);
 
+				processMessages("finalization", *m_pFinalizationSubscriber, subscribers::ReadNextFinalization);
 				processMessages("transaction_status", *m_pTransactionStatusSubscriber, subscribers::ReadNextTransactionStatus);
 			}
 
@@ -174,9 +190,6 @@ namespace catapult { namespace local {
 			}
 
 			void repairStateFromStorage(const extensions::StateHeights& heights) {
-				if (heights.Cache == heights.Storage)
-					return;
-
 				// disable load optimizations (loading from the saved state is optimization enough) in order to prevent
 				// discontinuities in block analysis (e.g. statistic cache expects consecutive blocks)
 				CATAPULT_LOG(info) << "loading state - block loading required";
@@ -209,7 +222,10 @@ namespace catapult { namespace local {
 
 				CATAPULT_LOG(debug) << " - moving supplemental data and block files";
 				MoveSupplementalDataFiles(m_dataDirectory);
-				auto startHeight = MoveBlockFiles(m_dataDirectory.spoolDir("block_sync"), *m_pBlockStorage);
+				auto startHeight = MoveBlockFiles(
+						m_dataDirectory.spoolDir("block_sync"),
+						*m_pBlockStorage,
+						m_config.Node.FileDatabaseBatchSize);
 
 				// when verifiable state is enabled, forcibly regenerate all patricia trees because cache changes are coalesced
 				if (stateRef().Config.BlockChain.EnableVerifiableState && startHeight > Height(0)) {
@@ -238,6 +254,13 @@ namespace catapult { namespace local {
 						m_pluginManager.createNotificationPublisher());
 				chain::BlockExecutionContext executionContext{ observer, resolverContext, observerState };
 
+				// reapplyBlocks is only called when EnableVerifiableState is true.
+				// non rocksdb backed caches (e.g. BlockStatisticCache) are loaded initially from "state" directory
+				// but are not updated / reloaded after copying "state.tmp" to "state".
+				// of these, only BlockStatisticCache is problematic because it has strict bounds checking.
+				// as a workaround, fill it with statistics up to the new chain height.
+				FillBlockStatisticCache(cacheDelta.sub<cache::BlockStatisticCache>(), chainHeight);
+
 				CATAPULT_LOG(debug) << " - rolling back blocks";
 				for (auto height = chainHeight; height >= startHeight; height = height - Height(1))
 					chain::RollbackBlock(*m_pBlockStorage->loadBlockElement(height), executionContext);
@@ -251,9 +274,20 @@ namespace catapult { namespace local {
 				stateRef().Cache.commit(chainHeight);
 			}
 
+		private:
+			static void FillBlockStatisticCache(cache::BlockStatisticCacheDelta& blockStatisticCacheDelta, Height newHeight) {
+				auto originalHeight = newHeight;
+				while (!blockStatisticCacheDelta.contains(state::BlockStatistic(originalHeight)))
+					originalHeight = originalHeight - Height(1);
+
+				// these statistics are placeholders and don't need to reflect the block exactly as long as the height is correct
+				for (auto height = originalHeight + Height(1); height <= newHeight; height = height + Height(1))
+					blockStatisticCacheDelta.insert(state::BlockStatistic(height));
+			}
+
 		public:
 			void shutdown() override {
-				utils::StackLogger stackLogger("shutting down recovery orchestrator", utils::LogLevel::Info);
+				utils::StackLogger stackLogger("shutting down recovery orchestrator", utils::LogLevel::info);
 
 				m_pBootstrapper->pool().shutdown();
 				saveStateToDisk();
@@ -296,8 +330,9 @@ namespace catapult { namespace local {
 			io::BlockStorageCache m_storage;
 			extensions::LocalNodeChainScore m_score;
 
-			std::unique_ptr<subscribers::TransactionStatusSubscriber> m_pTransactionStatusSubscriber;
+			std::unique_ptr<subscribers::FinalizationSubscriber> m_pFinalizationSubscriber;
 			std::unique_ptr<subscribers::StateChangeSubscriber> m_pStateChangeSubscriber;
+			std::unique_ptr<subscribers::TransactionStatusSubscriber> m_pTransactionStatusSubscriber;
 
 			plugins::PluginManager& m_pluginManager;
 			bool m_stateSavingRequired;

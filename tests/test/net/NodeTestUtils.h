@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -43,9 +44,13 @@ namespace catapult { namespace test {
 	ionet::Node CreateNamedNode(const Key& identityKey, const std::string& name, ionet::NodeRoles roles = ionet::NodeRoles::None);
 
 	/// Creates a node with \a identity, \a name and \a roles.
+	ionet::Node CreateNamedNode(const model::NodeIdentity& identity, const std::string& name, ionet::NodeRoles roles);
+
+	/// Creates a node with \a identity, \a name, \a version and \a roles.
 	ionet::Node CreateNamedNode(
 			const model::NodeIdentity& identity,
 			const std::string& name,
+			ionet::NodeVersion version = ionet::NodeVersion(),
 			ionet::NodeRoles roles = ionet::NodeRoles::None);
 
 	// endregion

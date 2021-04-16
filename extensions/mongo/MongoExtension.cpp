@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,6 +25,7 @@
 #include "src/MongoBlockStorage.h"
 #include "src/MongoBulkWriter.h"
 #include "src/MongoChainScoreProvider.h"
+#include "src/MongoFinalizationStorage.h"
 #include "src/MongoPluginLoader.h"
 #include "src/MongoPluginManager.h"
 #include "src/MongoPtStorage.h"
@@ -61,9 +63,12 @@ namespace catapult { namespace mongo {
 		}
 
 		void EmptyCollection(MongoStorageContext& context, const std::string& collectionName) {
+			mongocxx::options::delete_options options;
+			options.write_concern(context.bulkWriter().writeOptions());
+
 			auto database = context.createDatabaseConnection();
 			auto collection = database[collectionName];
-			collection.delete_many({});
+			collection.delete_many({}, options);
 		}
 
 		class MongoServices {
@@ -91,12 +96,8 @@ namespace catapult { namespace mongo {
 			// create mongo writer
 			// keep the minimum high enough in order to avoid deadlock while waiting for mongo operations due to blocking io threads
 			auto numWriterThreads = std::max(4u, std::min(std::thread::hardware_concurrency(), dbConfig.MaxWriterThreads));
-			auto pBulkWriterPool = bootstrapper.pool().pushIsolatedPool("bulk writer", numWriterThreads);
-			auto pMongoBulkWriter = MongoBulkWriter::Create(
-					dbUri,
-					dbName,
-					// pass in a non-owning shared_ptr so that the writer does not keep the bulk writer pool alive during shutdown
-					std::shared_ptr<thread::IoThreadPool>(pBulkWriterPool.get(), [](const auto*) {}));
+			auto* pBulkWriterPool = bootstrapper.pool().pushIsolatedPool("bulk writer", numWriterThreads);
+			auto pMongoBulkWriter = MongoBulkWriter::Create(dbUri, dbName, dbConfig.WriteTimeout, *pBulkWriterPool);
 
 			// create transaction registry
 			const auto& config = bootstrapper.config();
@@ -119,7 +120,11 @@ namespace catapult { namespace mongo {
 
 			// add a pre load handler for initializing (nemesis) storage
 			// (pPluginManager is kept alive by pTransactionRegistry)
-			auto pMongoBlockStorage = CreateMongoBlockStorage(*pMongoContext, *pTransactionRegistry, pPluginManager->receiptRegistry());
+			auto pMongoBlockStorage = CreateMongoBlockStorage(
+					*pMongoContext,
+					dbConfig.MaxDropBatchSize,
+					*pTransactionRegistry,
+					pPluginManager->receiptRegistry());
 
 			// empty unconfirmed and partial transactions collections
 			EmptyCollection(*pMongoContext, Ut_Collection_Name);
@@ -128,13 +133,14 @@ namespace catapult { namespace mongo {
 			// register subscriptions
 			bootstrapper.subscriptionManager().addBlockChangeSubscriber(
 					io::CreateBlockStorageChangeSubscriber(std::move(pMongoBlockStorage)));
+			bootstrapper.subscriptionManager().addPtChangeSubscriber(CreateMongoPtStorage(*pMongoContext, *pTransactionRegistry));
 			bootstrapper.subscriptionManager().addUtChangeSubscriber(
 					CreateMongoTransactionStorage(*pMongoContext, *pTransactionRegistry, Ut_Collection_Name));
-			bootstrapper.subscriptionManager().addPtChangeSubscriber(CreateMongoPtStorage(*pMongoContext, *pTransactionRegistry));
-			bootstrapper.subscriptionManager().addTransactionStatusSubscriber(CreateMongoTransactionStatusStorage(*pMongoContext));
+			bootstrapper.subscriptionManager().addFinalizationSubscriber(CreateMongoFinalizationStorage(*pMongoContext));
 			bootstrapper.subscriptionManager().addStateChangeSubscriber(std::make_unique<ApiStateChangeSubscriber>(
 					std::move(pChainScoreProvider),
 					std::move(pExternalCacheStorage)));
+			bootstrapper.subscriptionManager().addTransactionStatusSubscriber(CreateMongoTransactionStatusStorage(*pMongoContext));
 		}
 	}
 }}

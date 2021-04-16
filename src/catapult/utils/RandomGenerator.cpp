@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,7 +29,7 @@ namespace catapult { namespace utils {
 		void Fill(uint8_t* pOut, size_t count, TGenerator& generator) {
 			using GeneratorResultType = decltype(generator());
 
-			for (auto i = 0u; i < count; i += sizeof(GeneratorResultType)) {
+			for (size_t i = 0; i < count; i += sizeof(GeneratorResultType)) {
 				auto randomValue = generator();
 				std::memcpy(pOut + i, &randomValue, std::min(sizeof(GeneratorResultType), count - i));
 			}
@@ -36,6 +37,11 @@ namespace catapult { namespace utils {
 	}
 
 	// region HighEntropyRandomGenerator
+
+	HighEntropyRandomGenerator::HighEntropyRandomGenerator() = default;
+
+	HighEntropyRandomGenerator::HighEntropyRandomGenerator(const std::string& token) : m_rd(token)
+	{}
 
 	HighEntropyRandomGenerator::result_type HighEntropyRandomGenerator::operator()() {
 		return (static_cast<uint64_t>(m_rd()) << 32) | m_rd();

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -35,7 +36,6 @@ namespace catapult { namespace plugins {
 				// Arrange:
 				auto config = model::BlockChainConfiguration::Uninitialized();
 				config.BlockGenerationTargetTime = utils::TimeSpan::FromSeconds(1);
-				config.BlockPruneInterval = 150;
 				config.Plugins.emplace("catapult.plugins.mosaic", utils::ConfigurationBag({{
 					"",
 					{
@@ -43,7 +43,7 @@ namespace catapult { namespace plugins {
 						{ "maxMosaicDuration", "0h" },
 						{ "maxMosaicDivisibility", "0" },
 
-						{ "mosaicRentalFeeSinkPublicKey", "0000000000000000000000000000000000000000000000000000000000000000" },
+						{ "mosaicRentalFeeSinkAddress", "SAXQUTQQNS6JEJG7PLC6FRVJ2USS44GLMXG4DOA" },
 						{ "mosaicRentalFee", "0" }
 					}
 				}}));
@@ -81,7 +81,7 @@ namespace catapult { namespace plugins {
 
 			static std::vector<std::string> GetStatelessValidatorNames() {
 				return {
-					"MosaicPropertiesValidator",
+					"MosaicFlagsValidator",
 					"MosaicIdValidator",
 					"MosaicSupplyChangeValidator"
 				};
@@ -91,6 +91,7 @@ namespace catapult { namespace plugins {
 				return {
 					"RequiredMosaicValidator",
 					"MosaicAvailabilityValidator",
+					"MosaicDivisibilityValidator",
 					"MosaicDurationValidator",
 					"MosaicTransferValidator",
 					"MaxMosaicsBalanceTransferValidator",

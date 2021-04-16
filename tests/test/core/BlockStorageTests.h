@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -26,6 +27,7 @@
 #include "mocks/MockMemoryStream.h"
 #include "catapult/io/BlockStatementSerializer.h"
 #include "catapult/model/BlockUtils.h"
+#include "catapult/constants.h"
 #include "tests/test/nodeps/Nemesis.h"
 #include "tests/TestHarness.h"
 #include <numeric>
@@ -86,10 +88,13 @@ namespace catapult { namespace test {
 			auto blockStatementPair = storage.loadBlockStatementData(height);
 
 			// - deserialize block statement
-			mocks::MockMemoryStream stream(blockStatementPair.first);
-			auto pBlockStatement = std::make_shared<model::BlockStatement>();
-			io::ReadBlockStatement(stream, *pBlockStatement);
-			const_cast<model::BlockElement&>(*pBlockElement).OptionalStatement = std::move(pBlockStatement);
+			if (blockStatementPair.second) {
+				mocks::MockMemoryStream stream(blockStatementPair.first);
+				auto pBlockStatement = std::make_shared<model::BlockStatement>();
+				io::ReadBlockStatement(stream, *pBlockStatement);
+				const_cast<model::BlockElement&>(*pBlockElement).OptionalStatement = std::move(pBlockStatement);
+			}
+
 			return pBlockElement;
 		}
 
@@ -118,13 +123,20 @@ namespace catapult { namespace test {
 
 		static void Assert(
 				const model::BlockElement& originalBlockElement,
-				const std::pair<std::vector<uint8_t>, bool>& blockElementPair) {
+				const std::pair<std::vector<uint8_t>, bool>& blockStatementPair) {
 			// Assert:
+			if (!blockStatementPair.second) {
+				EXPECT_FALSE(!!originalBlockElement.OptionalStatement);
+				return;
+			}
+
+			// - serialize and compare the block statement
 			ASSERT_TRUE(!!originalBlockElement.OptionalStatement);
+
 			auto expectedData = SerializeBlockStatement(*originalBlockElement.OptionalStatement);
-			ASSERT_TRUE(blockElementPair.second);
-			ASSERT_EQ(expectedData.size(), blockElementPair.first.size());
-			EXPECT_EQ_MEMORY(expectedData.data(), blockElementPair.first.data(), expectedData.size());
+			ASSERT_TRUE(blockStatementPair.second);
+			ASSERT_EQ(expectedData.size(), blockStatementPair.first.size());
+			EXPECT_EQ_MEMORY(expectedData.data(), blockStatementPair.first.data(), expectedData.size());
 		}
 
 		static void AssertLoadError(const io::BlockStorage& storage, Height height) {
@@ -187,6 +199,7 @@ namespace catapult { namespace test {
 
 			// Assert:
 			EXPECT_EQ(Height(11), pStorage->chainHeight());
+
 			AssertEqual(expectedBlockElement, *pBlockElement);
 		}
 
@@ -205,6 +218,7 @@ namespace catapult { namespace test {
 
 			// Assert:
 			EXPECT_EQ(Height(11), pStorage->chainHeight());
+
 			AssertEqual(expectedBlockElement, *pBlockElement);
 		}
 
@@ -226,6 +240,7 @@ namespace catapult { namespace test {
 
 			// Assert: the modified data was loaded
 			EXPECT_EQ(Height(11), pStorage->chainHeight());
+
 			AssertEqual(expectedBlockElement, *pBlockElement);
 		}
 
@@ -297,16 +312,18 @@ namespace catapult { namespace test {
 		// running this test does not make any sense, as it needs to produce quite some blocks
 		static void AssertLoadHashesFrom_LoadsCanCrossIndexFileBoundary() {
 			// Arrange: (note hashes are set inside SeedBlocks)
-			std::vector<uint8_t> expectedHashes(11);
-			std::iota(expectedHashes.begin(), expectedHashes.end(), static_cast<uint8_t>(65530 % 0xFF));
+			std::vector<uint8_t> expectedHashes;
+			constexpr auto Start_Height = Files_Per_Storage_Directory - 5;
+			for (auto i = static_cast<uint8_t>(Start_Height); expectedHashes.size() < 11; ++i)
+				expectedHashes.push_back(i);
 
 			StorageContext context;
 			context.pTempDirectoryGuard = std::make_unique<typename TTraits::Guard>();
-			context.pStorage = TTraits::PrepareStorage(context.pTempDirectoryGuard->name(), Height(65530));
-			SeedBlocks(*context.pStorage, Height(65530), Height(65540));
+			context.pStorage = TTraits::PrepareStorage(context.pTempDirectoryGuard->name(), Height(Start_Height));
+			SeedBlocks(*context.pStorage, Height(Start_Height), Height(Start_Height + 10));
 
 			// Act:
-			auto hashes = context.pStorage->loadHashesFrom(Height(65530), 100);
+			auto hashes = context.pStorage->loadHashesFrom(Height(Start_Height), 100);
 
 			// Assert:
 			ASSERT_EQ(expectedHashes.size(), hashes.size());
@@ -337,6 +354,7 @@ namespace catapult { namespace test {
 
 			// Assert:
 			EXPECT_EQ(Height(11), pStorage->chainHeight());
+
 			auto expected = SerializeBlockStatement(*expectedBlockElement.OptionalStatement);
 			ASSERT_TRUE(blockStatementPair.second);
 			ASSERT_EQ(expected.size(), blockStatementPair.first.size());
@@ -411,6 +429,7 @@ namespace catapult { namespace test {
 
 			// Assert:
 			EXPECT_EQ(Height(8), pStorage->chainHeight());
+
 			EXPECT_TRUE(!!pStorage->loadBlockElement(Height(7)));
 			EXPECT_TRUE(!!pStorage->loadBlockElement(Height(8)));
 			EXPECT_THROW(pStorage->loadBlockElement(Height(9)), catapult_invalid_argument);
@@ -433,6 +452,7 @@ namespace catapult { namespace test {
 
 			// Assert:
 			EXPECT_EQ(Height(9), pStorage->chainHeight());
+
 			EXPECT_TRUE(!!pStorage->loadBlockElement(Height(9)));
 			EXPECT_THROW(pStorage->loadBlockElement(Height(10)), catapult_invalid_argument);
 		}
@@ -449,6 +469,7 @@ namespace catapult { namespace test {
 
 			// Assert:
 			EXPECT_EQ(Height(0), pStorage->chainHeight());
+
 			EXPECT_THROW(pStorage->loadBlockElement(Height(1)), catapult_invalid_argument);
 		}
 
@@ -458,13 +479,9 @@ namespace catapult { namespace test {
 
 		static void AssertStorageSeedInitiallyContainsNemesisBlock() {
 			// Arrange:
-#ifdef SIGNATURE_SCHEME_KECCAK
-			constexpr auto Source_Directory = "../seed/mijin-test.nis1";
-#else
-			constexpr auto Source_Directory = "../seed/mijin-test";
-#endif
+			constexpr auto Source_Directory = "../seed/private-test";
 
-			auto nemesisBlockElement = BlockToBlockElement(GetNemesisBlock(), GetNemesisGenerationHash());
+			auto nemesisBlockElement = BlockToBlockElement(GetNemesisBlock(), GetNemesisGenerationHashSeed());
 
 			// Act:
 			const auto pStorage = TTraits::OpenStorage(Source_Directory);
@@ -472,6 +489,7 @@ namespace catapult { namespace test {
 
 			// Assert:
 			EXPECT_EQ(Height(1), pStorage->chainHeight());
+
 			AssertEqual(nemesisBlockElement, *pBlockElement);
 			EXPECT_TRUE(model::VerifyBlockHeaderSignature(pBlockElement->Block));
 		}
@@ -497,6 +515,7 @@ namespace catapult { namespace test {
 
 			// Assert:
 			EXPECT_EQ(Height(12), pStorage->chainHeight());
+
 			TLoadTraits::Assert(blockElement, result);
 		}
 
@@ -514,6 +533,7 @@ namespace catapult { namespace test {
 
 			// Assert:
 			EXPECT_EQ(Height(11), pStorage->chainHeight());
+
 			TLoadTraits::Assert(blockElement, result);
 		}
 
@@ -544,6 +564,30 @@ namespace catapult { namespace test {
 
 			// Assert:
 			EXPECT_EQ(Height(7), pStorage->chainHeight());
+
+			TLoadTraits::Assert(blockElement1, result1);
+			TLoadTraits::Assert(blockElement2, result2);
+		}
+
+		template<typename TLoadTraits>
+		static void AssertCanLoadMultipleSavedWithoutStatements() {
+			// Arrange:
+			auto pStorage = PrepareStorageWithBlocks(5);
+
+			auto pBlock1 = GenerateBlockWithTransactions(5, Height(6));
+			auto pBlock2 = GenerateBlockWithTransactions(5, Height(7));
+			auto blockElement1 = BlockToBlockElement(*pBlock1, GenerateRandomByteArray<Hash256>());
+			auto blockElement2 = BlockToBlockElement(*pBlock2, GenerateRandomByteArray<Hash256>());
+			pStorage->saveBlock(blockElement1);
+			pStorage->saveBlock(blockElement2);
+
+			// Act:
+			auto result1 = TLoadTraits::Load(*pStorage, Height(6));
+			auto result2 = TLoadTraits::Load(*pStorage, Height(7));
+
+			// Assert:
+			EXPECT_EQ(Height(7), pStorage->chainHeight());
+
 			TLoadTraits::Assert(blockElement1, result1);
 			TLoadTraits::Assert(blockElement2, result2);
 		}
@@ -561,6 +605,7 @@ namespace catapult { namespace test {
 
 			// Assert:
 			EXPECT_EQ(Height(0), pStorage->chainHeight());
+
 			EXPECT_THROW(pStorage->loadBlock(Height(1)), catapult_invalid_argument);
 			EXPECT_THROW(pStorage->loadBlockElement(Height(1)), catapult_invalid_argument);
 		}
@@ -629,7 +674,8 @@ namespace catapult { namespace test {
 	DEFINE_BLOCK_STORAGE_LOAD_TESTS(TRAITS_NAME, CanLoadAtHeightLessThanChainHeight) \
 	DEFINE_BLOCK_STORAGE_LOAD_TESTS(TRAITS_NAME, CanLoadAtChainHeight) \
 	DEFINE_BLOCK_STORAGE_LOAD_TESTS(TRAITS_NAME, CannotLoadAtHeightGreaterThanChainHeight) \
-	DEFINE_BLOCK_STORAGE_LOAD_TESTS(TRAITS_NAME, CanLoadMultipleSaved)
+	DEFINE_BLOCK_STORAGE_LOAD_TESTS(TRAITS_NAME, CanLoadMultipleSaved) \
+	DEFINE_BLOCK_STORAGE_LOAD_TESTS(TRAITS_NAME, CanLoadMultipleSavedWithoutStatements)
 
 #define DEFINE_PRUNABLE_BLOCK_STORAGE_TESTS(TRAITS_NAME) \
 	MAKE_BLOCK_STORAGE_TEST(TRAITS_NAME, PurgeDestroysStorage) \

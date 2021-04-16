@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,9 +37,10 @@ namespace catapult { namespace nodediscovery {
 	/// Tries to parse \a packet into \a nodes.
 	bool TryParseNodesPacket(const ionet::Packet& packet, ionet::NodeSet& nodes);
 
-	/// Determines if \a node is compatible with expected network (\a networkIdentifier) and identity (\a identityKey).
-	bool IsNodeCompatible(const ionet::Node& node, model::NetworkIdentifier networkIdentifier, const Key& identityKey);
+	/// Determines if \a node is compatible with expected network (\a networkFingerprint) and identity (\a identityKey).
+	bool IsNodeCompatible(const ionet::Node& node, const model::UniqueNetworkFingerprint& networkFingerprint, const Key& identityKey);
 
 	/// Filters \a nodes by returning all nodes not contained in \a view.
+	/// \note \a nodes is expected to be the result of a peers request and, thus, will not have identity host set.
 	ionet::NodeSet SelectUnknownNodes(const ionet::NodeContainerView& view, const ionet::NodeSet& nodes);
 }}

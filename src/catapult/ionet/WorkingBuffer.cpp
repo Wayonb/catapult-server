@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -27,6 +28,10 @@ namespace catapult { namespace ionet {
 			, m_numDataSizeSamples(0)
 			, m_maxDataSize(0) {
 		m_data.reserve(m_options.WorkingBufferSize);
+	}
+
+	void WorkingBuffer::append(uint8_t byte) {
+		m_data.push_back(byte);
 	}
 
 	AppendContext WorkingBuffer::prepareAppend() {
@@ -56,7 +61,7 @@ namespace catapult { namespace ionet {
 		if (m_data.capacity() - maxDataSize < m_options.WorkingBufferSize)
 			return;
 
-		CATAPULT_LOG(debug) << "reclaiming memory, decreasing buffer capacity from " << m_data.capacity() << " to " << maxDataSize;
+		CATAPULT_LOG(trace) << "reclaiming memory, decreasing buffer capacity from " << m_data.capacity() << " to " << maxDataSize;
 
 		ByteBuffer dataCopy;
 		dataCopy.reserve(maxDataSize);

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -46,7 +47,7 @@ namespace catapult { namespace observers {
 
 			io::FileQueueWriter writer(directory.str());
 			io::Write8(writer, NotifyMode::Commit == context.Mode ? 0 : 1);
-			writer.write(notification.Sender);
+			writer.write(notification.SenderPublicKey);
 			writer.write({ notification.MessagePtr + Marker_Size, notification.MessageSize - Marker_Size });
 			writer.flush();
 		}));

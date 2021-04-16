@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -29,8 +30,6 @@ namespace catapult { namespace subscribers {
 #define TEST_CLASS TransactionStatusReaderTests
 
 	namespace {
-		// region test utils
-
 		void AssertEqual(
 				const test::TransactionStatusNotification& expected,
 				const mocks::TransactionStatusSubscriberStatusParams& actual,
@@ -39,8 +38,6 @@ namespace catapult { namespace subscribers {
 			EXPECT_EQ(expected.Hash, actual.HashCopy) << message;
 			EXPECT_EQ(expected.Status, actual.Status) << message;
 		}
-
-		// endregion
 	}
 
 	TEST(TEST_CLASS, CanReadSingle) {
@@ -50,6 +47,7 @@ namespace catapult { namespace subscribers {
 		std::vector<uint8_t> buffer;
 		mocks::MockMemoryStream stream(buffer);
 		test::WriteTransactionStatusNotification(stream, notification);
+		stream.seek(0);
 
 		mocks::MockTransactionStatusSubscriber subscriber;
 

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -67,13 +68,8 @@ namespace catapult { namespace mocks {
 		}
 
 	public:
-		void notifyAddCosignature(
-				const model::TransactionInfo& parentTransactionInfo,
-				const Key& signer,
-				const Signature& signature) override {
-			m_addedCosignatureInfos.emplace_back(
-					std::make_unique<model::TransactionInfo>(parentTransactionInfo.copy()),
-					model::Cosignature{ signer, signature });
+		void notifyAddCosignature(const model::TransactionInfo& parentTransactionInfo, const model::Cosignature& cosignature) override {
+			m_addedCosignatureInfos.emplace_back(std::make_unique<model::TransactionInfo>(parentTransactionInfo.copy()), cosignature);
 		}
 
 	private:

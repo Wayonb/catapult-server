@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,7 +21,6 @@
 
 #pragma once
 #include "TransactionTestUtils.h"
-#include "catapult/crypto/KeyPair.h"
 #include "catapult/model/Elements.h"
 #include "catapult/model/RangeTypes.h"
 #include <list>
@@ -30,11 +30,7 @@
 namespace catapult { namespace test {
 
 	/// Hash string of the deterministic block.
-#ifdef SIGNATURE_SCHEME_KECCAK
-	constexpr auto Deterministic_Block_Hash_String = "12C3680070376E350A95A699C6A4E03D3D46641C2DCFBB8A8C7698280E39C9B9";
-#else
-	constexpr auto Deterministic_Block_Hash_String = "902C5BD8BF53B95694EFA88336DC1E2C41779948924E9D678B3BDDC5DB727679";
-#endif
+	constexpr auto Deterministic_Block_Hash_String = "312721A613C45F71FC9FA8FC7D63A08F99709702ADFB791D9286188AC80FA8B2";
 
 	// region TestBlockTransactions
 
@@ -65,6 +61,9 @@ namespace catapult { namespace test {
 	/// Generates an empty block with random signer and no transactions.
 	std::unique_ptr<model::Block> GenerateEmptyRandomBlock();
 
+	/// Generates an importance block with random signer and \a transactions.
+	std::unique_ptr<model::Block> GenerateImportanceBlockWithTransactions(const TestBlockTransactions& transactions);
+
 	/// Generates a block with random signer and \a transactions.
 	std::unique_ptr<model::Block> GenerateBlockWithTransactions(const TestBlockTransactions& transactions);
 
@@ -91,8 +90,8 @@ namespace catapult { namespace test {
 	/// Creates a block entity range composed of \a numBlocks blocks.
 	model::BlockRange CreateBlockEntityRange(size_t numBlocks);
 
-	/// Creates \a count ranges of blocks.
-	std::vector<model::BlockRange> PrepareRanges(size_t count);
+	/// Creates \a count ranges of blocks with \a increment additional blocks in each range.
+	std::vector<model::BlockRange> PrepareRanges(size_t count, size_t increment = 0);
 
 	/// Counts the number of transactions in \a block.
 	size_t CountTransactions(const model::Block& block);
@@ -100,8 +99,8 @@ namespace catapult { namespace test {
 	/// Converts \a block to a block element.
 	model::BlockElement BlockToBlockElement(const model::Block& block);
 
-	/// Converts \a block to a block element with specified generation hash (\a generationHash).
-	model::BlockElement BlockToBlockElement(const model::Block& block, const GenerationHash& generationHash);
+	/// Converts \a block to a block element with specified generation hash seed (\a generationHashSeed).
+	model::BlockElement BlockToBlockElement(const model::Block& block, const GenerationHashSeed& generationHashSeed);
 
 	/// Converts \a block with \a hash to a block element.
 	model::BlockElement BlockToBlockElement(const model::Block& block, const Hash256& hash);

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,7 +21,6 @@
 
 #pragma once
 #include "catapult/crypto/KeyPair.h"
-#include "catapult/crypto/PrivateKey.h"
 #include "catapult/utils/ArraySet.h"
 
 namespace catapult { namespace test {
@@ -36,10 +36,4 @@ namespace catapult { namespace test {
 
 	/// Extracts the public keys of \a keyPairs into a key set.
 	utils::KeySet ToKeySet(const std::vector<crypto::KeyPair>& keyPairs);
-
-	/// Creates key pair around private key \a buffer.
-	template<typename TContainer>
-	crypto::KeyPair KeyPairFromPrivateKeyBuffer(const TContainer& buffer) {
-		return crypto::KeyPair::FromPrivate(crypto::PrivateKey::Generate([iter = buffer.begin()]() mutable { return *iter++; }));
-	}
 }}

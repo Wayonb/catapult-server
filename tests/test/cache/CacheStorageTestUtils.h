@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -83,8 +84,7 @@ namespace catapult { namespace test {
 		template<typename TLoadTraits>
 		static void AssertCanLoadValue() {
 			// Arrange:
-			std::vector<uint8_t> buffer(TTraits::Value_Size);
-			test::FillWithRandomData(buffer);
+			auto buffer = test::GenerateRandomVector(TTraits::Value_Size);
 			mocks::MockMemoryStream inputStream(buffer);
 			const auto& originalValue = reinterpret_cast<const ValueType&>(buffer[0]);
 

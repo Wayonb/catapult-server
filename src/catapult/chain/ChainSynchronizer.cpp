@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,6 +37,8 @@ namespace catapult { namespace chain {
 			Height EndHeight;
 			size_t NumBytes;
 		};
+
+		// region UnprocessedElements
 
 		class UnprocessedElements : public std::enable_shared_from_this<UnprocessedElements> {
 		public:
@@ -129,12 +132,9 @@ namespace catapult { namespace chain {
 			bool m_dirty;
 		};
 
-		ionet::NodeInteractionResultCode ToNodeInteractionResultCode(ChainComparisonCode code) {
-			// notice that this function is only called when code is not Remote_Is_Not_Synced
-			return IsRemoteOutOfSync(code) || IsRemoteEvil(code)
-					? ionet::NodeInteractionResultCode::Failure
-					: ionet::NodeInteractionResultCode::Neutral;
-		}
+		// endregion
+
+		// region RangeAggregator
 
 		class RangeAggregator {
 		public:
@@ -166,6 +166,17 @@ namespace catapult { namespace chain {
 			model::NodeIdentity m_sourceIdentity;
 			std::vector<model::BlockRange> m_ranges;
 		};
+
+		// endregion
+
+		// region interaction and future utils
+
+		ionet::NodeInteractionResultCode ToNodeInteractionResultCode(ChainComparisonCode code) {
+			// notice that this function is only called when code is not Remote_Is_Not_Synced
+			return IsRemoteOutOfSync(code) || IsRemoteEvil(code)
+					? ionet::NodeInteractionResultCode::Failure
+					: ionet::NodeInteractionResultCode::Neutral;
+		}
 
 		auto CreateFutureSupplier(const api::RemoteChainApi& remoteChainApi, const api::BlocksFromOptions& options) {
 			return [&remoteChainApi, options](auto height) {
@@ -208,10 +219,15 @@ namespace catapult { namespace chain {
 							<< " blocks (heights " << range.cbegin()->Height << " - " << endHeight << ")";
 
 					pRangeAggregator->add(std::move(range));
-					if (forkDepth <= pRangeAggregator->numBlocks())
+					if (forkDepth <= pRangeAggregator->numBlocks()) {
+						CATAPULT_LOG(debug)
+								<< "completing chain synchronization with " << pRangeAggregator->numBlocks() << " blocks"
+								<< " (fork depth = " << forkDepth << ")";
 						return CompleteChainBlocksFrom(*pRangeAggregator, unprocessedElements);
+					}
 
 					auto nextHeight = endHeight + Height(1);
+					CATAPULT_LOG(debug) << "resuming chain synchronization at " << nextHeight;
 					return ChainBlocksFrom(futureSupplier, nextHeight, forkDepth, pRangeAggregator, unprocessedElements);
 				} catch (const catapult_runtime_error& e) {
 					CATAPULT_LOG(warning) << "exception thrown while requesting blocks: " << e.what();
@@ -220,19 +236,22 @@ namespace catapult { namespace chain {
 			});
 		}
 
+		// endregion
+
+		// region DefaultChainSynchronizer
+
 		class DefaultChainSynchronizer {
 		public:
 			using RemoteApiType = api::RemoteChainApi;
 
 		public:
-			// note: the synchronizer will only request config.MaxRollbackBlocks blocks so that even if the peer returns
-			//       a chain part that is a fork of the real chain, that fork is still resolvable because it can be rolled back
 			DefaultChainSynchronizer(
 					const std::shared_ptr<const api::ChainApi>& pLocalChainApi,
 					const ChainSynchronizerConfiguration& config,
+					const supplier<Height>& localFinalizedHeightSupplier,
 					const CompletionAwareBlockRangeConsumerFunc& blockRangeConsumer)
 					: m_pLocalChainApi(pLocalChainApi)
-					, m_compareChainOptions(config.MaxBlocksPerSyncAttempt, config.MaxRollbackBlocks)
+					, m_compareChainOptions{ config.MaxHashesPerSyncAttempt, localFinalizedHeightSupplier }
 					, m_blocksFromOptions(config.MaxBlocksPerSyncAttempt, config.MaxChainBytesPerSyncAttempt)
 					, m_pUnprocessedElements(std::make_shared<UnprocessedElements>(
 							blockRangeConsumer,
@@ -289,7 +308,7 @@ namespace catapult { namespace chain {
 
 				CATAPULT_LOG(debug)
 						<< "pulling blocks from remote with common height " << compareResult.CommonBlockHeight
-						<< " (fork depth = " << compareResult.ForkDepth << ")";
+						<< " (fork depth = " << compareResult.ForkDepth << ") from " << remoteChainApi.remoteIdentity();
 				return ChainBlocksFrom(
 						CreateFutureSupplier(remoteChainApi, m_blocksFromOptions),
 						compareResult.CommonBlockHeight + Height(1),
@@ -304,13 +323,20 @@ namespace catapult { namespace chain {
 			api::BlocksFromOptions m_blocksFromOptions;
 			std::shared_ptr<UnprocessedElements> m_pUnprocessedElements;
 		};
+
+		// endregion
 	}
 
 	RemoteNodeSynchronizer<api::RemoteChainApi> CreateChainSynchronizer(
 			const std::shared_ptr<const api::ChainApi>& pLocalChainApi,
 			const ChainSynchronizerConfiguration& config,
+			const supplier<Height>& localFinalizedHeightSupplier,
 			const CompletionAwareBlockRangeConsumerFunc& blockRangeConsumer) {
-		auto pSynchronizer = std::make_shared<DefaultChainSynchronizer>(pLocalChainApi, config, blockRangeConsumer);
+		auto pSynchronizer = std::make_shared<DefaultChainSynchronizer>(
+				pLocalChainApi,
+				config,
+				localFinalizedHeightSupplier,
+				blockRangeConsumer);
 		return CreateRemoteNodeSynchronizer(pSynchronizer);
 	}
 }}

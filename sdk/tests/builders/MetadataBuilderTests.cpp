@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,14 +32,14 @@ namespace catapult { namespace builders {
 		struct TransactionProperties {
 		public:
 			TransactionProperties()
-					: TargetPublicKey()
+					: TargetAddress()
 					, ScopedMetadataKey()
 					, RawTargetId()
 					, ValueSizeDelta()
 			{}
 
 		public:
-			Key TargetPublicKey;
+			UnresolvedAddress TargetAddress;
 			uint64_t ScopedMetadataKey;
 			uint64_t RawTargetId;
 			int16_t ValueSizeDelta;
@@ -104,7 +105,7 @@ namespace catapult { namespace builders {
 
 		template<typename TTransaction>
 		void AssertTransactionProperties(const TransactionProperties& expectedProperties, const TTransaction& transaction) {
-			EXPECT_EQ(expectedProperties.TargetPublicKey, transaction.TargetPublicKey);
+			EXPECT_EQ(expectedProperties.TargetAddress, transaction.TargetAddress);
 			EXPECT_EQ(expectedProperties.ScopedMetadataKey, transaction.ScopedMetadataKey);
 			EXPECT_EQ(expectedProperties.ValueSizeDelta, transaction.ValueSizeDelta);
 			ASSERT_EQ(expectedProperties.Value.size(), transaction.ValueSize);
@@ -116,11 +117,11 @@ namespace catapult { namespace builders {
 				const TransactionProperties& expectedProperties,
 				const consumer<typename TTraits::BuilderType&>& buildTransaction) {
 			// Arrange:
-			auto networkId = static_cast<model::NetworkIdentifier>(0x62);
+			auto networkIdentifier = static_cast<model::NetworkIdentifier>(0x62);
 			auto signer = test::GenerateRandomByteArray<Key>();
 
 			// Act:
-			typename TTraits::BuilderType builder(networkId, signer);
+			typename TTraits::BuilderType builder(networkIdentifier, signer);
 			buildTransaction(builder);
 			auto pTransaction = TTraits::TransactionTraits::InvokeBuilder(builder);
 
@@ -157,14 +158,14 @@ namespace catapult { namespace builders {
 
 	// region additional transaction fields
 
-	TRAITS_BASED_TEST(CanSetTargetPublicKey) {
+	TRAITS_BASED_TEST(CanSetTargetAddress) {
 		// Arrange:
 		auto expectedProperties = TransactionProperties();
-		test::FillWithRandomData(expectedProperties.TargetPublicKey);
+		test::FillWithRandomData(expectedProperties.TargetAddress);
 
 		// Assert:
-		AssertCanBuildTransaction<TTraits>(expectedProperties, [&targetPublicKey = expectedProperties.TargetPublicKey](auto& builder) {
-			builder.setTargetPublicKey(targetPublicKey);
+		AssertCanBuildTransaction<TTraits>(expectedProperties, [&targetAddress = expectedProperties.TargetAddress](auto& builder) {
+			builder.setTargetAddress(targetAddress);
 		});
 	}
 

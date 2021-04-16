@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -49,17 +50,17 @@ namespace catapult { namespace model {
 	template<typename TDerivedNotification>
 	struct BasicAggregateNotification : public Notification {
 	protected:
-		/// Creates a notification around \a signer, \a cosignaturesCount and \a pCosignatures.
-		BasicAggregateNotification(const Key& signer, size_t cosignaturesCount, const Cosignature* pCosignatures)
+		/// Creates a notification around \a signerPublicKey, \a cosignaturesCount and \a pCosignatures.
+		BasicAggregateNotification(const Key& signerPublicKey, size_t cosignaturesCount, const Cosignature* pCosignatures)
 				: Notification(TDerivedNotification::Notification_Type, sizeof(TDerivedNotification))
-				, Signer(signer)
+				, SignerPublicKey(signerPublicKey)
 				, CosignaturesCount(cosignaturesCount)
 				, CosignaturesPtr(pCosignatures)
 		{}
 
 	public:
-		/// Aggregate signer.
-		const Key& Signer;
+		/// Aggregate signer public key.
+		const Key& SignerPublicKey;
 
 		/// Number of cosignatures.
 		size_t CosignaturesCount;
@@ -79,13 +80,13 @@ namespace catapult { namespace model {
 		static constexpr auto Notification_Type = Aggregate_Embedded_Transaction_Notification;
 
 	public:
-		/// Creates a notification around \a signer, \a transaction, \a cosignaturesCount and \a pCosignatures.
+		/// Creates a notification around \a signerPublicKey, \a transaction, \a cosignaturesCount and \a pCosignatures.
 		AggregateEmbeddedTransactionNotification(
-				const Key& signer,
+				const Key& signerPublicKey,
 				const EmbeddedTransaction& transaction,
 				size_t cosignaturesCount,
 				const Cosignature* pCosignatures)
-				: BasicAggregateNotification<AggregateEmbeddedTransactionNotification>(signer, cosignaturesCount, pCosignatures)
+				: BasicAggregateNotification<AggregateEmbeddedTransactionNotification>(signerPublicKey, cosignaturesCount, pCosignatures)
 				, Transaction(transaction)
 		{}
 
@@ -106,14 +107,15 @@ namespace catapult { namespace model {
 		static constexpr auto Notification_Type = Aggregate_Cosignatures_Notification;
 
 	public:
-		/// Creates a notification around \a signer, \a transactionsCount, \a pTransactions, \a cosignaturesCount and \a pCosignatures.
+		/// Creates a notification around \a signerPublicKey, \a transactionsCount, \a pTransactions, \a cosignaturesCount
+		/// and \a pCosignatures.
 		AggregateCosignaturesNotification(
-				const Key& signer,
+				const Key& signerPublicKey,
 				size_t transactionsCount,
 				const EmbeddedTransaction* pTransactions,
 				size_t cosignaturesCount,
 				const Cosignature* pCosignatures)
-				: BasicAggregateNotification<AggregateCosignaturesNotification>(signer, cosignaturesCount, pCosignatures)
+				: BasicAggregateNotification<AggregateCosignaturesNotification>(signerPublicKey, cosignaturesCount, pCosignatures)
 				, TransactionsCount(transactionsCount)
 				, TransactionsPtr(pTransactions)
 		{}

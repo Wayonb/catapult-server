@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -33,14 +34,16 @@ namespace catapult { namespace config {
 					{
 						"account",
 						{
-							{ "bootPrivateKey", "boot-key" },
 							{ "enableDelegatedHarvestersAutoDetection", "true" }
 						}
 					},
 					{
 						"storage",
 						{
-							{ "dataDirectory", "./db" },
+							{ "seedDirectory", "./sd" },
+							{ "dataDirectory", "./dd" },
+							{ "certificateDirectory", "./cert" },
+							{ "votingKeysDirectory", "./keys" },
 							{ "pluginsDirectory", "./ext" }
 						}
 					}
@@ -53,19 +56,23 @@ namespace catapult { namespace config {
 
 			static void AssertZero(const UserConfiguration& config) {
 				// Assert:
-				EXPECT_EQ("", config.BootPrivateKey);
 				EXPECT_FALSE(config.EnableDelegatedHarvestersAutoDetection);
 
+				EXPECT_EQ("", config.SeedDirectory);
 				EXPECT_EQ("", config.DataDirectory);
+				EXPECT_EQ("", config.CertificateDirectory);
+				EXPECT_EQ("", config.VotingKeysDirectory);
 				EXPECT_EQ("", config.PluginsDirectory);
 			}
 
 			static void AssertCustom(const UserConfiguration& config) {
 				// Assert:
-				EXPECT_EQ("boot-key", config.BootPrivateKey);
 				EXPECT_TRUE(config.EnableDelegatedHarvestersAutoDetection);
 
-				EXPECT_EQ("./db", config.DataDirectory);
+				EXPECT_EQ("./sd", config.SeedDirectory);
+				EXPECT_EQ("./dd", config.DataDirectory);
+				EXPECT_EQ("./cert", config.CertificateDirectory);
+				EXPECT_EQ("./keys", config.VotingKeysDirectory);
 				EXPECT_EQ("./ext", config.PluginsDirectory);
 			}
 		};

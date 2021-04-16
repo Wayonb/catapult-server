@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,6 +20,7 @@
 **/
 
 #pragma once
+#include "catapult/utils/BaseValue.h"
 #include "catapult/functions.h"
 #include <boost/multiprecision/cpp_int.hpp>
 #include <iosfwd>
@@ -31,6 +33,10 @@ namespace catapult { namespace model {
 	private:
 		using ArrayType = std::array<uint64_t, 2>;
 		static constexpr uint32_t Bits_Per_Value = 64;
+
+	public:
+		struct Delta_tag {};
+		using Delta = utils::BaseValue<int64_t, Delta_tag>;
 
 	public:
 		/// Creates a default chain score.
@@ -68,10 +74,28 @@ namespace catapult { namespace model {
 			return *this;
 		}
 
-		/// Subtracts \a rhs from this chain score.
-		ChainScore& operator-=(const ChainScore& rhs) {
-			m_score -= rhs.m_score;
+		/// Adds \a rhs to this chain score.
+		ChainScore& operator+=(Delta rhs) {
+			if (rhs < Delta())
+				m_score -= static_cast<uint64_t>(-rhs.unwrap());
+			else
+				m_score += rhs.unwrap();
+
 			return *this;
+		}
+
+		/// Subtracts \a rhs from this chain score.
+		Delta operator-(const ChainScore& rhs) {
+			boost::multiprecision::checked_uint128_t result = rhs < *this
+					? m_score - rhs.m_score
+					: rhs.m_score - m_score;
+
+			if (result > std::numeric_limits<int64_t>::max())
+				throw std::range_error("subtraction failed because chain scores are too far apart");
+
+			return rhs < *this
+					? Delta(static_cast<int64_t>(result))
+					: Delta(-static_cast<int64_t>(result));
 		}
 
 	public:
@@ -113,7 +137,7 @@ namespace catapult { namespace model {
 		}
 
 	private:
-		boost::multiprecision::uint128_t m_score;
+		boost::multiprecision::checked_uint128_t m_score;
 	};
 
 	/// Prototype for a function that returns a chain score.

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -38,12 +39,13 @@ namespace catapult { namespace handlers {
 	/// Registers a pull block handler in \a handlers that responds with a block in \a storage.
 	void RegisterPullBlockHandler(ionet::ServerPacketHandlers& handlers, const io::BlockStorageCache& storage);
 
-	/// Registers a chain info handler in \a handlers that responds with the height of the chain in \a storage
-	/// and the score of the chain returned by \a chainScoreSupplier.
-	void RegisterChainInfoHandler(
+	/// Registers a chain statistics handler in \a handlers that responds with the height of the chain in \a storage,
+	/// the score returned by \a chainScoreSupplier and the finalized height returned by \a finalizedHeightSupplier.
+	void RegisterChainStatisticsHandler(
 			ionet::ServerPacketHandlers& handlers,
 			const io::BlockStorageCache& storage,
-			const model::ChainScoreSupplier& chainScoreSupplier);
+			const model::ChainScoreSupplier& chainScoreSupplier,
+			const supplier<Height>& finalizedHeightSupplier);
 
 	/// Registers a block hashes handler in \a handlers that responds with at most \a maxHashes hashes in \a storage.
 	void RegisterBlockHashesHandler(ionet::ServerPacketHandlers& handlers, const io::BlockStorageCache& storage, uint32_t maxHashes);

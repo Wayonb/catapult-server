@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,7 +20,7 @@
 **/
 
 #include "StaticNodeRefreshService.h"
-#include "catapult/crypto/KeyPair.h"
+#include "catapult/config/CatapultKeys.h"
 #include "catapult/extensions/NetworkUtils.h"
 #include "catapult/extensions/ServiceLocator.h"
 #include "catapult/extensions/ServiceState.h"
@@ -86,13 +87,13 @@ namespace catapult { namespace local {
 
 				auto pServerConnector = pServiceGroup->pushService(
 						net::CreateServerConnector,
-						locator.keyPair(),
+						locator.keys().caPublicKey(),
 						connectionSettings,
 						"static node refresh");
 				locator.registerService("snr.server_connector", pServerConnector);
 
 				// add task
-				state.tasks().push_back(CreateRefreshTask(m_staticNodes, locator.keyPair().publicKey(), *pServerConnector, state.nodes()));
+				state.tasks().push_back(CreateRefreshTask(m_staticNodes, locator.keys().caPublicKey(), *pServerConnector, state.nodes()));
 			}
 
 		private:

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -63,7 +64,6 @@ namespace catapult { namespace test {
 	PeerLocalNodeStats CountersToPeerLocalNodeStats(const local::LocalNodeCounterValues& counters) {
 		PeerLocalNodeStats stats;
 		CountersToBasicLocalNodeStats(counters, stats);
-		stats.NumActiveBroadcastWriters = GetCounterValue(counters, "B WRITERS");
 		stats.NumUnlockedAccounts = GetCounterValue(counters, "UNLKED ACCTS");
 		return stats;
 	}
@@ -72,30 +72,19 @@ namespace catapult { namespace test {
 
 	// region partner nodes
 
-	namespace {
-		constexpr auto Local_Node_Partner_Private_Key = "8473645728B15F007385CE2889D198D26369D2806DCDED4A9B219FD0DE23A505";
-	}
-
-	crypto::KeyPair LoadPartnerServerKeyPair() {
-		return crypto::KeyPair::FromPrivate(crypto::PrivateKey::FromString(Local_Node_Partner_Private_Key));
-	}
-
-	ionet::Node CreateLocalPartnerNode() {
-		auto metadata = ionet::NodeMetadata(model::NetworkIdentifier::Zero, "PARTNER");
-		metadata.Roles = ionet::NodeRoles::Api | ionet::NodeRoles::Peer;
-		return ionet::Node(
-				{ LoadPartnerServerKeyPair().publicKey(), "127.0.0.1" },
-				CreateLocalHostNodeEndpoint(GetLocalHostPort() + 10),
-				metadata);
+	ionet::Node CreateLocalPartnerNode(const Key& publicKey) {
+		auto endpoint = CreateLocalHostNodeEndpoint(static_cast<unsigned short>(GetLocalHostPort() + 10));
+		auto metadata = ionet::NodeMetadata(model::UniqueNetworkFingerprint(), "PARTNER");
+		metadata.Roles = ionet::NodeRoles::IPv4 | ionet::NodeRoles::Api | ionet::NodeRoles::Peer;
+		return ionet::Node({ publicKey, "127.0.0.1" }, endpoint, metadata);
 	}
 
 	std::unique_ptr<local::LocalNode> BootLocalPartnerNode(
 			config::CatapultConfiguration&& config,
-			const crypto::KeyPair& keyPair,
+			const config::CatapultKeys& keys,
 			NodeFlag nodeFlag) {
 		// partner node is a P2P node on offset ports
-		const_cast<uint16_t&>(config.Node.Port) += 10;
-		const_cast<uint16_t&>(config.Node.ApiPort) += 10;
+		const_cast<uint16_t&>(config.Node.Port) = static_cast<uint16_t>(config.Node.Port + 10);
 
 		// make additional configuration modifications
 		PrepareCatapultConfiguration(config, AddSimplePartnerPluginExtensions, nodeFlag);
@@ -105,7 +94,7 @@ namespace catapult { namespace test {
 		auto pBootstrapper = std::make_unique<extensions::ProcessBootstrapper>(std::move(config), resourcesPath, disposition, "Partner");
 		pBootstrapper->loadExtensions();
 
-		return local::CreateLocalNode(keyPair, std::move(pBootstrapper));
+		return local::CreateLocalNode(keys, std::move(pBootstrapper));
 	}
 
 	void PrepareCatapultConfiguration(config::CatapultConfiguration& config, NodeFlag nodeFlag) {
@@ -129,9 +118,7 @@ namespace catapult { namespace test {
 	ExternalConnection CreateExternalConnection(unsigned short port) {
 		ExternalConnection connection;
 		connection.pPool = CreateStartedIoThreadPool(1);
-
-		auto serverKeyPair = LoadServerKeyPair();
-		connection.pIo = ConnectToLocalHost(connection.pPool->ioContext(), port, serverKeyPair.publicKey());
+		connection.pIo = ConnectToLocalHost(connection.pPool->ioContext(), port);
 		return connection;
 	}
 

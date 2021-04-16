@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,7 +21,7 @@
 
 #include "PtSyncSourceService.h"
 #include "PtBootstrapperService.h"
-#include "partialtransaction/src/handlers/CosignatureHandler.h"
+#include "partialtransaction/src/handlers/CosignatureHandlers.h"
 #include "partialtransaction/src/handlers/PtHandlers.h"
 #include "catapult/cache_tx/MemoryPtCache.h"
 #include "catapult/extensions/ServiceState.h"
@@ -49,8 +50,10 @@ namespace catapult { namespace partialtransaction {
 						state.pluginManager().transactionRegistry(),
 						hooks.ptRangeConsumer());
 
-				handlers::RegisterPullPartialTransactionInfosHandler(state.packetHandlers(), [&ptCache](const auto& shortHashPairs) {
-					return ptCache.view().unknownTransactions(shortHashPairs);
+				handlers::RegisterPullPartialTransactionInfosHandler(state.packetHandlers(), [&ptCache](
+						auto minDeadline,
+						const auto& shortHashPairs) {
+					return ptCache.view().unknownTransactions(minDeadline, shortHashPairs);
 				});
 
 				handlers::RegisterPushCosignaturesHandler(state.packetHandlers(), hooks.cosignatureRangeConsumer());

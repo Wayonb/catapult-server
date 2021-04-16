@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -49,7 +50,7 @@ namespace catapult { namespace api {
 		uint32_t NumBytes;
 	};
 
-	/// Api for retrieving chain information from a remote node.
+	/// Api for retrieving chain statistics from a remote node.
 	class RemoteChainApi : public RemoteApi, public ChainApi {
 	protected:
 		/// Creates a remote api for the node with specified \a remoteIdentity.

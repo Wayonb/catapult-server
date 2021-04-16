@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,6 +23,7 @@
 #include "PacketPayload.h"
 #include "catapult/model/EntityRange.h"
 #include "catapult/utils/IntegerMath.h"
+#include "catapult/constants.h"
 
 namespace catapult { namespace ionet {
 
@@ -29,7 +31,7 @@ namespace catapult { namespace ionet {
 	class PacketPayloadBuilder {
 	public:
 		/// Creates builder for a packet with the specified \a type.
-		explicit PacketPayloadBuilder(PacketType type) : PacketPayloadBuilder(type, std::numeric_limits<uint32_t>::max())
+		explicit PacketPayloadBuilder(PacketType type) : PacketPayloadBuilder(type, Default_Max_Packet_Data_Size)
 		{}
 
 		/// Creates builder for a packet with the specified \a type and max packet data size (\a maxPacketDataSize).

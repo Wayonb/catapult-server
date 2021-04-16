@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,7 +23,6 @@
 #include "catapult/config/CatapultDataDirectory.h"
 #include "catapult/io/FilesystemUtils.h"
 #include "catapult/io/IndexFile.h"
-#include <boost/filesystem.hpp>
 
 namespace catapult { namespace local {
 
@@ -70,8 +70,10 @@ namespace catapult { namespace local {
 
 		// broker process should be able to process these queues as-is on next reboot
 		// - block_change messages are produced after State_Written, so always safe to process
+		// - finalization messages are independent of state change
 		// - transaction_status messages are permanent and have no impact on state
 		repairer.retain("block_change");
+		repairer.retain("finalization");
 		repairer.retain("transaction_status");
 
 		// recovery assumes that both broker and server processes are stopped

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -34,9 +35,13 @@ namespace catapult { namespace harvesting {
 	// endregion
 
 	namespace {
+		const Key& GetPublicKey(const UnlockedAccountsKeyPairContainer::value_type& pair) {
+			return pair.first.signingKeyPair().publicKey();
+		}
+
 		auto CreateContainsPredicate(const Key& publicKey) {
 			return [&publicKey](const auto& prioritizedKeyPair) {
-				return prioritizedKeyPair.first.publicKey() == publicKey;
+				return GetPublicKey(prioritizedKeyPair) == publicKey;
 			};
 		}
 	}
@@ -58,7 +63,7 @@ namespace catapult { namespace harvesting {
 		return std::any_of(m_prioritizedKeyPairs.cbegin(), m_prioritizedKeyPairs.cend(), CreateContainsPredicate(publicKey));
 	}
 
-	void UnlockedAccountsView::forEach(const predicate<const crypto::KeyPair&>& consumer) const {
+	void UnlockedAccountsView::forEach(const predicate<const BlockGeneratorAccountDescriptor&>& consumer) const {
 		for (const auto& prioritizedKeyPair : m_prioritizedKeyPairs) {
 			if (!consumer(prioritizedKeyPair.first))
 				break;
@@ -80,11 +85,16 @@ namespace catapult { namespace harvesting {
 			, m_writeLock(std::move(writeLock))
 	{}
 
-	UnlockedAccountsAddResult UnlockedAccountsModifier::add(crypto::KeyPair&& keyPair) {
-		if (std::any_of(m_prioritizedKeyPairs.cbegin(), m_prioritizedKeyPairs.cend(), CreateContainsPredicate(keyPair.publicKey())))
-			return UnlockedAccountsAddResult::Success_Redundant;
+	UnlockedAccountsAddResult UnlockedAccountsModifier::add(BlockGeneratorAccountDescriptor&& descriptor) {
+		const auto& publicKey = descriptor.signingKeyPair().publicKey();
+		for (auto& prioritizedKeyPair : m_prioritizedKeyPairs) {
+			if (CreateContainsPredicate(publicKey)(prioritizedKeyPair)) {
+				prioritizedKeyPair.first = std::move(descriptor);
+				return UnlockedAccountsAddResult::Success_Update;
+			}
+		}
 
-		auto priorityScore = m_prioritizer(keyPair.publicKey());
+		auto priorityScore = m_prioritizer(publicKey);
 		if (m_maxUnlockedAccounts == m_prioritizedKeyPairs.size()) {
 			if (m_prioritizedKeyPairs.back().second >= priorityScore)
 				return UnlockedAccountsAddResult::Failure_Server_Limit;
@@ -98,7 +108,7 @@ namespace catapult { namespace harvesting {
 				break;
 		}
 
-		m_prioritizedKeyPairs.emplace(iter, std::move(keyPair), priorityScore);
+		m_prioritizedKeyPairs.emplace(iter, std::move(descriptor), priorityScore);
 		return UnlockedAccountsAddResult::Success_New;
 	}
 
@@ -112,11 +122,11 @@ namespace catapult { namespace harvesting {
 		return false;
 	}
 
-	void UnlockedAccountsModifier::removeIf(const KeyPredicate& predicate) {
+	void UnlockedAccountsModifier::removeIf(const predicate<const BlockGeneratorAccountDescriptor&>& predicate) {
 		auto initialSize = m_prioritizedKeyPairs.size();
 		auto newPrioritizedKeyPairsEnd = std::remove_if(m_prioritizedKeyPairs.begin(), m_prioritizedKeyPairs.end(), [predicate](
 				const auto& prioritizedKeyPair) {
-			return predicate(prioritizedKeyPair.first.publicKey());
+			return predicate(prioritizedKeyPair.first);
 		});
 
 		m_prioritizedKeyPairs.erase(newPrioritizedKeyPairsEnd, m_prioritizedKeyPairs.end());

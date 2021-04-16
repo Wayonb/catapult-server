@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -39,56 +40,22 @@ namespace catapult { namespace mongo {
 		constexpr size_t Num_Transaction_Statuses = 10;
 		constexpr auto Collection_Name = "transactionStatuses";
 
+		// region test utils
+
 		using TransactionStatusesMap = std::unordered_map<Hash256, model::TransactionStatus, utils::ArrayHasher<Hash256>>;
 
-		auto ResetDatabaseAndCreateMongoContext() {
-			test::ResetDatabase(test::DatabaseName());
-			return test::CreateDefaultMongoStorageContext(test::DatabaseName());
+		auto PrepareDatabaseAndCreateMongoContext(thread::IoThreadPool& pool) {
+			test::PrepareDatabase(test::DatabaseName());
+			return test::CreateDefaultMongoStorageContext(test::DatabaseName(), pool);
 		}
 
 		auto CreateTransactionStatuses(size_t count) {
 			std::vector<model::TransactionStatus> statuses;
-			for (auto i = 0u; i < count; ++i)
-				statuses.emplace_back(test::GenerateRandomByteArray<Hash256>(), i, Timestamp(i * i));
+			for (auto i = 1u; i <= count; ++i)
+				statuses.emplace_back(test::GenerateRandomByteArray<Hash256>(), Timestamp(i * i), i);
 
 			return statuses;
 		}
-
-		class TransactionStatusSubscriberContext {
-		public:
-			explicit TransactionStatusSubscriberContext(size_t numTransactionStatuses)
-					: m_pMongoContext(ResetDatabaseAndCreateMongoContext())
-					, m_pSubscriber(CreateMongoTransactionStatusStorage(*m_pMongoContext))
-					, m_statuses(CreateTransactionStatuses(numTransactionStatuses))
-			{}
-
-		public:
-			subscribers::TransactionStatusSubscriber& subscriber() {
-				return *m_pSubscriber;
-			}
-
-			const std::vector<model::TransactionStatus>& statuses() const {
-				return m_statuses;
-			}
-
-			TransactionStatusesMap toMap() {
-				TransactionStatusesMap map;
-				for (const auto& status : m_statuses)
-					map.emplace(status.Hash, status);
-
-				return map;
-			}
-
-			void saveTransactionStatus(const model::TransactionStatus& status) {
-				m_pSubscriber->notifyStatus(*test::GenerateTransactionWithDeadline(status.Deadline), status.Hash, status.Status);
-				m_pSubscriber->flush();
-			}
-
-		private:
-			std::unique_ptr<MongoStorageContext> m_pMongoContext;
-			std::unique_ptr<subscribers::TransactionStatusSubscriber> m_pSubscriber;
-			std::vector<model::TransactionStatus> m_statuses;
-		};
 
 		void AssertTransactionStatuses(const TransactionStatusesMap& expectedTransactionStatuses) {
 			auto connection = test::CreateDbConnection();
@@ -102,8 +69,7 @@ namespace catapult { namespace mongo {
 			for (const auto& view : txCursor) {
 				auto statusView = view["status"].get_document().view();
 
-				Hash256 dbHash;
-				mappers::DbBinaryToModelArray(dbHash, statusView["hash"].get_binary());
+				auto dbHash = test::GetHashValue(statusView, "hash");
 				auto expectedIter = expectedTransactionStatuses.find(dbHash);
 				ASSERT_TRUE(expectedTransactionStatuses.cend() != expectedIter);
 
@@ -113,6 +79,57 @@ namespace catapult { namespace mongo {
 				EXPECT_EQ(status.Deadline, Timestamp(test::GetUint64(statusView, "deadline")));
 			}
 		}
+
+		// endregion
+
+		// region TransactionStatusSubscriberContext
+
+		class TransactionStatusSubscriberContext {
+		public:
+			explicit TransactionStatusSubscriberContext(size_t numTransactionStatuses)
+					: m_pPool(test::CreateStartedIoThreadPool(test::Num_Default_Mongo_Test_Pool_Threads))
+					, m_pMongoContext(PrepareDatabaseAndCreateMongoContext(*m_pPool))
+					, m_pSubscriber(CreateMongoTransactionStatusStorage(*m_pMongoContext))
+					, m_statuses(CreateTransactionStatuses(numTransactionStatuses))
+			{}
+
+		public:
+			subscribers::TransactionStatusSubscriber& subscriber() {
+				return *m_pSubscriber;
+			}
+
+			const std::vector<model::TransactionStatus>& statuses() const {
+				return m_statuses;
+			}
+
+			TransactionStatusesMap toMap(size_t startIndex = 0) const {
+				TransactionStatusesMap map;
+
+				auto i = 0u;
+				for (const auto& status : m_statuses) {
+					if (startIndex > i++)
+						continue;
+
+					map.emplace(status.Hash, status);
+				}
+
+				return map;
+			}
+
+		public:
+			void saveTransactionStatus(const model::TransactionStatus& status) {
+				m_pSubscriber->notifyStatus(*test::GenerateTransactionWithDeadline(status.Deadline), status.Hash, status.Status);
+				m_pSubscriber->flush();
+			}
+
+		private:
+			std::unique_ptr<thread::IoThreadPool> m_pPool;
+			std::unique_ptr<MongoStorageContext> m_pMongoContext;
+			std::unique_ptr<subscribers::TransactionStatusSubscriber> m_pSubscriber;
+			std::vector<model::TransactionStatus> m_statuses;
+		};
+
+		// endregion
 	}
 
 	// region notifyStatus
@@ -166,6 +183,21 @@ namespace catapult { namespace mongo {
 		TransactionStatusesMap map;
 		map.emplace(status.Hash, status);
 		AssertTransactionStatuses(map);
+	}
+
+	TEST(TEST_CLASS, TransactionStatusCollectionIsCapped) {
+		// Arrange: max is set to 25 in PrepareDatabase
+		TransactionStatusSubscriberContext context(30);
+
+		// Sanity:
+		test::AssertCollectionSize(Collection_Name, 0);
+
+		// Act:
+		for (const auto& status : context.statuses())
+			context.saveTransactionStatus(status);
+
+		// Assert: only the 25 most recent statuses are saved
+		AssertTransactionStatuses(context.toMap(5));
 	}
 
 	// endregion

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,11 +21,10 @@
 
 #pragma once
 #include "HashLockInfoCacheTypes.h"
-#include "src/state/HashLockInfoSerializer.h"
+#include "src/state/HashLockInfoHistorySerializer.h"
 #include "plugins/txes/lock_shared/src/cache/LockInfoCacheStorage.h"
 
 namespace catapult { namespace cache {
 
-	/// Policy for saving and loading hash lock info cache data.
-	struct HashLockInfoCacheStorage : public LockInfoCacheStorage<HashLockInfoCacheDescriptor, state::HashLockInfoSerializer> {};
+	DEFINE_LOCK_INFO_CACHE_STORAGE(HashLockInfo)
 }}

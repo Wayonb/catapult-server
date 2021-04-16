@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -28,9 +29,12 @@ namespace catapult { namespace validators {
 	using Notification = model::BlockNotification;
 
 	DEFINE_STATEFUL_VALIDATOR(EligibleHarvester, [](const Notification& notification, const ValidatorContext& context) {
+		if (Height(1) == context.Height)
+			return ValidationResult::Success;
+
 		cache::ImportanceView view(context.Cache.sub<cache::AccountStateCache>());
-		return view.canHarvest(notification.Signer, context.Height)
+		return view.canHarvest(notification.Harvester, context.Height)
 				? ValidationResult::Success
 				: Failure_Core_Block_Harvester_Ineligible;
-	});
+	})
 }}

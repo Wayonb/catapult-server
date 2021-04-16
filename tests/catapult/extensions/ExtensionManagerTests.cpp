@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -158,8 +159,8 @@ namespace catapult { namespace extensions {
 
 	TEST(TEST_CLASS, CanRegisterZeroServices) {
 		// Arrange:
-		auto keyPair = test::GenerateKeyPair();
-		ServiceLocator locator(keyPair);
+		config::CatapultKeys keys;
+		ServiceLocator locator(keys);
 		test::ServiceTestState testState;
 		auto& state = testState.state();
 
@@ -171,8 +172,8 @@ namespace catapult { namespace extensions {
 
 	TEST(TEST_CLASS, CanRegisterSingleService) {
 		// Arrange:
-		auto keyPair = test::GenerateKeyPair();
-		ServiceLocator locator(keyPair);
+		config::CatapultKeys keys;
+		ServiceLocator locator(keys);
 		test::ServiceTestState testState;
 		auto& state = testState.state();
 		std::vector<ServiceRegistrarBreadcrumb> breadcrumbs;
@@ -191,8 +192,8 @@ namespace catapult { namespace extensions {
 
 	TEST(TEST_CLASS, CanRegisterMultipleServices) {
 		// Arrange:
-		auto keyPair = test::GenerateKeyPair();
-		ServiceLocator locator(keyPair);
+		config::CatapultKeys keys;
+		ServiceLocator locator(keys);
 		test::ServiceTestState testState;
 		auto& state = testState.state();
 		std::vector<ServiceRegistrarBreadcrumb> breadcrumbs;
@@ -219,8 +220,8 @@ namespace catapult { namespace extensions {
 
 	TEST(TEST_CLASS, RegisterServicesDestroysRegistrars) {
 		// Arrange:
-		auto keyPair = test::GenerateKeyPair();
-		ServiceLocator locator(keyPair);
+		config::CatapultKeys keys;
+		ServiceLocator locator(keys);
 		test::ServiceTestState testState;
 		auto& state = testState.state();
 		std::vector<ServiceRegistrarBreadcrumb> breadcrumbs;

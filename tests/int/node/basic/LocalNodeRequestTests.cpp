@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -22,6 +23,7 @@
 #include "tests/int/node/test/LocalNodeApiTraits.h"
 #include "tests/int/node/test/LocalNodeRequestTestUtils.h"
 #include "tests/int/node/test/PeerLocalNodeTestContext.h"
+#include "tests/test/nodeps/Filesystem.h"
 #include "tests/TestHarness.h"
 
 namespace catapult { namespace local {
@@ -39,7 +41,7 @@ namespace catapult { namespace local {
 
 		class TestCatapultDataDirectory {
 		public:
-			explicit TestCatapultDataDirectory(const boost::filesystem::path& directory) : m_dataDirectory(directory)
+			explicit TestCatapultDataDirectory(const std::filesystem::path& directory) : m_dataDirectory(directory)
 			{}
 
 		public:
@@ -53,6 +55,10 @@ namespace catapult { namespace local {
 
 			std::string stateChangeReaderIndex() const {
 				return m_dataDirectory.spoolDir("state_change").file("index_server_r.dat");
+			}
+
+			config::CatapultDirectory dir(const std::string& name) const {
+				return m_dataDirectory.dir(name);
 			}
 
 		private:
@@ -75,11 +81,11 @@ namespace catapult { namespace local {
 			// Sanity: two files are produced when booting with nemesis height
 			EXPECT_EQ(Height(1), context.height());
 			EXPECT_EQ(Height(1), context.loadSavedStateChainHeight());
-			EXPECT_TRUE(boost::filesystem::exists(dataDirectory.commitStep()));
+			EXPECT_TRUE(std::filesystem::exists(dataDirectory.commitStep()));
 			EXPECT_EQ(2u, ReadIndexFileValue(dataDirectory.stateChangeWriterIndex()));
 
 			// Act:
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			auto pIo = test::PushValidBlock(connection);
 
 			// - wait for the chain height to change and for all height readers to disconnect
@@ -122,7 +128,7 @@ namespace catapult { namespace local {
 			// Assert: state_change subscriber produces two files each in boot and per sync
 			EXPECT_EQ(2u, ReadIndexFileValue(dataDirectory.commitStep()));
 			EXPECT_EQ(4u, ReadIndexFileValue(dataDirectory.stateChangeWriterIndex()));
-			EXPECT_FALSE(boost::filesystem::exists(dataDirectory.stateChangeReaderIndex()));
+			EXPECT_FALSE(std::filesystem::exists(dataDirectory.stateChangeReaderIndex()));
 		});
 	}
 
@@ -141,7 +147,7 @@ namespace catapult { namespace local {
 		test::WaitForBoot(context);
 
 		// Act:
-		test::ExternalSourceConnection connection;
+		test::ExternalSourceConnection connection(context.publicKey());
 		auto pIo = test::PushValidTransaction(connection);
 		WAIT_FOR_ONE_EXPR(context.stats().NumAddedTransactionElements);
 
@@ -152,6 +158,26 @@ namespace catapult { namespace local {
 
 		// - the connection is still active
 		context.assertSingleReaderConnection();
+	}
+
+	// endregion
+
+	// region push - side effects
+
+	TEST(TEST_CLASS, SuccessfulImportanceBlockPushCommitsImportanceFiles) {
+		AssertCanPushBlockToLocalNode(test::NodeFlag::Regular, [](const auto&, const auto& dataDirectory) {
+			// Assert: importance files were committed from wip to base
+			auto importanceDirectory = dataDirectory.dir("importance");
+			EXPECT_EQ(4u, test::CountFilesAndDirectories(importanceDirectory.path()));
+			EXPECT_EQ(0u, test::CountFilesAndDirectories(importanceDirectory.dir("wip").path()));
+
+			for (auto name : { "index.dat", "0000000000000001.dat", "0000000000000002.dat" })
+				EXPECT_TRUE(std::filesystem::exists(importanceDirectory.file(name))) << name;
+
+			auto indexFile = io::IndexFile(importanceDirectory.file("index.dat"));
+			ASSERT_TRUE(indexFile.exists());
+			EXPECT_EQ(2u, indexFile.get());
+		});
 	}
 
 	// endregion

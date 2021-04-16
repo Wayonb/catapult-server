@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -52,7 +53,7 @@ namespace catapult { namespace validators {
 				m_notificationTypes.push_back(notification.Type);
 
 				if (model::Core_Signature_Notification == notification.Type)
-					m_signerKeys.push_back(static_cast<const model::SignatureNotification&>(notification).Signer);
+					m_signerKeys.push_back(static_cast<const model::SignatureNotification&>(notification).SignerPublicKey);
 
 				return m_result;
 			}

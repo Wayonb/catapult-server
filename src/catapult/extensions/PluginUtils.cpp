@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -30,8 +31,8 @@ namespace catapult { namespace extensions {
 	plugins::StorageConfiguration CreateStorageConfiguration(const config::CatapultConfiguration& config) {
 		plugins::StorageConfiguration storageConfig;
 		storageConfig.PreferCacheDatabase = config.Node.EnableCacheDatabaseStorage;
-		storageConfig.CacheDatabaseDirectory = (boost::filesystem::path(config.User.DataDirectory) / "statedb").generic_string();
-		storageConfig.MaxCacheDatabaseWriteBatchSize = config.Node.MaxCacheDatabaseWriteBatchSize;
+		storageConfig.CacheDatabaseDirectory = (std::filesystem::path(config.User.DataDirectory) / "statedb").generic_string();
+		storageConfig.CacheDatabaseConfig = config.Node.CacheDatabase;
 		return storageConfig;
 	}
 

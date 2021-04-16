@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,6 +21,7 @@
 
 #include "BlockUtils.h"
 #include "FeeUtils.h"
+#include "TransactionPlugin.h"
 #include "catapult/crypto/Hashes.h"
 #include "catapult/crypto/MerkleHashBuilder.h"
 #include "catapult/crypto/Signer.h"
@@ -28,15 +30,6 @@
 #include <cstring>
 
 namespace catapult { namespace model {
-
-	namespace {
-		RawBuffer BlockDataBuffer(const Block& block) {
-			return {
-				reinterpret_cast<const uint8_t*>(&block) + VerifiableEntity::Header_Size,
-				sizeof(BlockHeader) - VerifiableEntity::Header_Size - Block::Footer_Size
-			};
-		}
-	}
 
 	// region hashes
 
@@ -48,13 +41,54 @@ namespace catapult { namespace model {
 		builder.final(blockTransactionsHash);
 	}
 
-	GenerationHash CalculateGenerationHash(const GenerationHash& previousGenerationHash, const Key& publicKey) {
-		GenerationHash generationHash;
-		crypto::GenerationHash_Builder hasher;
-		hasher.update(previousGenerationHash);
-		hasher.update(publicKey);
-		hasher.final(generationHash);
-		return generationHash;
+	GenerationHash CalculateGenerationHash(const crypto::ProofGamma& gamma) {
+		auto proofHash = GenerateVrfProofHash(gamma);
+		return proofHash.copyTo<GenerationHash>();
+	}
+
+	// endregion
+
+	// region block type
+
+	model::EntityType CalculateBlockTypeFromHeight(Height height, uint64_t importanceGrouping) {
+		if (Height(1) == height)
+			return model::Entity_Type_Block_Nemesis;
+
+		return 0 == height.unwrap() % importanceGrouping ? model::Entity_Type_Block_Importance : model::Entity_Type_Block_Normal;
+	}
+
+	// endregion
+
+	// region block transactions info
+
+	namespace {
+		ExtendedBlockTransactionsInfo CalculateBlockTransactionsInfo(const Block& block, const TransactionRegistry* pTransactionRegistry) {
+			ExtendedBlockTransactionsInfo blockTransactionsInfo;
+			for (const auto& transaction : block.Transactions()) {
+				auto transactionFee = CalculateTransactionFee(block.FeeMultiplier, transaction);
+				blockTransactionsInfo.TotalFee = blockTransactionsInfo.TotalFee + transactionFee;
+				++blockTransactionsInfo.Count;
+
+				if (!pTransactionRegistry)
+					continue;
+
+				const auto* pPlugin = pTransactionRegistry->findPlugin(transaction.Type);
+				if (pPlugin)
+					blockTransactionsInfo.DeepCount += 1 + pPlugin->embeddedCount(transaction);
+				else
+					CATAPULT_LOG(warning) << "skipping transaction with unknown type " << transaction.Type;
+			}
+
+			return blockTransactionsInfo;
+		}
+	}
+
+	BlockTransactionsInfo CalculateBlockTransactionsInfo(const Block& block) {
+		return CalculateBlockTransactionsInfo(block, nullptr);
+	}
+
+	ExtendedBlockTransactionsInfo CalculateBlockTransactionsInfo(const Block& block, const TransactionRegistry& transactionRegistry) {
+		return CalculateBlockTransactionsInfo(block, &transactionRegistry);
 	}
 
 	// endregion
@@ -62,26 +96,11 @@ namespace catapult { namespace model {
 	// region sign / verify
 
 	void SignBlockHeader(const crypto::KeyPair& signer, Block& block) {
-		crypto::Sign(signer, BlockDataBuffer(block), block.Signature);
+		crypto::Sign(signer, GetBlockHeaderDataBuffer(block), block.Signature);
 	}
 
 	bool VerifyBlockHeaderSignature(const Block& block) {
-		return crypto::Verify(block.SignerPublicKey, BlockDataBuffer(block), block.Signature);
-	}
-
-	// endregion
-
-	// region fees
-
-	BlockTransactionsInfo CalculateBlockTransactionsInfo(const Block& block) {
-		BlockTransactionsInfo blockTransactionsInfo;
-		for (const auto& transaction : block.Transactions()) {
-			auto transactionFee = CalculateTransactionFee(block.FeeMultiplier, transaction);
-			blockTransactionsInfo.TotalFee = blockTransactionsInfo.TotalFee + transactionFee;
-			++blockTransactionsInfo.Count;
-		}
-
-		return blockTransactionsInfo;
+		return crypto::Verify(block.SignerPublicKey, GetBlockHeaderDataBuffer(block), block.Signature);
 	}
 
 	// endregion
@@ -118,25 +137,28 @@ namespace catapult { namespace model {
 
 		template<typename TContainer>
 		std::unique_ptr<Block> CreateBlockT(
+				EntityType blockType,
 				const PreviousBlockContext& context,
 				NetworkIdentifier networkIdentifier,
 				const Key& signerPublicKey,
 				const TContainer& transactions) {
-			uint32_t size = sizeof(BlockHeader) + CalculateTotalSize(transactions);
+			auto headerSize = GetBlockHeaderSize(blockType);
+			auto size = headerSize + CalculateTotalSize(transactions);
 			auto pBlock = utils::MakeUniqueWithSize<Block>(size);
-			std::memset(static_cast<void*>(pBlock.get()), 0, sizeof(BlockHeader));
+			std::memset(static_cast<void*>(pBlock.get()), 0, headerSize);
 			pBlock->Size = size;
 
 			pBlock->SignerPublicKey = signerPublicKey;
-			pBlock->BeneficiaryPublicKey = signerPublicKey;
 
 			pBlock->Version = Block::Current_Version;
 			pBlock->Network = networkIdentifier;
-			pBlock->Type = Entity_Type_Block;
+			pBlock->Type = blockType;
 
 			pBlock->Height = context.BlockHeight + Height(1);
 			pBlock->Difficulty = Difficulty();
 			pBlock->PreviousBlockHash = context.BlockHash;
+
+			pBlock->BeneficiaryAddress = GetSignerAddress(*pBlock);
 
 			// append all the transactions
 			auto* pDestination = reinterpret_cast<uint8_t*>(pBlock->TransactionsPtr());
@@ -146,17 +168,23 @@ namespace catapult { namespace model {
 	}
 
 	std::unique_ptr<Block> CreateBlock(
+			EntityType blockType,
 			const PreviousBlockContext& context,
 			NetworkIdentifier networkIdentifier,
 			const Key& signerPublicKey,
 			const Transactions& transactions) {
-		return CreateBlockT(context, networkIdentifier, signerPublicKey, transactions);
+		return CreateBlockT(blockType, context, networkIdentifier, signerPublicKey, transactions);
 	}
 
 	std::unique_ptr<Block> StitchBlock(const BlockHeader& blockHeader, const Transactions& transactions) {
-		auto size = sizeof(BlockHeader) + CalculateTotalSize(transactions);
+		auto headerSize = GetBlockHeaderSize(blockHeader.Type);
+		auto size = headerSize + CalculateTotalSize(transactions);
 		auto pBlock = utils::MakeUniqueWithSize<Block>(size);
-		std::memcpy(static_cast<void*>(pBlock.get()), &blockHeader, sizeof(BlockHeader));
+		auto* pBlockData = reinterpret_cast<uint8_t*>(pBlock.get());
+
+		// only copy BlockHeader and zero header footer
+		std::memcpy(pBlockData, &blockHeader, sizeof(BlockHeader));
+		std::memset(pBlockData + sizeof(BlockHeader), 0, headerSize - sizeof(BlockHeader));
 		pBlock->Size = static_cast<uint32_t>(size);
 
 		// append all the transactions

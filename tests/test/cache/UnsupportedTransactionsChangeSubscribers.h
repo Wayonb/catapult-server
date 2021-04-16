@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -61,7 +62,7 @@ namespace catapult { namespace test {
 			CATAPULT_THROW_RUNTIME_ERROR("notifyAddPartials - not supported in mock");
 		}
 
-		void notifyAddCosignature(const model::TransactionInfo&, const Key&, const Signature&) override {
+		void notifyAddCosignature(const model::TransactionInfo&, const model::Cosignature&) override {
 			CATAPULT_THROW_RUNTIME_ERROR("notifyAddCosignature - not supported in mock");
 		}
 

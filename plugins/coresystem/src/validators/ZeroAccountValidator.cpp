@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -30,8 +31,8 @@ namespace catapult { namespace validators {
 		auto zeroAddress = model::PublicKeyToAddress(Key(), networkIdentifier);
 		return MAKE_STATELESS_VALIDATOR_WITH_TYPE(ZeroAddress, Notification, [zeroAddress](const Notification& notification) {
 			// copy Address from unresolved to resolved in order to check it against (resolved) zeroAddress
-			// if it needs to be resolved, it will never match
-			return zeroAddress == model::ResolverContext().resolve(notification.Address)
+			// if it needs to be resolved, it will never match (due to different resolved bit flag)
+			return zeroAddress == notification.Address.resolved(model::ResolverContext())
 					? Failure_Core_Zero_Address
 					: ValidationResult::Success;
 		});
@@ -40,5 +41,5 @@ namespace catapult { namespace validators {
 	DEFINE_STATELESS_VALIDATOR_WITH_TYPE(ZeroPublicKey, model::AccountPublicKeyNotification, [](
 			const model::AccountPublicKeyNotification& notification) {
 		return Key() == notification.PublicKey ? Failure_Core_Zero_Public_Key : ValidationResult::Success;
-	});
+	})
 }}

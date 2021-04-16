@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -26,6 +27,8 @@
 #include <set>
 
 namespace catapult { namespace cache {
+
+	// region PtData
 
 	class PtData {
 	public:
@@ -64,16 +67,16 @@ namespace catapult { namespace cache {
 		}
 
 	public:
-		bool add(const Key& signer, const Signature& signature) {
-			if (weakCosignedTransactionInfo().hasCosignatory(signer))
+		bool add(const model::Cosignature& cosignature) {
+			if (weakCosignedTransactionInfo().hasCosignatory(cosignature.SignerPublicKey))
 				return false;
 
 			// insert cosignature into sorted vector
 			auto iter = m_cosignatures.begin();
-			while (m_cosignatures.end() != iter && iter->SignerPublicKey < signer)
+			while (m_cosignatures.end() != iter && iter->SignerPublicKey < cosignature.SignerPublicKey)
 				++iter;
 
-			m_cosignatures.insert(iter, { signer, signature });
+			m_cosignatures.insert(iter, cosignature);
 
 			// recalculate the cosignatures hash
 			crypto::Sha3_256(
@@ -85,22 +88,32 @@ namespace catapult { namespace cache {
 	private:
 		model::DetachedTransactionInfo m_transactionInfo;
 		Hash256 m_cosignaturesHash;
-		std::vector<model::Cosignature> m_cosignatures; // sorted by signer so that sets of cosignatures added in different order match
+
+		// sorted by SignerPublicKey so that sets of cosignatures added in different order match
+		std::vector<model::Cosignature> m_cosignatures;
 	};
+
+	// endregion
 
 	// region MemoryPtCacheView
 
 	MemoryPtCacheView::MemoryPtCacheView(
-			uint64_t maxResponseSize,
+			utils::FileSize maxResponseSize,
+			utils::FileSize cacheSize,
 			const PtDataContainer& transactionDataContainer,
 			utils::SpinReaderWriterLock::ReaderLockGuard&& readLock)
 			: m_maxResponseSize(maxResponseSize)
+			, m_cacheSize(cacheSize)
 			, m_transactionDataContainer(transactionDataContainer)
 			, m_readLock(std::move(readLock))
 	{}
 
 	size_t MemoryPtCacheView::size() const {
 		return m_transactionDataContainer.size();
+	}
+
+	utils::FileSize MemoryPtCacheView::memorySize() const {
+		return m_cacheSize;
 	}
 
 	model::WeakCosignedTransactionInfo MemoryPtCacheView::find(const Hash256& hash) const {
@@ -123,7 +136,9 @@ namespace catapult { namespace cache {
 		return shortHashPairs;
 	}
 
-	MemoryPtCacheView::UnknownTransactionInfos MemoryPtCacheView::unknownTransactions(const ShortHashPairMap& knownShortHashPairs) const {
+	MemoryPtCacheView::UnknownTransactionInfos MemoryPtCacheView::unknownTransactions(
+			Timestamp minDeadline,
+			const ShortHashPairMap& knownShortHashPairs) const {
 		uint64_t totalSize = 0;
 		UnknownTransactionInfos unknownTransactionInfos;
 		for (const auto& pair : m_transactionDataContainer) {
@@ -133,6 +148,9 @@ namespace catapult { namespace cache {
 
 			// if both hashes match, the data is completely known, so skip it
 			if (knownShortHashPairs.cend() != iter && iter->second == utils::ToShortHash(ptData.cosignaturesHash()))
+				continue;
+
+			if (ptData.transaction()->Deadline < minDeadline)
 				continue;
 
 			auto entrySize = sizeof(Hash256) + sizeof(model::Cosignature) * ptData.cosignatures().size();
@@ -147,7 +165,7 @@ namespace catapult { namespace cache {
 			}
 
 			totalSize += entrySize;
-			if (totalSize > m_maxResponseSize)
+			if (totalSize > m_maxResponseSize.bytes())
 				break;
 
 			unknownTransactionInfos.push_back(transactionInfo);
@@ -168,11 +186,13 @@ namespace catapult { namespace cache {
 		class MemoryPtCacheModifier : public PtCacheModifier {
 		public:
 			MemoryPtCacheModifier(
-					uint64_t maxCacheSize,
+					utils::FileSize maxCacheSize,
+					utils::FileSize& cacheSize,
 					PtDataContainer& transactionDataContainer,
 					std::set<state::TimestampedHash>& timestampedHashes,
 					utils::SpinReaderWriterLock::WriterLockGuard&& writeLock)
 					: m_maxCacheSize(maxCacheSize)
+					, m_cacheSize(cacheSize)
 					, m_transactionDataContainer(transactionDataContainer)
 					, m_timestampedHashes(timestampedHashes)
 					, m_writeLock(std::move(writeLock))
@@ -183,8 +203,13 @@ namespace catapult { namespace cache {
 				return m_transactionDataContainer.size();
 			}
 
+			utils::FileSize memorySize() const override {
+				return m_cacheSize;
+			}
+
 			bool add(const model::DetachedTransactionInfo& transactionInfo) override {
-				if (m_maxCacheSize <= m_transactionDataContainer.size())
+				auto transactionSize = transactionInfo.pEntity->Size;
+				if (m_maxCacheSize.bytes() - m_cacheSize.bytes() < transactionSize)
 					return false;
 
 				auto iter = m_transactionDataContainer.find(transactionInfo.EntityHash);
@@ -193,15 +218,21 @@ namespace catapult { namespace cache {
 
 				m_transactionDataContainer.emplace(transactionInfo.EntityHash, PtData(transactionInfo));
 				m_timestampedHashes.emplace(transactionInfo.pEntity->Deadline, transactionInfo.EntityHash);
-				LogSizes("partial transactions", m_transactionDataContainer.size(), m_maxCacheSize);
+
+				auto oldCacheSize = m_cacheSize;
+				m_cacheSize = utils::FileSize::FromBytes(m_cacheSize.bytes() + transactionSize);
+				LogSizes("partial transactions", oldCacheSize, m_cacheSize, m_maxCacheSize);
 				return true;
 			}
 
-			model::DetachedTransactionInfo add(const Hash256& parentHash, const Key& signer, const Signature& signature) override {
+			model::DetachedTransactionInfo add(const Hash256& parentHash, const model::Cosignature& cosignature) override {
 				auto iter = m_transactionDataContainer.find(parentHash);
-				return m_transactionDataContainer.cend() == iter || !iter->second.add(signer, signature)
-						? model::DetachedTransactionInfo()
-						: ToTransactionInfo(*iter);
+				if (m_transactionDataContainer.cend() == iter || !iter->second.add(cosignature))
+					return model::DetachedTransactionInfo();
+
+				// don't enforce maxCacheSize here or partials might not be able to complete when cache is full
+				m_cacheSize = utils::FileSize::FromBytes(m_cacheSize.bytes() + sizeof(model::Cosignature));
+				return ToTransactionInfo(*iter);
 			}
 
 			model::DetachedTransactionInfo remove(const Hash256& hash) override {
@@ -247,11 +278,14 @@ namespace catapult { namespace cache {
 		private:
 			void remove(PtDataContainer::iterator iter) {
 				m_timestampedHashes.erase(iter->second.timestampedHash());
+				auto numRemovedBytes = iter->second.transaction()->Size + sizeof(model::Cosignature) * iter->second.cosignatures().size();
+				m_cacheSize = utils::FileSize::FromBytes(m_cacheSize.bytes() - numRemovedBytes);
 				m_transactionDataContainer.erase(iter);
 			}
 
 		private:
-			uint64_t m_maxCacheSize;
+			utils::FileSize m_maxCacheSize;
+			utils::FileSize& m_cacheSize;
 			PtDataContainer& m_transactionDataContainer;
 			std::set<state::TimestampedHash>& m_timestampedHashes;
 			utils::SpinReaderWriterLock::WriterLockGuard m_writeLock;
@@ -264,6 +298,8 @@ namespace catapult { namespace cache {
 
 	struct MemoryPtCache::Impl {
 		PtDataContainer TransactionDataContainer;
+		utils::FileSize CacheSize;
+
 		std::set<state::TimestampedHash> TimestampedHashes;
 	};
 
@@ -276,13 +312,14 @@ namespace catapult { namespace cache {
 
 	MemoryPtCacheView MemoryPtCache::view() const {
 		auto readLock = m_lock.acquireReader();
-		return MemoryPtCacheView(m_options.MaxResponseSize, m_pImpl->TransactionDataContainer, std::move(readLock));
+		return MemoryPtCacheView(m_options.MaxResponseSize, m_pImpl->CacheSize, m_pImpl->TransactionDataContainer, std::move(readLock));
 	}
 
 	PtCacheModifierProxy MemoryPtCache::modifier() {
 		auto writeLock = m_lock.acquireWriter();
 		return PtCacheModifierProxy(std::make_unique<MemoryPtCacheModifier>(
 				m_options.MaxCacheSize,
+				m_pImpl->CacheSize,
 				m_pImpl->TransactionDataContainer,
 				m_pImpl->TimestampedHashes,
 				std::move(writeLock)));

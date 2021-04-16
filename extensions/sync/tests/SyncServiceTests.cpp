@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,8 +32,6 @@ namespace catapult { namespace sync {
 #define TEST_CLASS SyncServiceTests
 
 	namespace {
-		constexpr auto Num_Expected_Tasks = 3u;
-
 		struct SyncServiceTraits {
 			static constexpr auto CreateRegistrar = CreateSyncServiceRegistrar;
 		};
@@ -49,6 +48,7 @@ namespace catapult { namespace sync {
 					return [](auto&&, auto) { return disruptor::DisruptorElementId(); };
 				});
 				hooks.setTransactionRangeConsumerFactory([](auto) { return [](auto&&) {}; });
+				hooks.setLocalFinalizedHeightHashPairSupplier([]() { return model::HeightHashPair{ Height(1), Hash256() }; });
 			}
 		};
 	}
@@ -57,16 +57,12 @@ namespace catapult { namespace sync {
 
 	// region tasks
 
-	TEST(TEST_CLASS, ConnectPeersTaskIsScheduled) {
-		test::AssertRegisteredTask(TestContext(), Num_Expected_Tasks, "connect peers task for service Sync");
-	}
-
-	TEST(TEST_CLASS, SynchronizerTaskIsScheduled) {
-		test::AssertRegisteredTask(TestContext(), Num_Expected_Tasks, "synchronizer task");
-	}
-
-	TEST(TEST_CLASS, PullUtTaskIsScheduled) {
-		test::AssertRegisteredTask(TestContext(), Num_Expected_Tasks, "pull unconfirmed transactions task");
+	TEST(TEST_CLASS, TasksAreRegistered) {
+		test::AssertRegisteredTasks(TestContext(), {
+			"connect peers task for service Sync",
+			"synchronizer task",
+			"pull unconfirmed transactions task"
+		});
 	}
 
 	// endregion

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -29,11 +30,11 @@ namespace catapult { namespace cache {
 	BasicAccountStateCacheDelta::BasicAccountStateCacheDelta(
 			const AccountStateCacheTypes::BaseSetDeltaPointers& accountStateSets,
 			const AccountStateCacheTypes::Options& options,
-			const model::AddressSet& highValueAddresses)
+			const HighValueAccounts& highValueAccounts)
 			: BasicAccountStateCacheDelta(
 					accountStateSets,
 					options,
-					highValueAddresses,
+					highValueAccounts,
 					std::make_unique<AccountStateCacheDeltaMixins::KeyLookupAdapter>(
 							*accountStateSets.pKeyLookupMap,
 							*accountStateSets.pPrimary))
@@ -42,22 +43,20 @@ namespace catapult { namespace cache {
 	BasicAccountStateCacheDelta::BasicAccountStateCacheDelta(
 			const AccountStateCacheTypes::BaseSetDeltaPointers& accountStateSets,
 			const AccountStateCacheTypes::Options& options,
-			const model::AddressSet& highValueAddresses,
+			const HighValueAccounts& highValueAccounts,
 			std::unique_ptr<AccountStateCacheDeltaMixins::KeyLookupAdapter>&& pKeyLookupAdapter)
 			: AccountStateCacheDeltaMixins::Size(*accountStateSets.pPrimary)
 			, AccountStateCacheDeltaMixins::ContainsAddress(*accountStateSets.pPrimary)
 			, AccountStateCacheDeltaMixins::ContainsKey(*accountStateSets.pKeyLookupMap)
 			, AccountStateCacheDeltaMixins::ConstAccessorAddress(*accountStateSets.pPrimary)
 			, AccountStateCacheDeltaMixins::ConstAccessorKey(*pKeyLookupAdapter)
-			, AccountStateCacheDeltaMixins::MutableAccessorAddress(*accountStateSets.pPrimary)
-			, AccountStateCacheDeltaMixins::MutableAccessorKey(*pKeyLookupAdapter)
 			, AccountStateCacheDeltaMixins::PatriciaTreeDelta(*accountStateSets.pPrimary, accountStateSets.pPatriciaTree)
 			, AccountStateCacheDeltaMixins::DeltaElements(*accountStateSets.pPrimary)
 			, m_pStateByAddress(accountStateSets.pPrimary)
 			, m_pKeyToAddress(accountStateSets.pKeyLookupMap)
 			, m_options(options)
-			, m_highValueAddresses(highValueAddresses)
 			, m_pKeyLookupAdapter(std::move(pKeyLookupAdapter))
+			, m_highValueAccountsUpdater(m_options, highValueAccounts)
 	{}
 
 	model::NetworkIdentifier BasicAccountStateCacheDelta::networkIdentifier() const {
@@ -80,15 +79,25 @@ namespace catapult { namespace cache {
 		return m_options.HarvestingMosaicId;
 	}
 
-	Address BasicAccountStateCacheDelta::getAddress(const Key& publicKey) {
-		auto keyToAddressIter = m_pKeyToAddress->find(publicKey);
-		const auto* pPair = keyToAddressIter.get();
-		if (pPair)
-			return pPair->second;
+	namespace {
+		template<typename TIterator>
+		TIterator PrepareMutableIterator(TIterator&& iter, const AccountStateCacheTypes::Options& options) {
+			// in order to guarantee deterministic sorting of mosaics, CurrencyMosaicId always needs to be set as the optimized mosaic id
+			// before the iterator is returned because that information is lost during serialization when the AccountState doesn't
+			// contain any CurrencyMosaicId balance
+			if (iter.tryGet())
+				iter.get().Balances.optimize(options.CurrencyMosaicId);
 
-		auto address = model::PublicKeyToAddress(publicKey, m_options.NetworkIdentifier);
-		m_pKeyToAddress->emplace(publicKey, address);
-		return address;
+			return std::move(iter);
+		}
+	}
+
+	AccountStateCacheDeltaMixins::MutableAccessorAddress::iterator BasicAccountStateCacheDelta::find(const Address& address) {
+		return PrepareMutableIterator(AccountStateCacheDeltaMixins::MutableAccessorAddress(*m_pStateByAddress).find(address), m_options);
+	}
+
+	AccountStateCacheDeltaMixins::MutableAccessorKey::iterator BasicAccountStateCacheDelta::find(const Key& key) {
+		return PrepareMutableIterator(AccountStateCacheDeltaMixins::MutableAccessorKey(*m_pKeyLookupAdapter).find(key), m_options);
 	}
 
 	void BasicAccountStateCacheDelta::addAccount(const Address& address, Height height) {
@@ -125,44 +134,6 @@ namespace catapult { namespace cache {
 		m_pStateByAddress->find(accountState.Address).get()->Balances.optimize(m_options.CurrencyMosaicId);
 	}
 
-	void BasicAccountStateCacheDelta::remove(const Address& address, Height height) {
-		auto accountStateIter = this->find(address);
-		if (!accountStateIter.tryGet())
-			return;
-
-		const auto& accountState = accountStateIter.get();
-		if (height != accountState.AddressHeight)
-			return;
-
-		// note: we can only remove the entry from m_pKeyToAddress if the account state's public key is valid
-		if (Height(0) != accountState.PublicKeyHeight)
-			m_pKeyToAddress->remove(accountState.PublicKey);
-
-		m_pStateByAddress->remove(address);
-	}
-
-	void BasicAccountStateCacheDelta::remove(const Key& publicKey, Height height) {
-		auto accountStateIter = this->find(publicKey);
-		if (!accountStateIter.tryGet())
-			return;
-
-		auto& accountState = accountStateIter.get();
-		if (height != accountState.PublicKeyHeight)
-			return;
-
-		m_pKeyToAddress->remove(accountState.PublicKey);
-
-		// if same height, remove address entry too
-		if (accountState.PublicKeyHeight == accountState.AddressHeight) {
-			m_pStateByAddress->remove(accountState.Address);
-			return;
-		}
-
-		// safe, as the account is still in m_pStateByAddress
-		accountState.PublicKeyHeight = Height(0);
-		accountState.PublicKey = Key();
-	}
-
 	void BasicAccountStateCacheDelta::queueRemove(const Address& address, Height height) {
 		m_queuedRemoveByAddress.emplace(height, address);
 	}
@@ -179,73 +150,107 @@ namespace catapult { namespace cache {
 		m_queuedRemoveByPublicKey.erase(std::make_pair(height, publicKey));
 	}
 
-	void BasicAccountStateCacheDelta::commitRemovals() {
+	void BasicAccountStateCacheDelta::commitRemovals(CommitRemovalsMode mode) {
 		for (const auto& addressHeightPair : m_queuedRemoveByAddress)
 			remove(addressHeightPair.second, addressHeightPair.first);
 
 		for (const auto& keyHeightPair : m_queuedRemoveByPublicKey)
-			remove(keyHeightPair.second, keyHeightPair.first);
+			remove(keyHeightPair.second, keyHeightPair.first, mode);
 
 		m_queuedRemoveByAddress.clear();
 		m_queuedRemoveByPublicKey.clear();
 	}
 
-	namespace {
-		class HighValueAddressesUpdater {
-		private:
-			using DeltasSet = AccountStateCacheTypes::PrimaryTypes::BaseSetDeltaType::SetType::MemorySetType;
-
-		public:
-			HighValueAddressesUpdater(
-					const model::AddressSet& originalHighValueAddresses,
-					BasicAccountStateCacheDelta::HighValueAddressesTuple& highValueAddressesTuple)
-					: m_original(originalHighValueAddresses)
-					, m_current(highValueAddressesTuple.Current)
-					, m_removed(highValueAddressesTuple.Removed)
-			{}
-
-		public:
-			void update(const DeltasSet& source, const predicate<const state::AccountState&>& include) {
-				for (const auto& pair : source) {
-					const auto& accountState = pair.second;
-					const auto& address = accountState.Address;
-					if (include(accountState)) {
-						m_current.insert(address);
-
-						// don't need to modify m_removed because an element can't be in both Added and Copied
-					} else {
-						m_current.erase(address);
-
-						if (m_original.cend() != m_original.find(address))
-							m_removed.insert(address);
-					}
-				}
-			}
-
-		private:
-			const model::AddressSet& m_original;
-			model::AddressSet& m_current;
-			model::AddressSet& m_removed;
-		};
+	const HighValueAccountsUpdater& BasicAccountStateCacheDelta::highValueAccounts() const {
+		return m_highValueAccountsUpdater;
 	}
 
-	BasicAccountStateCacheDelta::HighValueAddressesTuple BasicAccountStateCacheDelta::highValueAddresses() const {
-		// 1. copy original high value addresses
-		HighValueAddressesTuple highValueAddresses;
-		highValueAddresses.Current = m_highValueAddresses;
-
-		// 2. update for changes
-		auto minBalance = m_options.MinHarvesterBalance;
-		auto harvestingMosaicId = m_options.HarvestingMosaicId;
-		auto hasHighValue = [minBalance, harvestingMosaicId](const auto& accountState) {
-			return accountState.Balances.get(harvestingMosaicId) >= minBalance;
-		};
-
-		auto deltas = m_pStateByAddress->deltas();
-		HighValueAddressesUpdater updater(m_highValueAddresses, highValueAddresses);
-		updater.update(deltas.Added, hasHighValue);
-		updater.update(deltas.Copied, hasHighValue);
-		updater.update(deltas.Removed, [](const auto&) { return false; });
-		return highValueAddresses;
+	void BasicAccountStateCacheDelta::updateHighValueAccounts(Height height) {
+		m_highValueAccountsUpdater.setHeight(height);
+		m_highValueAccountsUpdater.update(m_pStateByAddress->deltas());
 	}
+
+	void BasicAccountStateCacheDelta::processHighValueRemovedAccounts(model::ImportanceHeight importanceHeight) {
+		model::AddressSet filteredRemovedHighValueAddresses;
+
+		const auto& removedHighValueAddresses = m_highValueAccountsUpdater.removedAddresses();
+		for (const auto& address : removedHighValueAddresses) {
+			auto accountStateIter = find(address);
+			if (!accountStateIter.tryGet())
+				continue;
+
+			auto& accountState = accountStateIter.get();
+			auto& activityBuckets = accountState.ActivityBuckets;
+			auto currentBucket = activityBuckets.get(importanceHeight);
+			if (currentBucket.StartHeight == importanceHeight)
+				activityBuckets.pop();
+
+			// shift the removed account's buckets and snapshots
+			activityBuckets.push();
+			accountState.ImportanceSnapshots.push();
+
+			if (state::HasHistoricalInformation(accountState))
+				filteredRemovedHighValueAddresses.insert(address);
+		}
+
+		m_highValueAccountsUpdater.setRemovedAddresses(std::move(filteredRemovedHighValueAddresses));
+	}
+
+	HighValueAccounts BasicAccountStateCacheDelta::detachHighValueAccounts() {
+		return m_highValueAccountsUpdater.detachAccounts();
+	}
+
+	void BasicAccountStateCacheDelta::prune(Height height) {
+		m_highValueAccountsUpdater.prune(model::CalculateGroupedHeight<Height>(height, m_options.VotingSetGrouping));
+	}
+
+	Address BasicAccountStateCacheDelta::getAddress(const Key& publicKey) {
+		auto keyToAddressIter = m_pKeyToAddress->find(publicKey);
+		const auto* pPair = keyToAddressIter.get();
+		if (pPair)
+			return pPair->second;
+
+		auto address = model::PublicKeyToAddress(publicKey, m_options.NetworkIdentifier);
+		m_pKeyToAddress->emplace(publicKey, address);
+		return address;
+	}
+
+	void BasicAccountStateCacheDelta::remove(const Address& address, Height height) {
+		auto accountStateIter = this->find(address);
+		if (!accountStateIter.tryGet())
+			return;
+
+		const auto& accountState = accountStateIter.get();
+		if (height != accountState.AddressHeight)
+			return;
+
+		// note: we can only remove the entry from m_pKeyToAddress if the account state's public key is valid
+		if (Height(0) != accountState.PublicKeyHeight)
+			m_pKeyToAddress->remove(accountState.PublicKey);
+
+		m_pStateByAddress->remove(address);
+	}
+
+	void BasicAccountStateCacheDelta::remove(const Key& publicKey, Height height, CommitRemovalsMode mode) {
+		auto accountStateIter = this->find(publicKey);
+		if (!accountStateIter.tryGet())
+			return;
+
+		auto& accountState = accountStateIter.get();
+		if (height != accountState.PublicKeyHeight)
+			return;
+
+		m_pKeyToAddress->remove(accountState.PublicKey);
+
+		// if same height, remove address entry too
+		if (CommitRemovalsMode::Linked == mode && accountState.PublicKeyHeight == accountState.AddressHeight) {
+			m_pStateByAddress->remove(accountState.Address);
+			return;
+		}
+
+		// safe, as the account is still in m_pStateByAddress
+		accountState.PublicKeyHeight = Height(0);
+		accountState.PublicKey = Key();
+	}
+
 }}

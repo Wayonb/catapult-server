@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -396,15 +397,42 @@ namespace catapult { namespace state {
 		AssertContents(map, MosaicId(85), GetSevenExpectedMosaicsForOptimizeTests());
 	}
 
-	TEST(TEST_CLASS, CannotReoptimizeOrDeoptimizeMosaic) {
-		// Arrange: optimize and insert
+	TEST(TEST_CLASS, CanReoptimizeWithDifferentMosaic) {
+		// Arrange: insert and optimize
 		CompactMosaicMap map;
-		map.optimize(MosaicId(85));
 		InsertSevenForOptimizeTests(map);
+		map.optimize(MosaicId(102));
 
-		// Act + Assert:
-		EXPECT_THROW(map.optimize(MosaicId(30)), catapult_invalid_argument); // reoptimize
-		EXPECT_THROW(map.optimize(MosaicId()), catapult_invalid_argument); // deoptimize
+		// Sanity:
+		EXPECT_EQ(MosaicId(102), map.begin()->first);
+
+		// Act: change optimization
+		map.optimize(MosaicId(85));
+
+		// Assert: optimized mosaic id should be treated as smallest value
+		AssertContents(map, MosaicId(85), GetSevenExpectedMosaicsForOptimizeTests());
+
+		// Sanity:
+		EXPECT_EQ(MosaicId(85), map.begin()->first);
+	}
+
+	TEST(TEST_CLASS, CanDeoptimizeWhenOptimized) {
+		// Arrange: insert and optimize
+		CompactMosaicMap map;
+		InsertSevenForOptimizeTests(map);
+		map.optimize(MosaicId(102));
+
+		// Sanity:
+		EXPECT_EQ(MosaicId(102), map.begin()->first);
+
+		// Act: deoptimize
+		map.optimize(MosaicId(0));
+
+		// Assert:
+		AssertContents(map, GetSevenExpectedMosaicsForOptimizeTests());
+
+		// Sanity:
+		EXPECT_EQ(MosaicId(29), map.begin()->first);
 	}
 
 	// endregion

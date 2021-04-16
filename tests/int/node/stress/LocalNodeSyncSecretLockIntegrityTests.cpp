@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -73,11 +74,11 @@ namespace catapult { namespace local {
 			transactionsBuilder.addTransfer(0, 3, Amount(1'000'000));
 			auto secretProof = transactionsBuilder.addSecretLock(2, 3, Amount(100'000), Lock_Duration);
 
-			BlockChainBuilder builder(accounts, stateHashCalculator);
+			BlockChainBuilder builder(accounts, stateHashCalculator, context.createConfig().BlockChain);
 			auto pSecretLockBlock = utils::UniqueToShared(builder.asSingleBlock(transactionsBuilder));
 
 			// Act:
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			auto pIo = test::PushEntity(connection, ionet::PacketType::Push_Block, pSecretLockBlock);
 
 			// - wait for the chain height to change and for all height readers to disconnect
@@ -142,7 +143,7 @@ namespace catapult { namespace local {
 				auto secretLockTuple = PrepareSecretLock(m_context, m_accounts, stateHashCalculator, m_stateHashes);
 
 				// - add the specified number of blocks
-				test::ExternalSourceConnection connection;
+				test::ExternalSourceConnection connection(m_context.publicKey());
 				auto builder2 = secretLockTuple.Builder.createChainedBuilder();
 				auto transferBlocksResult = PushTransferBlocks(m_context, connection, m_accounts, builder2, numBlocks);
 				m_numAliveChains = transferBlocksResult.NumAliveChains;
@@ -248,7 +249,7 @@ namespace catapult { namespace local {
 			});
 
 			// Act:
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			auto pIo1 = test::PushEntities(connection, ionet::PacketType::Push_Block, nextBlocks);
 
 			// - wait for the chain height to change and for all height readers to disconnect
@@ -306,7 +307,7 @@ namespace catapult { namespace local {
 			});
 
 			// Act:
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			auto pIo1 = test::PushEntities(connection, ionet::PacketType::Push_Block, nextBlocks);
 
 			// - wait for the chain height to change and for all height readers to disconnect
@@ -368,7 +369,7 @@ namespace catapult { namespace local {
 			});
 
 			// Act:
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			auto pIo1 = test::PushEntities(connection, ionet::PacketType::Push_Block, worseBlocks);
 			auto pIo2 = test::PushEntities(connection, ionet::PacketType::Push_Block, betterBlocks);
 
@@ -442,7 +443,7 @@ namespace catapult { namespace local {
 			});
 
 			// Act:
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			auto pIo1 = test::PushEntities(connection, ionet::PacketType::Push_Block, worseBlocks);
 			auto pIo2 = test::PushEntities(connection, ionet::PacketType::Push_Block, betterBlocks);
 
@@ -495,6 +496,7 @@ namespace catapult { namespace local {
 			SecretLockRollbackTestContext()
 					: m_context(test::NonNemesisTransactionPlugins::Lock_Secret, ConfigTransform)
 					, m_accounts(4)
+					, m_connection(m_context.publicKey())
 			{}
 
 		public:
@@ -506,7 +508,7 @@ namespace catapult { namespace local {
 				// - wait for boot
 				test::WaitForBoot(m_context);
 
-				// - seed cache with mijin test private keys
+				// - seed cache with test private keys
 				//   this is needed since those keys are used to sign blocks and can lead to unexpected state changes when
 				//   they are added to the account state cache
 				auto builder = seedCache(allBlocks);
@@ -573,18 +575,18 @@ namespace catapult { namespace local {
 		private:
 			struct CacheSeedingTransactionsBuilder : public test::TransactionsGenerator {
 			public:
-				size_t size() const {
-					return std::size(test::Mijin_Test_Private_Keys);
+				size_t size() const override {
+					return std::size(test::Test_Network_Private_Keys);
 				}
 
-				std::unique_ptr<model::Transaction> generateAt(size_t index, Timestamp deadline) const {
-					auto keyPair = crypto::KeyPair::FromString(test::Mijin_Test_Private_Keys[index]);
-					auto recipient = model::PublicKeyToAddress(keyPair.publicKey(), model::NetworkIdentifier::Mijin_Test);
+				std::unique_ptr<model::Transaction> generateAt(size_t index, Timestamp deadline) const override {
+					auto keyPair = crypto::KeyPair::FromString(test::Test_Network_Private_Keys[index]);
+					auto recipient = model::PublicKeyToAddress(keyPair.publicKey(), model::NetworkIdentifier::Private_Test);
 					auto unresolvedRecipient = extensions::CopyToUnresolvedAddress(recipient);
 					auto pTransaction = test::CreateTransferTransaction(keyPair, unresolvedRecipient, Amount(0));
 					pTransaction->Deadline = deadline;
 					pTransaction->MaxFee = Amount(pTransaction->Size);
-					extensions::TransactionExtensions(test::GetNemesisGenerationHash()).sign(keyPair, *pTransaction);
+					extensions::TransactionExtensions(test::GetNemesisGenerationHashSeed()).sign(keyPair, *pTransaction);
 					return pTransaction;
 				}
 			};
@@ -592,7 +594,7 @@ namespace catapult { namespace local {
 			BlockChainBuilder seedCache(BlockChainBuilder::Blocks& allBlocks) {
 				CacheSeedingTransactionsBuilder transactionsBuilder;
 				auto stateHashCalculator = m_context.createStateHashCalculator();
-				BlockChainBuilder builder(m_accounts, stateHashCalculator);
+				BlockChainBuilder builder(m_accounts, stateHashCalculator, m_context.createConfig().BlockChain);
 				auto pBlock = utils::UniqueToShared(builder.asSingleBlock(transactionsBuilder));
 				allBlocks.push_back(pBlock);
 
@@ -713,10 +715,10 @@ namespace catapult { namespace local {
 			transactionsBuilder.addSecretProof(2, 3, secretProof);
 
 			// - send chain
-			BlockChainBuilder builder(accounts, stateHashCalculator);
+			BlockChainBuilder builder(accounts, stateHashCalculator, context.createConfig().BlockChain);
 			auto blocks = builder.asBlockChain(transactionsBuilder);
 
-			test::ExternalSourceConnection connection;
+			test::ExternalSourceConnection connection(context.publicKey());
 			test::PushEntities(connection, ionet::PacketType::Push_Block, blocks);
 			test::WaitForHeightAndElements(context, Height(5), 1, 1);
 			stateHashes.emplace_back(GetStateHash(context), GetComponentStateHash(context));

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,7 +25,7 @@
 #include "catapult/io/IndexFile.h"
 #include "tests/test/nodeps/Filesystem.h"
 #include "tests/TestHarness.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 namespace catapult { namespace test {
 
@@ -43,7 +44,7 @@ namespace catapult { namespace test {
 			auto numIndexFiles = 0u;
 			auto queuePath = qualifyQueueName(queueName);
 			for (const auto& indexFilename : { "index_server.dat", "index.dat", "index_broker_r.dat", "index_server_r.dat" }) {
-				if (boost::filesystem::exists(queuePath / indexFilename))
+				if (std::filesystem::exists(queuePath / indexFilename))
 					++numIndexFiles;
 			}
 
@@ -52,8 +53,8 @@ namespace catapult { namespace test {
 
 		size_t countMessageFiles(const std::string& queueName) const {
 			auto queuePath = qualifyQueueName(queueName);
-			auto begin = boost::filesystem::directory_iterator(queuePath);
-			auto end = boost::filesystem::directory_iterator();
+			auto begin = std::filesystem::directory_iterator(queuePath);
+			auto end = std::filesystem::directory_iterator();
 			auto numMessages = static_cast<size_t>(std::distance(begin, end));
 
 			// subtract index files
@@ -83,7 +84,7 @@ namespace catapult { namespace test {
 		}
 
 	private:
-		boost::filesystem::path qualifyQueueName(const std::string& queueName) const {
+		std::filesystem::path qualifyQueueName(const std::string& queueName) const {
 			return dataDirectory().spoolDir(queueName).path();
 		}
 

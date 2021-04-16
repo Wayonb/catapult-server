@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -50,9 +51,10 @@ namespace catapult { namespace extensions {
 		settings.SocketWorkingBufferSize = config.Node.SocketWorkingBufferSize;
 		settings.SocketWorkingBufferSensitivity = config.Node.SocketWorkingBufferSensitivity;
 		settings.MaxPacketDataSize = config.Node.MaxPacketDataSize;
+		settings.OutgoingProtocols = ionet::MapNodeRolesToIpProtocols(config.Node.Local.Roles);
 
-		settings.OutgoingSecurityMode = config.Node.OutgoingSecurityMode;
-		settings.IncomingSecurityModes = config.Node.IncomingSecurityModes;
+		settings.SslOptions.ContextSupplier = ionet::CreateSslContextSupplier(config.User.CertificateDirectory);
+		settings.SslOptions.VerifyCallbackSupplier = ionet::CreateSslVerifyCallbackSupplier();
 		return settings;
 	}
 
@@ -76,7 +78,7 @@ namespace catapult { namespace extensions {
 					unsigned short port,
 					ionet::ServiceIdentifier serviceId,
 					subscribers::NodeSubscriber& nodeSubscriber,
-					net::ConnectionContainer& acceptor)
+					net::AcceptedConnectionContainer& acceptor)
 					: Port(port)
 					, ServiceId(serviceId)
 					, NodeSubscriber(nodeSubscriber)
@@ -87,7 +89,7 @@ namespace catapult { namespace extensions {
 			unsigned short Port;
 			ionet::ServiceIdentifier ServiceId;
 			subscribers::NodeSubscriber& NodeSubscriber;
-			net::ConnectionContainer& Acceptor;
+			net::AcceptedConnectionContainer& Acceptor;
 		};
 	}
 
@@ -98,9 +100,8 @@ namespace catapult { namespace extensions {
 			const config::CatapultConfiguration& config,
 			const supplier<Timestamp>& timeSupplier,
 			subscribers::NodeSubscriber& nodeSubscriber,
-			net::ConnectionContainer& acceptor) {
-		auto endpoint = boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port);
-
+			net::AcceptedConnectionContainer& acceptor) {
+		auto endpoint = boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(config.Node.ListenInterface), port);
 		BootServerState bootServerState(port, serviceId, nodeSubscriber, acceptor);
 		auto rateMonitorSettings = GetRateMonitorSettings(config.Node.Banning);
 
@@ -109,11 +110,14 @@ namespace catapult { namespace extensions {
 			pCurrentNodeIdentity->Host = socketInfo.host();
 
 			auto rateExceededHandler = [bootServerState, pCurrentNodeIdentity]() {
-				bootServerState.NodeSubscriber.notifyBan(*pCurrentNodeIdentity, Failure_Extension_Read_Rate_Limit_Exceeded);
+				bootServerState.NodeSubscriber.notifyBan(
+						*pCurrentNodeIdentity,
+						utils::to_underlying_type(Failure_Extension_Read_Rate_Limit_Exceeded));
 				bootServerState.Acceptor.closeOne(*pCurrentNodeIdentity);
 			};
 			ionet::PacketSocketInfo decoratedSocketInfo(
 					socketInfo.host(),
+					socketInfo.publicKey(),
 					ionet::AddReadRateMonitor(socketInfo.socket(), rateMonitorSettings, timeSupplier, rateExceededHandler));
 
 			bootServerState.Acceptor.accept(decoratedSocketInfo, [bootServerState, pCurrentNodeIdentity](const auto& connectResult) {
@@ -123,11 +127,14 @@ namespace catapult { namespace extensions {
 						<< " from " << pCurrentNodeIdentity->Host << ": " << connectResult.Code;
 
 				if (net::PeerConnectCode::Accepted != connectResult.Code)
-					return;
+					return false;
 
 				*pCurrentNodeIdentity = connectResult.Identity;
-				if (!bootServerState.NodeSubscriber.notifyIncomingNode(connectResult.Identity, bootServerState.ServiceId))
-					bootServerState.Acceptor.closeOne(connectResult.Identity);
+				if (bootServerState.NodeSubscriber.notifyIncomingNode(connectResult.Identity, bootServerState.ServiceId))
+					return true;
+
+				bootServerState.Acceptor.closeOne(connectResult.Identity);
+				return false;
 			});
 		});
 

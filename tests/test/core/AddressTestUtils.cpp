@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -26,7 +27,7 @@
 namespace catapult { namespace test {
 
 	Address GenerateRandomAddress() {
-		return GenerateRandomAddress(model::NetworkIdentifier::Mijin_Test);
+		return GenerateRandomAddress(model::NetworkIdentifier::Private_Test);
 	}
 
 	Address GenerateRandomAddress(model::NetworkIdentifier networkIdentifier) {
@@ -36,6 +37,14 @@ namespace catapult { namespace test {
 
 	UnresolvedAddress GenerateRandomUnresolvedAddress() {
 		return extensions::CopyToUnresolvedAddress(GenerateRandomAddress());
+	}
+
+	std::vector<Address> GenerateRandomAddresses(size_t count) {
+		std::vector<Address> addresses;
+		for (auto i = 0u; i < count; ++i)
+			addresses.push_back(test::GenerateRandomAddress());
+
+		return addresses;
 	}
 
 	std::shared_ptr<model::UnresolvedAddressSet> GenerateRandomUnresolvedAddressSetPointer(size_t count) {

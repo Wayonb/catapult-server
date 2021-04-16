@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -27,8 +28,11 @@
 namespace catapult { namespace observers {
 
 	DEFINE_OBSERVER(ExpiredSecretLockInfo, model::BlockNotification, [](const auto&, ObserverContext& context) {
-		ExpiredLockInfoObserver<cache::SecretLockInfoCache>(context, model::Receipt_Type_LockSecret_Expired, [](const auto& lockInfo) {
-			return lockInfo.SenderPublicKey;
+		ExpiredLockInfoObserver<cache::SecretLockInfoCache>(context, model::Receipt_Type_LockSecret_Expired, [](
+				auto& accountStateCache,
+				const auto& lockInfo,
+				auto accountStateConsumer) {
+			accountStateConsumer(accountStateCache.find(lockInfo.OwnerAddress).get());
 		});
-	});
+	})
 }}

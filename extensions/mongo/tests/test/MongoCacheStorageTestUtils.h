@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -35,7 +36,8 @@ namespace catapult { namespace test {
 		class CacheStorageWrapper : public PrepareDatabaseMixin {
 		public:
 			CacheStorageWrapper()
-					: m_pMongoContext(CreateDefaultMongoStorageContext(DatabaseName()))
+					: m_pPool(CreateStartedIoThreadPool(Num_Default_Mongo_Test_Pool_Threads))
+					, m_pMongoContext(CreateDefaultMongoStorageContext(DatabaseName(), *m_pPool))
 					, m_pCacheStorage(TTraits::CreateCacheStorage(*m_pMongoContext, TTraits::Network_Id))
 			{}
 
@@ -45,6 +47,7 @@ namespace catapult { namespace test {
 			}
 
 		private:
+			std::unique_ptr<thread::IoThreadPool> m_pPool;
 			std::unique_ptr<mongo::MongoStorageContext> m_pMongoContext;
 			std::unique_ptr<mongo::ExternalCacheStorage> m_pCacheStorage;
 		};
@@ -71,11 +74,16 @@ namespace catapult { namespace test {
 
 	private:
 		static void AssertDbContains(mongocxx::database& database, const ElementType& element) {
+			// Assert: database contains matching element
 			auto filter = TTraits::GetFindFilter(element);
 			auto matchedDocument = database[TTraits::Collection_Name].find_one(filter.view());
 			ASSERT_TRUE(matchedDocument.has_value());
 
-			TTraits::AssertEqual(element, matchedDocument.value().view());
+			auto view = matchedDocument.value().view();
+			TTraits::AssertEqual(element, view);
+
+			// - all required properties are set
+			EXPECT_TRUE(!!view[TTraits::Primary_Document_Name].get_document().view()["version"]);
 		}
 	};
 }}

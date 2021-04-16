@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -32,6 +33,7 @@ namespace catapult { namespace ionet {
 				: Node(node)
 				, NodeInfo(source)
 				, NodeId(nodeId)
+				, HasIdentityUpdateInProgress(false)
 		{}
 
 	public:
@@ -43,6 +45,11 @@ namespace catapult { namespace ionet {
 
 		/// Local node identifier.
 		size_t NodeId;
+
+		/// \c true if part one of a two phase identity update has been detected.
+		/// \note Any identity change will require a two phase update where phase one is triggered by an accepted incoming connection,
+		///       which will likely have a lower NodeSource.
+		bool HasIdentityUpdateInProgress;
 	};
 
 	/// Container of nodes and associated data.

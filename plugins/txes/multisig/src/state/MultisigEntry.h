@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,6 +25,8 @@
 
 namespace catapult { namespace state {
 
+	using SortedAddressSet = std::set<Address>;
+
 	/// Mixin for storing information about cosignatories of an account.
 	class MultisigCosignatoriesMixin {
 	public:
@@ -34,19 +37,19 @@ namespace catapult { namespace state {
 		{}
 
 	public:
-		/// Gets the (const) cosignatory account keys.
-		const utils::SortedKeySet& cosignatoryPublicKeys() const {
-			return m_cosignatoryPublicKeys;
+		/// Gets the (const) cosignatory addresses.
+		const SortedAddressSet& cosignatoryAddresses() const {
+			return m_cosignatoryAddresses;
 		}
 
-		/// Gets the cosignatory account keys.
-		utils::SortedKeySet& cosignatoryPublicKeys() {
-			return m_cosignatoryPublicKeys;
+		/// Gets the cosignatory addresses.
+		SortedAddressSet& cosignatoryAddresses() {
+			return m_cosignatoryAddresses;
 		}
 
-		/// Returns \c true if \a key is a cosignatory.
-		bool hasCosignatory(const Key& key) const {
-			return m_cosignatoryPublicKeys.end() != m_cosignatoryPublicKeys.find(key);
+		/// Returns \c true if \a address is a cosignatory.
+		bool hasCosignatory(const Address& address) const {
+			return m_cosignatoryAddresses.end() != m_cosignatoryAddresses.find(address);
 		}
 
 		/// Gets the number of cosignatories required when approving (any) transaction.
@@ -70,7 +73,7 @@ namespace catapult { namespace state {
 		}
 
 	private:
-		utils::SortedKeySet m_cosignatoryPublicKeys;
+		SortedAddressSet m_cosignatoryAddresses;
 		uint32_t m_minApproval;
 		uint32_t m_minRemoval;
 	};
@@ -78,34 +81,34 @@ namespace catapult { namespace state {
 	/// Mixin for storing information about accounts that current account can cosign.
 	class MultisigCosignatoryOfMixin {
 	public:
-		/// Gets the (const) multisig account keys.
-		const utils::SortedKeySet& multisigPublicKeys() const {
-			return m_multisigPublicKeys;
+		/// Gets the (const) multisig addresses.
+		const SortedAddressSet& multisigAddresses() const {
+			return m_multisigAddresses;
 		}
 
-		/// Gets the multisig account keys.
-		utils::SortedKeySet& multisigPublicKeys() {
-			return m_multisigPublicKeys;
+		/// Gets the multisig addresses.
+		SortedAddressSet& multisigAddresses() {
+			return m_multisigAddresses;
 		}
 
 	private:
-		utils::SortedKeySet m_multisigPublicKeys;
+		SortedAddressSet m_multisigAddresses;
 	};
 
 	/// Multisig entry.
 	class PLUGIN_API_DEPENDENCY MultisigEntry : public MultisigCosignatoriesMixin, public MultisigCosignatoryOfMixin {
 	public:
-		/// Creates a multisig entry around \a key.
-		explicit MultisigEntry(const Key& key) : m_key(key)
+		/// Creates a multisig entry around \a address.
+		explicit MultisigEntry(const Address& address) : m_address(address)
 		{}
 
 	public:
-		/// Gets the account public key.
-		const Key& key() const {
-			return m_key;
+		/// Gets the account address.
+		const Address& address() const {
+			return m_address;
 		}
 
 	private:
-		Key m_key;
+		Address m_address;
 	};
 }}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,6 +21,7 @@
 
 #include "catapult/local/server/NemesisBlockNotifier.h"
 #include "catapult/cache_core/AccountStateCache.h"
+#include "catapult/model/Address.h"
 #include "catapult/plugins/PluginManager.h"
 #include "tests/test/core/BlockStatementTestUtils.h"
 #include "tests/test/core/BlockTestUtils.h"
@@ -27,8 +29,9 @@
 #include "tests/test/local/LocalTestUtils.h"
 #include "tests/test/nemesis/NemesisCompatibleConfiguration.h"
 #include "tests/test/nemesis/NemesisTestUtils.h"
-#include "tests/test/nodeps/MijinConstants.h"
+#include "tests/test/nodeps/TestNetworkConstants.h"
 #include "tests/test/other/mocks/MockBlockChangeSubscriber.h"
+#include "tests/test/other/mocks/MockFinalizationSubscriber.h"
 #include "tests/test/other/mocks/MockStateChangeSubscriber.h"
 #include "tests/TestHarness.h"
 
@@ -51,6 +54,11 @@ namespace catapult { namespace local {
 		public:
 			auto& notifier() {
 				return m_notifier;
+			}
+
+		public:
+			auto nemesisEntityHash() {
+				return m_pStorage->view().loadBlockElement(Height(1))->EntityHash;
 			}
 
 		public:
@@ -90,24 +98,11 @@ namespace catapult { namespace local {
 		// endregion
 	}
 
-	// region block notifications
+	// region block change notifications
 
-	TEST(TEST_CLASS, BlockNotificationsAreNotRaisedWhenHeightIsGreaterThanOne) {
+	TEST(TEST_CLASS, BlockChangeNotificationsAreNotRaisedWhenPreviousExecutionIsDetected) {
 		// Arrange:
 		TestContext context(2);
-		mocks::MockBlockChangeSubscriber subscriber;
-
-		// Act:
-		EXPECT_THROW(context.notifier().raise(subscriber), catapult_runtime_error);
-
-		// Assert:
-		const auto& capturedBlockElements = subscriber.copiedBlockElements();
-		EXPECT_EQ(0u, capturedBlockElements.size());
-	}
-
-	TEST(TEST_CLASS, BlockNotificationsAreNotRaisedWhenHeightIsEqualToOneAndPreviousExecutionIsDetected) {
-		// Arrange: add account to indicate previous execution
-		TestContext context(1);
 		context.addRandomAccountToCache();
 		mocks::MockBlockChangeSubscriber subscriber;
 
@@ -119,9 +114,9 @@ namespace catapult { namespace local {
 		EXPECT_EQ(0u, capturedBlockElements.size());
 	}
 
-	TEST(TEST_CLASS, BlockNotificationsAreRaisedWhenHeightIsEqualToOneAndPreviousExecutionIsNotDetected_WithoutStatement) {
+	TEST(TEST_CLASS, BlockChangeNotificationsAreRaisedWhenPreviousExecutionIsNotDetected_WithoutStatement) {
 		// Arrange:
-		TestContext context(1);
+		TestContext context(2);
 		mocks::MockBlockChangeSubscriber subscriber;
 
 		// Act:
@@ -135,9 +130,9 @@ namespace catapult { namespace local {
 		EXPECT_FALSE(capturedBlockElements[0]->OptionalStatement);
 	}
 
-	TEST(TEST_CLASS, BlockNotificationsAreRaisedWhenHeightIsEqualToOneAndPreviousExecutionIsNotDetected_WithStatement) {
+	TEST(TEST_CLASS, BlockChangeNotificationsAreRaisedWhenPreviousExecutionIsNotDetected_WithStatement) {
 		// Arrange:
-		TestContext context(1);
+		TestContext context(2);
 		auto pBlockStatement = context.reseedNemesisWithStatement();
 		mocks::MockBlockChangeSubscriber subscriber;
 
@@ -155,7 +150,41 @@ namespace catapult { namespace local {
 
 	// endregion
 
-	// region state notifications
+	// region finalization notifications
+
+	TEST(TEST_CLASS, FinalizationNotificationsAreNotRaisedWhenPreviousExecutionIsDetected) {
+		// Arrange:
+		TestContext context(2);
+		context.addRandomAccountToCache();
+		mocks::MockFinalizationSubscriber subscriber;
+
+		// Act:
+		EXPECT_THROW(context.notifier().raise(subscriber), catapult_runtime_error);
+
+		// Assert:
+		EXPECT_EQ(0u, subscriber.finalizedBlockParams().params().size());
+	}
+
+	TEST(TEST_CLASS, FinalizationNotificationsAreRaisedWhenPreviousExecutionIsNotDetected) {
+		// Arrange:
+		TestContext context(2);
+		mocks::MockFinalizationSubscriber subscriber;
+
+		// Act:
+		context.notifier().raise(subscriber);
+
+		// Assert:
+		ASSERT_EQ(1u, subscriber.finalizedBlockParams().params().size());
+
+		const auto& subscriberParams = subscriber.finalizedBlockParams().params()[0];
+		EXPECT_EQ(model::FinalizationRound({ FinalizationEpoch(1), FinalizationPoint(1) }), subscriberParams.Round);
+		EXPECT_EQ(Height(1), subscriberParams.Height);
+		EXPECT_EQ(context.nemesisEntityHash(), subscriberParams.Hash);
+	}
+
+	// endregion
+
+	// region state change notifications
 
 	namespace {
 		model::AddressSet GetAddedAccountAddresses(const cache::CacheChanges& cacheChanges) {
@@ -174,15 +203,12 @@ namespace catapult { namespace local {
 		bool ContainsModifiedPrivate(const model::AddressSet& addresses, const char* privateKeyString) {
 			return ContainsAddress(addresses, test::RawPrivateKeyToAddress(privateKeyString));
 		}
-
-		bool ContainsModifiedPublic(const model::AddressSet& addresses, const char* publicKeyString) {
-			return ContainsAddress(addresses, test::RawPublicKeyToAddress(publicKeyString));
-		}
 	}
 
-	TEST(TEST_CLASS, StateNotificationsAreNotRaisedWhenHeightIsGreaterThanOne) {
+	TEST(TEST_CLASS, StateChangeNotificationsAreNotRaisedWhenPreviousExecutionIsDetected) {
 		// Arrange:
 		TestContext context(2);
+		context.addRandomAccountToCache();
 		mocks::MockStateChangeSubscriber subscriber;
 
 		// Act:
@@ -193,9 +219,9 @@ namespace catapult { namespace local {
 		EXPECT_EQ(0u, subscriber.numStateChanges());
 	}
 
-	TEST(TEST_CLASS, StateNotificationsAreRaisedWhenHeightIsEqualToOne) {
+	TEST(TEST_CLASS, StateChangeNotificationsAreRaisedWhenPreviousExecutionIsNotDetected) {
 		// Arrange:
-		TestContext context(1);
+		TestContext context(2);
 		mocks::MockStateChangeSubscriber subscriber;
 
 		// - register consumer because CatapultCacheDelta wrapped by CacheChanges is temporary and will be out of scope below
@@ -215,19 +241,19 @@ namespace catapult { namespace local {
 		EXPECT_EQ(model::ChainScore(1), chainScore);
 
 		const auto& stateChangeInfo = subscriber.lastStateChangeInfo();
-		EXPECT_EQ(model::ChainScore(1), stateChangeInfo.ScoreDelta);
+		EXPECT_EQ(model::ChainScore::Delta(1), stateChangeInfo.ScoreDelta);
 		EXPECT_EQ(Height(1), stateChangeInfo.Height);
 
 		// - check account state changes
-		EXPECT_EQ(3u + CountOf(test::Mijin_Test_Private_Keys), addedAddresses.size());
+		EXPECT_EQ(3u + CountOf(test::Test_Network_Private_Keys), addedAddresses.size());
 
 		// - check nemesis and rental fee sinks
-		EXPECT_TRUE(ContainsModifiedPrivate(addedAddresses, test::Mijin_Test_Nemesis_Private_Key));
-		EXPECT_TRUE(ContainsModifiedPublic(addedAddresses, test::Namespace_Rental_Fee_Sink_Public_Key));
-		EXPECT_TRUE(ContainsModifiedPublic(addedAddresses, test::Mosaic_Rental_Fee_Sink_Public_Key));
+		EXPECT_TRUE(ContainsModifiedPrivate(addedAddresses, test::Test_Network_Nemesis_Private_Key));
+		EXPECT_TRUE(ContainsAddress(addedAddresses, model::StringToAddress(test::Namespace_Rental_Fee_Sink_Address)));
+		EXPECT_TRUE(ContainsAddress(addedAddresses, model::StringToAddress(test::Mosaic_Rental_Fee_Sink_Address)));
 
 		// - check recipient accounts
-		for (const auto* pRecipientPrivateKeyString : test::Mijin_Test_Private_Keys)
+		for (const auto* pRecipientPrivateKeyString : test::Test_Network_Private_Keys)
 			EXPECT_TRUE(ContainsModifiedPrivate(addedAddresses, pRecipientPrivateKeyString)) << pRecipientPrivateKeyString;
 	}
 

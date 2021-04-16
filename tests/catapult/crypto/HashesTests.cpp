@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -46,7 +47,7 @@ namespace catapult { namespace crypto {
 				return "9C1185A5C5E9FC54612808977EE8F548B2258D31";
 			}
 
-			// data taken from : https://homes.esat.kuleuven.be/~bosselae/ripemd160.html
+			// data from: https://homes.esat.kuleuven.be/~bosselae/ripemd160.html
 			static std::vector<std::string> SampleTestVectorsInput() {
 				return {
 					AsciiToHexString("a"),
@@ -73,16 +74,6 @@ namespace catapult { namespace crypto {
 
 			static std::string MillionTimesATestVector() {
 				return "52783243C1697BDBE16D37F97F68F08325DC1528";
-			}
-
-			static std::vector<std::string> CatapultStringTestVectors() {
-				return {
-					"37F332F68DB77BD9D7EDD4969571AD671CF9DD3B",
-					"114C70B78838555E6C3AB418F3052A949F73544A",
-					"7D0982BE59EBE828D02AA0D031AA6651644D60DA",
-					"5A4535208909435DECD5C7D6D818F67626A177E4",
-					"1B3ACB0409F7BA78A0BE07A2DE5454DCB0D48817"
-				};
 			}
 		};
 
@@ -120,15 +111,44 @@ namespace catapult { namespace crypto {
 					"11B366EDFC0A8B66FEEBAE5C2E25A7B6A5D1CF31"
 				};
 			}
+		};
 
-			static std::vector<std::string> CatapultStringTestVectors() {
+		struct Sha256_Traits {
+			using HashType = Hash256;
+
+			static constexpr auto HashFunc = Sha256;
+
+			static std::string EmptyStringHash() {
+				return "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855";
+			}
+
+			// data from: https://opensource.apple.com/source/sudo/sudo-83/sudo/plugins/sudoers/regress/parser/check_digest.out.ok
+			static std::vector<std::string> SampleTestVectorsInput() {
 				return {
-					"0E3397B4ABC7A382B3EA2365883C3C7CA5F07600",
-					"5367F36F9B941E14EBE4B30783B8A32274481A62",
-					"17F200E445D54D96986F579662A85D7BF0A1E106",
-					"359327D26A3A91458E0F6FDD9BB9F4FF77B9299F",
-					"18638F1D82C80B35703A4B89227E3D567FA03BEA"
+					AsciiToHexString("a"),
+					AsciiToHexString("abc"),
+					AsciiToHexString("message digest"),
+					AsciiToHexString("abcdefghijklmnopqrstuvwxyz"),
+					AsciiToHexString("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"),
+					AsciiToHexString("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"),
+					AsciiToHexString("12345678901234567890123456789012345678901234567890123456789012345678901234567890")
 				};
+			}
+
+			static std::vector<std::string> SampleTestVectorsOutput() {
+				return {
+					"CA978112CA1BBDCAFAC231B39A23DC4DA786EFF8147C4E72B9807785AFEE48BB",
+					"BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD",
+					"F7846F55CF23E14EEBEAB5B4E1550CAD5B509E3348FBC4EFA3A1413D393CB650",
+					"71C480DF93D6AE2F1EFAD1447C66C9525E316218CF51FC8D9ED832F2DAF18B73",
+					"248D6A61D20638B8E5C026930C3E6039A33CE45964FF2167F6ECEDD419DB06C1",
+					"DB4BFCBD4DA0CD85A60C3C37D3FBD8805C77F15FC6B1FDFE614EE0A7C8FDB4C0",
+					"F371BC4A311F2B009EEF952DD83CA80E2B60026C8E935592D0F9C308453C813E"
+				};
+			}
+
+			static std::string MillionTimesATestVector() {
+				return "CDC76E5C9914FB9281A1C7E284D73E67F1809A48A497200E046D39CCC7112CD0";
 			}
 		};
 
@@ -141,7 +161,7 @@ namespace catapult { namespace crypto {
 				return "5DF6E0E2761359D30A8275058E299FCC0381534545F55CF43E41983F5D4C9456";
 			}
 
-			// data taken from : https://www.dlitz.net/crypto/shad256-test-vectors/
+			// data from: https://www.dlitz.net/crypto/shad256-test-vectors/
 			static std::vector<std::string> SampleTestVectorsInput() {
 				return {
 					"616263",
@@ -163,22 +183,61 @@ namespace catapult { namespace crypto {
 			static std::string MillionTimesATestVector() {
 				return "80D1189477563E1B5206B2749F1AFE4807E5705E8BD77887A60187A712156688";
 			}
+		};
 
-			// those vectors were generated
-			// non authorative results: https://github.com/DeathAndTaxes/BitCrypto/blob/master/BitCrypto.Test/Sha256Tests.cs
-			static std::vector<std::string> CatapultStringTestVectors() {
+		struct Sha512_Traits {
+			using HashBuilder = Sha512_Builder;
+			using HashType = HashBuilder::OutputType;
+
+			static constexpr auto HashFunc = Sha512;
+
+			static std::string EmptyStringHash() {
+				return
+						"CF83E1357EEFB8BDF1542850D66D8007D620E4050B5715DC83F4A921D36CE9CE"
+						"47D0D13C5D85F2B0FF8318D2877EEC2F63B931BD47417A81A538327AF927DA3E";
+			}
+
+			// data from: https://opensource.apple.com/source/sudo/sudo-83/sudo/plugins/sudoers/regress/parser/check_digest.out.ok
+			static std::vector<std::string> SampleTestVectorsInput() {
 				return {
-					"6D37795021E544D82B41850EDF7AABAB9A0EBE274E54A519840C4666F35B3937",
-					"DB6F466A6C6B50BE9AE850C01693BA95BEDC4A8CF8028D2B52B8429F406F6F2F",
-					"A1DB794104F5A6532731E7A0F3FD39077932A3B978CC9E250F20259DA900DAD4",
-					"7FE281A3E3F5AF049328818B02B8BEC1F9BAE1B5C5D8D3DD3F0AACE75700604F",
-					"94A09FEA3A99ED4CFE79819BDEA443AF4B35C83E9E92AD21669B521C5375FA9C"
+					AsciiToHexString("a"),
+					AsciiToHexString("abc"),
+					AsciiToHexString("message digest"),
+					AsciiToHexString("abcdefghijklmnopqrstuvwxyz"),
+					AsciiToHexString("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"),
+					AsciiToHexString("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"),
+					AsciiToHexString("12345678901234567890123456789012345678901234567890123456789012345678901234567890")
 				};
+			}
+
+			static std::vector<std::string> SampleTestVectorsOutput() {
+				return {
+					"1F40FC92DA241694750979EE6CF582F2D5D7D28E18335DE05ABC54D0560E0F53"
+					"02860C652BF08D560252AA5E74210546F369FBBBCE8C12CFC7957B2652FE9A75",
+					"DDAF35A193617ABACC417349AE20413112E6FA4E89A97EA20A9EEEE64B55D39A"
+					"2192992A274FC1A836BA3C23A3FEEBBD454D4423643CE80E2A9AC94FA54CA49F",
+					"107DBF389D9E9F71A3A95F6C055B9251BC5268C2BE16D6C13492EA45B0199F33"
+					"09E16455AB1E96118E8A905D5597B72038DDB372A89826046DE66687BB420E7C",
+					"4DBFF86CC2CA1BAE1E16468A05CB9881C97F1753BCE3619034898FAA1AABE429"
+					"955A1BF8EC483D7421FE3C1646613A59ED5441FB0F321389F77F48A879C7B1F1",
+					"204A8FC6DDA82F0A0CED7BEB8E08A41657C16EF468B228A8279BE331A703C335"
+					"96FD15C13B1B07F9AA1D3BEA57789CA031AD85C7A71DD70354EC631238CA3445",
+					"1E07BE23C26A86EA37EA810C8EC7809352515A970E9253C26F536CFC7A9996C4"
+					"5C8370583E0A78FA4A90041D71A4CEAB7423F19C71B9D5A3E01249F0BEBD5894",
+					"72EC1EF1124A45B047E8B7C75A932195135BB61DE24EC0D1914042246E0AEC3A"
+					"2354E093D76F3048B456764346900CB130D2A4FD5DD16ABB5E30BCB850DEE843"
+				};
+			}
+
+			static std::string MillionTimesATestVector() {
+				return
+						"E718483D0CE769644E2E42C7BC15B4638E1F98B13B2044285632A803AFA973EB"
+						"DE0FF244877EA60A4CB0432CE577C31BEB009C5C2C49AA2E4EADB217AD8CC09B";
 			}
 		};
 
 		struct Keccak_Base {
-			// data taken from http://mumble.net/~campbell/hg/sha3/kat/ShortMsgKAT_SHA3-256.txt
+			// data from: http://mumble.net/~campbell/hg/sha3/kat/ShortMsgKAT_SHA3-256.txt
 			static std::vector<std::string> SampleTestVectorsInput() {
 				return {
 					"CC",
@@ -200,7 +259,7 @@ namespace catapult { namespace crypto {
 				return "A7FFC6F8BF1ED76651C14756A061D662F580FF4DE43B49FA82D80A4B80F8434A";
 			}
 
-			// vectors taken from http://mumble.net/~campbell/hg/sha3/kat/ShortMsgKAT_SHA3-256.txt
+			// data from: http://mumble.net/~campbell/hg/sha3/kat/ShortMsgKAT_SHA3-256.txt
 			static std::vector<std::string> SampleTestVectorsOutput() {
 				return {
 					"677035391CD3701293D385F037BA32796252BB7CE180B00B582DD9B20AAAD7F0",
@@ -211,104 +270,9 @@ namespace catapult { namespace crypto {
 				};
 			}
 
-			// taken from https://www.di-mgt.com.au/sha_testvectors.html
+			// data from: https://www.di-mgt.com.au/sha_testvectors.html
 			static std::string MillionTimesATestVector() {
 				return "5C8875AE474A3634BA4FD55EC85BFFD661F32ACA75C6D699D0CDCB6C115891C1";
-			}
-		};
-
-		struct Sha3_512_Traits : public Keccak_Base {
-			using HashBuilder = Sha3_512_Builder;
-			using HashType = HashBuilder::OutputType;
-
-			static constexpr auto HashFunc = Sha3_512;
-
-			static std::string EmptyStringHash() {
-				return "A69F73CCA23A9AC5C8B567DC185A756E97C982164FE25859E0D1DCC1475C80A6"
-						"15B2123AF1F5F94C11E3E9402C3AC558F500199D95B6D3E301758586281DCD26";
-			}
-
-			// vectors taken from http://mumble.net/~campbell/hg/sha3/kat/ShortMsgKAT_SHA3-512.txt
-			static std::vector<std::string> SampleTestVectorsOutput() {
-				return {
-					"3939FCC8B57B63612542DA31A834E5DCC36E2EE0F652AC72E02624FA2E5ADEEC"
-					"C7DD6BB3580224B4D6138706FC6E80597B528051230B00621CC2B22999EAA205",
-					"AA092865A40694D91754DBC767B5202C546E226877147A95CB8B4C8F8709FE8C"
-					"D6905256B089DA37896EA5CA19D2CD9AB94C7192FC39F7CD4D598975A3013C69",
-					"CB20DCF54955F8091111688BECCEF48C1A2F0D0608C3A575163751F002DB30F4"
-					"0F2F671834B22D208591CFAF1F5ECFE43C49863A53B3225BDFD7C6591BA7658B",
-					"D4B4BDFEF56B821D36F4F70AB0D231B8D0C9134638FD54C46309D14FADA92A28"
-					"40186EED5415AD7CF3969BDFBF2DAF8CCA76ABFE549BE6578C6F4143617A4F1A",
-					"B087C90421AEBF87911647DE9D465CBDA166B672EC47CCD4054A7135A1EF885E"
-					"7903B52C3F2C3FE722B1C169297A91B82428956A02C631A2240F12162C7BC726"
-				};
-			}
-
-			// taken from https://www.di-mgt.com.au/sha_testvectors.html
-			static std::string MillionTimesATestVector() {
-				return "3C3A876DA14034AB60627C077BB98F7E120A2A5370212DFFB3385A18D4F38859"
-						"ED311D0A9D5141CE9CC5C66EE689B266A8AA18ACE8282A0E0DB596C90B0A7B87";
-			}
-		};
-
-		struct Keccak_256_Traits : public Keccak_Base {
-			using HashBuilder = Keccak_256_Builder;
-			using HashType = HashBuilder::OutputType;
-
-			static constexpr auto HashFunc = Keccak_256;
-
-			static std::string EmptyStringHash() {
-				return "C5D2460186F7233C927E7DB2DCC703C0E500B653CA82273B7BFAD8045D85A470";
-			}
-
-			static std::vector<std::string> SampleTestVectorsOutput() {
-				return {
-					"EEAD6DBFC7340A56CAEDC044696A168870549A6A7F6F56961E84A54BD9970B8A",
-					"A8EACEDA4D47B3281A795AD9E1EA2122B407BAF9AABCB9E18B5717B7873537D2",
-					"627D7BC1491B2AB127282827B8DE2D276B13D7D70FB4C5957FDF20655BC7AC30",
-					"B149E766D7612EAF7D55F74E1A4FDD63709A8115B14F61FCD22AA4ABC8B8E122",
-					"24DD2EE02482144F539F810D2CAA8A7B75D0FA33657E47932122D273C3F6F6D1"
-				};
-			}
-
-			// vector was generated
-			// non authorative results: https://github.com/weidai11/cryptopp/blob/master/TestVectors/keccak.txt
-			static std::string MillionTimesATestVector() {
-				return "FADAE6B49F129BBB812BE8407B7B2894F34AECF6DBD1F9B0F0C7E9853098FC96";
-			}
-		};
-
-		struct Keccak_512_Traits : public Keccak_Base {
-			using HashBuilder = Keccak_512_Builder;
-			using HashType = HashBuilder::OutputType;
-
-			static constexpr auto HashFunc = Keccak_512;
-
-			static std::string EmptyStringHash() {
-				return "0EAB42DE4C3CEB9235FC91ACFFE746B29C29A8C366B7C60E4E67C466F36A4304"
-						"C00FA9CAF9D87976BA469BCBE06713B435F091EF2769FB160CDAB33D3670680E";
-			}
-
-			static std::vector<std::string> SampleTestVectorsOutput() {
-				return {
-					"8630C13CBD066EA74BBE7FE468FEC1DEE10EDC1254FB4C1B7C5FD69B646E4416"
-					"0B8CE01D05A0908CA790DFB080F4B513BC3B6225ECE7A810371441A5AC666EB9",
-					"551DA6236F8B96FCE9F97F1190E901324F0B45E06DBBB5CDB8355D6ED1DC34B3"
-					"F0EAE7DCB68622FF232FA3CECE0D4616CDEB3931F93803662A28DF1CD535B731",
-					"EB7F2A98E00AF37D964F7D8C44C1FB6E114D8EE21A7B976AE736539EFDC1E3FE"
-					"43BECEF5015171E6DA30168CAE99A82C53FA99042774EF982C01626A540F08C0",
-					"952D4C0A6F0EF5CE438C52E3EDD345EA00F91CF5DA8097C1168A16069E958FC0"
-					"5BAD90A0C5FB4DD9EC28E84B226B94A847D6BB89235692EF4C9712F0C7030FAE",
-					"1EAFEDCE7292BA73B80AE6151745F43AC95BFC9F31694D422473ABCA2E69D695"
-					"CB6544DB65506078CB20DBE0762F84AA6AFD14A60AB597955BE73F3F5C50F7A8"
-				};
-			}
-
-			// vector was generated
-			// non authorative results: https://github.com/weidai11/cryptopp/blob/master/TestVectors/keccak.txt
-			static std::string MillionTimesATestVector() {
-				return "5CF53F2E556BE5A624425EDE23D0E8B2C7814B4BA0E4E09CBBF3C2FAC7056F61"
-						"E048FC341262875EBC58A5183FEA651447124370C1EBF4D6C89BC9A7731063BB";
 			}
 		};
 
@@ -380,37 +344,6 @@ namespace catapult { namespace crypto {
 			EXPECT_EQ(expectedHash, hash);
 		}
 
-		template<typename TTraits>
-		void AssertCatapultStringHasExpectedHash() {
-			// Arrange:
-			std::vector<std::string> dataSet{
-				"The quick brown fox jumps over the lazy dog",
-				"Kitten Kaboodle",
-				"Lorem ipsum dolor sit amet",
-				"GimreJaguar0625BloodyRookie",
-				"The ripe taste of cheese improves with age"
-			};
-			auto expectedHashes = TTraits::CatapultStringTestVectors();
-
-			// Sanity:
-			ASSERT_EQ(dataSet.size(), expectedHashes.size());
-
-			auto i = 0u;
-			for (const auto& dataStr : dataSet) {
-				// Arrange:
-				auto hex = AsciiToHexString(dataStr);
-				auto buffer = test::HexStringToVector(hex);
-
-				// Act:
-				typename TTraits::HashType hash;
-				TTraits::HashFunc(buffer, hash);
-
-				// Assert:
-				EXPECT_EQ(utils::ParseByteArray<typename TTraits::HashType>(expectedHashes[i]), hash);
-				++i;
-			}
-		}
-
 		// endregion
 	}
 
@@ -422,7 +355,6 @@ namespace catapult { namespace crypto {
 	MAKE_HASH_TEST(Ripemd160, EmptyStringHasExpectedHash)
 	MAKE_HASH_TEST(Ripemd160, SampleTestVectors)
 	MAKE_HASH_TEST(Ripemd160, MillionTimesAHasExpectedHash)
-	MAKE_HASH_TEST(Ripemd160, CatapultStringHasExpectedHash)
 
 	// endregion
 
@@ -431,7 +363,14 @@ namespace catapult { namespace crypto {
 	MAKE_HASH_TEST(Bitcoin160, EmptyStringHasExpectedHash)
 	MAKE_HASH_TEST(Bitcoin160, SampleTestVectors)
 	// MillionTimesAHasExpectedHash left out, couldn't find any resource on the network, that would confirm the value
-	MAKE_HASH_TEST(Bitcoin160, CatapultStringHasExpectedHash)
+
+	// endregion
+
+	// region Sha256
+
+	MAKE_HASH_TEST(Sha256, EmptyStringHasExpectedHash)
+	MAKE_HASH_TEST(Sha256, SampleTestVectors)
+	MAKE_HASH_TEST(Sha256, MillionTimesAHasExpectedHash)
 
 	// endregion
 
@@ -440,18 +379,22 @@ namespace catapult { namespace crypto {
 	MAKE_HASH_TEST(Sha256Double, EmptyStringHasExpectedHash)
 	MAKE_HASH_TEST(Sha256Double, SampleTestVectors)
 	MAKE_HASH_TEST(Sha256Double, MillionTimesAHasExpectedHash)
-	MAKE_HASH_TEST(Sha256Double, CatapultStringHasExpectedHash)
 
 	// endregion
 
-	// region sha3 / keccak free function tests
+	// region Sha512
+
+	MAKE_HASH_TEST(Sha512, EmptyStringHasExpectedHash)
+	MAKE_HASH_TEST(Sha512, SampleTestVectors)
+	MAKE_HASH_TEST(Sha512, MillionTimesAHasExpectedHash)
+
+	// endregion
+
+	// region Sha3
 
 #define SHA3_TRAITS_BASED_TEST(TEST_NAME) \
 	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)(); \
 	TEST(TEST_CLASS, Sha3_256_##TEST_NAME) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<Sha3_256_Traits>(); } \
-	TEST(TEST_CLASS, Sha3_512_##TEST_NAME) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<Sha3_512_Traits>(); } \
-	TEST(TEST_CLASS, Keccak_256_##TEST_NAME) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<Keccak_256_Traits>(); } \
-	TEST(TEST_CLASS, Keccak_512_##TEST_NAME) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<Keccak_512_Traits>(); } \
 	TEST(TEST_CLASS, GenerationHash_##TEST_NAME) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<GenerationHash_Traits>(); } \
 	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)()
 
@@ -467,14 +410,241 @@ namespace catapult { namespace crypto {
 		AssertMillionTimesAHasExpectedHash<TTraits>();
 	}
 
-	// CatapultStringHasExpectedHash is intentionally left out
+	// endregion
+
+	// region Hmac_Sha256 / Hmac_Sha512
+
+	// data from: https://github.com/randombit/botan/blob/master/src/tests/data/mac/hmac.vec
+
+	namespace {
+		struct Hmac_Sha256_Traits {
+		public:
+			using HashType = Hash256;
+
+			static constexpr auto Hmac = Hmac_Sha256;
+
+		public:
+			static std::vector<std::string> SampleTestVectorsKey() {
+				return {
+					"0102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F20",
+					"4A656665",
+					"0102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F20",
+					"0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B",
+					"0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C",
+					"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						"AAAAAA",
+					"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						"AAAAAA",
+
+					// data from: NIST CAVP, [L=32], sample 30
+					"9779D9120642797F1747025D5B22B7AC607CAB08E1758F2F3A46C8BE1E25C53B8C6A"
+						"8F58FFEFA176"
+				};
+			}
+
+			static std::vector<std::string> SampleTestVectorsInput() {
+				return {
+					"616263",
+					"7768617420646F2079612077616E7420666F72206E6F7468696E673F",
+					"6162636462636465636465666465666765666768666768696768696A68696A6B"
+						"696A6B6C6A6B6C6D6B6C6D6E6C6D6E6F6D6E6F706E6F70716162636462636465"
+						"636465666465666765666768666768696768696A68696A6B696A6B6C6A6B6C6D"
+						"6B6C6D6E6C6D6E6F6D6E6F706E6F7071",
+					"4869205468657265",
+					"546573742057697468205472756E636174696F6E",
+					"54657374205573696E67204C6172676572205468616E20426C6F636B2D53697A"
+						"65204B6579202D2048617368204B6579204669727374",
+					"5468697320697320612074657374207573696E672061206C6172676572207468"
+						"616E20626C6F636B2D73697A65206B657920616E642061206C61726765722074"
+						"68616E20626C6F636B2D73697A6520646174612E20546865206B6579206E6565"
+						"647320746F20626520686173686564206265666F7265206265696E6720757365"
+						"642062792074686520484D414320616C676F726974686D2E",
+					"B1689C2591EAF3C9E66070F8A77954FFB81749F1B00346F9DFE0B2EE905DCC288BAF"
+						"4A92DE3F4001DD9F44C468C3D07D6C6EE82FACEAFC97C2FC0FC0601719D2DCD0AA2A"
+						"EC92D1B0AE933C65EB06A03C9C935C2BAD0459810241347AB87E9F11ADB30415424C"
+						"6C7F5F22A003B8AB8DE54F6DED0E3AB9245FA79568451DFA258E"
+				};
+			}
+
+			static std::vector<std::string> SampleTestVectorsOutput() {
+				return {
+					"A21B1F5D4CF4F73A4DD939750F7A066A7F98CC131CB16A6692759021CFAB8181",
+					"5BDCC146BF60754E6A042426089575C75A003F089D2739839DEC58B964EC3843",
+					"470305FC7E40FE34D3EEB3E773D95AAB73ACF0FD060447A5EB4595BF33A9D1A3",
+					"198A607EB44BFBC69903A0F1CF2BBDC5BA0AA3F3D9AE3C1C7A3B1696A0B68CF7",
+					"7546AF01841FC09B1AB9C3749A5F1C17D4F589668A587B2700A9C97C1193CF42",
+					"60E431591EE0B67F0D8A26AACBF5B77F8E0BC6213728C5140546040F0EE37F54",
+					"9B09FFA71B942FCB27635FBCD5B0E944BFDC63644F0713938A7F51535C3A35E2",
+					"769F00D3E6A6CC1FB426A14A4F76C6462E6149726E0DEE0EC0CF97A16605AC8B"
+				};
+			}
+		};
+
+		struct Hmac_Sha512_Traits {
+		public:
+			using HashType = Hash512;
+
+			static constexpr auto Hmac = Hmac_Sha512;
+
+		public:
+			static std::vector<std::string> SampleTestVectorsKey() {
+				return {
+					"0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B",
+					"4A656665",
+					"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					"0102030405060708090A0B0C0D0E0F10111213141516171819",
+					"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						"AAAAAA",
+					"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						"AAAAAA"
+				};
+			}
+
+			static std::vector<std::string> SampleTestVectorsInput() {
+				return {
+					"4869205468657265",
+					"7768617420646F2079612077616E7420666F72206E6F7468696E673F",
+					"DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+					"CDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCD",
+					"54657374205573696E67204C6172676572205468616E20426C6F636B2D53697A"
+						"65204B6579202D2048617368204B6579204669727374",
+					"5468697320697320612074657374207573696E672061206C6172676572207468"
+						"616E20626C6F636B2D73697A65206B657920616E642061206C61726765722074"
+						"68616E20626C6F636B2D73697A6520646174612E20546865206B6579206E6565"
+						"647320746F20626520686173686564206265666F7265206265696E6720757365"
+						"642062792074686520484D414320616C676F726974686D2E"
+				};
+			}
+
+			static std::vector<std::string> SampleTestVectorsOutput() {
+				return {
+					"87AA7CDEA5EF619D4FF0B4241A1D6CB02379F4E2CE4EC2787AD0B30545E17CDE"
+					"DAA833B7D6B8A702038B274EAEA3F4E4BE9D914EEB61F1702E696C203A126854",
+					"164B7A7BFCF819E2E395FBE73B56E0A387BD64222E831FD610270CD7EA250554"
+					"9758BF75C05A994A6D034F65F8F0E6FDCAEAB1A34D4A6B4B636E070A38BCE737",
+					"FA73B0089D56A284EFB0F0756C890BE9B1B5DBDD8EE81A3655F83E33B2279D39"
+					"BF3E848279A722C806B485A47E67C807B946A337BEE8942674278859E13292FB",
+					"B0BA465637458C6990E5A8C5F61D4AF7E576D97FF94B872DE76F8050361EE3DB"
+					"A91CA5C11AA25EB4D679275CC5788063A5F19741120C4F2DE2ADEBEB10A298DD",
+					"80B24263C7C1A3EBB71493C1DD7BE8B49B46D1F41B4AEEC1121B013783F8F352"
+					"6B56D037E05F2598BD0FD2215D6A1E5295E64F73F63F0AEC8B915A985D786598",
+					"E37B6A775DC87DBAA4DFA9F96E5E3FFDDEBD71F8867289865DF5A32D20CDC944"
+					"B6022CAC3C4982B10D5EEB55C3E4DE15134676FB6DE0446065C97440FA8C6A58"
+				};
+			}
+		};
+
+		template<typename TTraits>
+		void RunHmacTestVectors() {
+			// Arrange:
+			auto keys = TTraits::SampleTestVectorsKey();
+			auto inputs = TTraits::SampleTestVectorsInput();
+			auto expectedHashes = TTraits::SampleTestVectorsOutput();
+
+			// Sanity:
+			ASSERT_EQ(keys.size(), expectedHashes.size());
+			ASSERT_EQ(inputs.size(), expectedHashes.size());
+
+			for (auto i = 0u; i < keys.size(); ++i) {
+				auto key = test::HexStringToVector(keys[i]);
+				auto input = test::HexStringToVector(inputs[i]);
+				auto expected = expectedHashes[i];
+
+				// Act:
+				typename TTraits::HashType output;
+				TTraits::Hmac(key, input, output);
+
+				// Assert:
+				EXPECT_EQ(utils::ParseByteArray<typename TTraits::HashType>(expected), output) << "test vector at " << i;
+			}
+		}
+	}
+
+	TEST(TEST_CLASS, Hmac_Sha256_SampleTestVectors) {
+		RunHmacTestVectors<Hmac_Sha256_Traits>();
+	}
+
+	TEST(TEST_CLASS, Hmac_Sha512_SampleTestVectors) {
+		RunHmacTestVectors<Hmac_Sha512_Traits>();
+	}
 
 	// endregion
 
-	// region Sha3 builder - utils
+	// region Pbkdf2_Sha512
+
+	// data from: https://fossies.org/linux/nettle/testsuite/pbkdf2-test.c
 
 	namespace {
-		// data taken from http://mumble.net/~campbell/hg/sha3/kat/ShortMsgKAT_SHA3-256.txt)
+		struct TestVectorPbkdf2 {
+			RawString Salt;
+			uint32_t IterationCount;
+			RawString Password;
+			std::string ExpectedResult;
+		};
+
+		std::vector<TestVectorPbkdf2> GetTestVectorsPbkdf2() {
+			return {
+				{
+					{ "NaCL", 4 },
+					1,
+					{ "password", 8 },
+					"73DECFA58AA2E84F94771A75736BB88BD3C7B38270CFB50CB390ED78B305656A"
+					"F8148E52452B2216B2B8098B761FC6336060A09F76415E9F71EA47F9E9064306"
+				},
+				{
+					{ "sa\0lt", 5 },
+					1,
+					{ "pass\0word", 9 },
+					"71A0EC842ABD5C678BCFD145F09D83522F93361560563C4D0D63B88329871090"
+					"E76604A49AF08FE7C9F57156C8790996B20F06BC535E5AB5440DF7E878296FA7"
+				},
+				{
+					{ "salt\0\0\0", 7 },
+					50,
+					{ "passwordPASSWORDpassword", 24 },
+					"016871A4C4B75F96857FD2B9F8CA28023B30EE2A39F5ADCAC8C9375F9BDA1CCD"
+					"1B6F0B2FC3ADDA505412E79D890056C62E524C7D51154B1A8534575BD02DEE39"
+				}
+			};
+		}
+	}
+
+	TEST(TEST_CLASS, Pbkdf2_Sha512_SampleTestVectors) {
+		// Arrange:
+		auto i = 0u;
+		for (const auto& testVector : GetTestVectorsPbkdf2()) {
+			// Act:
+			Hash512 output;
+			Pbkdf2_Sha512(
+					{ reinterpret_cast<const uint8_t*>(testVector.Password.pData), testVector.Password.Size },
+					{ reinterpret_cast<const uint8_t*>(testVector.Salt.pData), testVector.Salt.Size },
+					testVector.IterationCount,
+					output);
+
+			// Assert:
+			EXPECT_EQ(utils::ParseByteArray<Hash512>(testVector.ExpectedResult), output) << "test vector at " << i;
+			++i;
+		}
+	}
+
+	// endregion
+
+	// region builder test utils
+
+	namespace {
+		// data from: http://mumble.net/~campbell/hg/sha3/kat/ShortMsgKAT_SHA3-256.txt)
 		// same data is used for 512 variant
 		const char* Data_Sets_Long[] = {
 			"9F2FCC7C90DE090D6B87CD7E9718C1EA6CB21118FC2D5DE9F97E5DB6AC1E9C10",
@@ -559,6 +729,18 @@ namespace catapult { namespace crypto {
 					EXPECT_EQ(expected, result);
 			}
 		}
+	}
+
+	// endregion
+
+	// region Sha512 builder - tests
+
+	TEST(TEST_CLASS, Sha512_ConcatenatedMatchesSingleCallVariant) {
+		AssertConcatenatedHashMatchesSingleCallVariant<Sha512_Builder>(Sha512_Traits::HashFunc);
+	}
+
+	TEST(TEST_CLASS, Sha512_BuilderBasedMatchesSingleCallVariant) {
+		AssertBuilderBasedHashMatchesSingleCallVariant<Sha512_Builder>(Sha512_Traits::HashFunc);
 	}
 
 	// endregion

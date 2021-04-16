@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -23,9 +24,11 @@
 #include "partialtransaction/src/api/RemotePtApi.h"
 #include "partialtransaction/src/chain/PtSynchronizer.h"
 #include "catapult/cache_tx/MemoryPtCache.h"
+#include "catapult/config/CatapultKeys.h"
 #include "catapult/extensions/NetworkUtils.h"
 #include "catapult/extensions/PeersConnectionTasks.h"
 #include "catapult/extensions/ServiceLocator.h"
+#include "catapult/extensions/ServiceUtils.h"
 #include "catapult/extensions/SynchronizerTaskCallbacks.h"
 #include "catapult/net/PacketWriters.h"
 #include "catapult/thread/MultiServicePool.h"
@@ -33,17 +36,11 @@
 namespace catapult { namespace partialtransaction {
 
 	namespace {
-		constexpr auto Service_Name = "api.partial";
+		constexpr auto Service_Name = "pt.writers";
 		constexpr auto Service_Id = ionet::ServiceIdentifier(0x50415254);
 
 		thread::Task CreateConnectPeersTask(extensions::ServiceState& state, net::PacketWriters& packetWriters) {
-			auto settings = extensions::SelectorSettings(
-					state.cache(),
-					state.config().BlockChain.TotalChainImportance,
-					state.nodes(),
-					Service_Id,
-					ionet::NodeRoles::Api,
-					state.config().Node.OutgoingConnections);
+			auto settings = extensions::CreateOutgoingSelectorSettings(state, Service_Id, ionet::NodeRoles::Api);
 			auto task = extensions::CreateConnectPeersTask(settings, packetWriters);
 			task.Name += " for service Pt";
 			return task;
@@ -56,8 +53,10 @@ namespace catapult { namespace partialtransaction {
 			const auto& ptCache = GetMemoryPtCache(locator);
 			const auto& serverHooks = GetPtServerHooks(locator);
 			auto ptSynchronizer = chain::CreatePtSynchronizer(
+					state.timeSupplier(),
 					[&ptCache]() { return ptCache.view().shortHashPairs(); },
-					serverHooks.cosignedTransactionInfosConsumer());
+					serverHooks.cosignedTransactionInfosConsumer(),
+					extensions::CreateShouldProcessTransactionsPredicate(state));
 
 			thread::Task task;
 			task.Name = "pull partial transactions task";
@@ -85,10 +84,13 @@ namespace catapult { namespace partialtransaction {
 			void registerServices(extensions::ServiceLocator& locator, extensions::ServiceState& state) override {
 				auto connectionSettings = extensions::GetConnectionSettings(state.config());
 				auto pServiceGroup = state.pool().pushServiceGroup("partial");
-				auto pWriters = pServiceGroup->pushService(net::CreatePacketWriters, locator.keyPair(), connectionSettings);
+				auto pWriters = pServiceGroup->pushService(net::CreatePacketWriters, locator.keys().caPublicKey(), connectionSettings);
 
 				locator.registerService(Service_Name, pWriters);
 				state.packetIoPickers().insert(*pWriters, ionet::NodeRoles::Api);
+
+				// add sinks
+				state.hooks().addBannedNodeIdentitySink(extensions::CreateCloseConnectionSink(*pWriters));
 
 				// add tasks
 				state.tasks().push_back(CreateConnectPeersTask(state, *pWriters));

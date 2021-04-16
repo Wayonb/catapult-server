@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,10 +22,18 @@
 #pragma once
 #include "MapperInclude.h"
 
-namespace catapult { namespace model { struct BlockElement; } }
+namespace catapult {
+	namespace model {
+		struct BlockElement;
+		struct FinalizationRound;
+	}
+}
 
 namespace catapult { namespace mongo { namespace mappers {
 
-	/// Maps \a blockElement to the corresponding db model entity.
-	bsoncxx::document::value ToDbModel(const model::BlockElement& blockElement);
+	/// Maps \a blockElement to the corresponding db model value given \a totalTransactionsCount.
+	bsoncxx::document::value ToDbModel(const model::BlockElement& blockElement, uint32_t totalTransactionsCount);
+
+	/// Maps a finalized block with \a height and \a hash at finalization \a round to to the corresponding db model value.
+	bsoncxx::document::value ToDbModel(const model::FinalizationRound& round, Height height, const Hash256& hash);
 }}}

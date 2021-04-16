@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,14 +21,13 @@
 
 #include "sdk/src/extensions/BlockExtensions.h"
 #include "sdk/src/extensions/TransactionExtensions.h"
-#include "catapult/crypto/KeyPair.h"
 #include "catapult/model/BlockUtils.h"
-#include "catapult/model/NetworkInfo.h"
+#include "catapult/model/NetworkIdentifier.h"
 #include "tests/int/stress/test/EntityDump.h"
 #include "tests/test/core/BlockTestUtils.h"
 #include "tests/test/local/RealTransactionFactory.h"
-#include "tests/test/nodeps/MijinConstants.h"
 #include "tests/test/nodeps/Nemesis.h"
+#include "tests/test/nodeps/TestNetworkConstants.h"
 #include "tests/TestHarness.h"
 
 namespace catapult {
@@ -35,18 +35,18 @@ namespace catapult {
 #define TEST_CLASS NemesisBlockGeneratorIntegrityTests
 
 	namespace {
-		constexpr auto Network_Identifier = model::NetworkIdentifier::Mijin_Test;
-		constexpr Amount Nemesis_Amount(9000000000ull / CountOf(test::Mijin_Test_Private_Keys) * 1000000ull);
+		constexpr auto Network_Identifier = model::NetworkIdentifier::Private_Test;
+		constexpr Amount Nemesis_Amount(9000000000ull / CountOf(test::Test_Network_Private_Keys) * 1000000ull);
 
 		bool VerifyNemesisNetworkTransactionSignature(const model::Transaction& transaction) {
-			return extensions::TransactionExtensions(test::GetNemesisGenerationHash()).verify(transaction);
+			return extensions::TransactionExtensions(test::GetNemesisGenerationHashSeed()).verify(transaction);
 		}
 	}
 
 	TEST(TEST_CLASS, CreateTransaction) {
 		// Arrange:
-		auto signer = crypto::KeyPair::FromString(test::Mijin_Test_Nemesis_Private_Key);
-		auto recipient = crypto::KeyPair::FromString(test::Mijin_Test_Private_Keys[0]);
+		auto signer = crypto::KeyPair::FromString(test::Test_Network_Nemesis_Private_Key);
+		auto recipient = crypto::KeyPair::FromString(test::Test_Network_Private_Keys[0]);
 
 		// Act:
 		auto pTransaction = test::CreateTransferTransaction(signer, recipient.publicKey(), Amount(1234));
@@ -58,9 +58,9 @@ namespace catapult {
 
 	TEST(TEST_CLASS, CreateNemesisBlockTransactions) {
 		// Arrange:
-		auto signer = crypto::KeyPair::FromString(test::Mijin_Test_Nemesis_Private_Key);
+		auto signer = crypto::KeyPair::FromString(test::Test_Network_Nemesis_Private_Key);
 
-		for (const auto* pRecipientPrivateKeyString : test::Mijin_Test_Private_Keys) {
+		for (const auto* pRecipientPrivateKeyString : test::Test_Network_Private_Keys) {
 			auto recipient = crypto::KeyPair::FromString(pRecipientPrivateKeyString);
 
 			// Act:
@@ -76,27 +76,28 @@ namespace catapult {
 
 	namespace {
 		auto CreateNemesisBlock() {
-			auto signer = crypto::KeyPair::FromString(test::Mijin_Test_Nemesis_Private_Key);
-			auto generationHash = test::GetNemesisGenerationHash();
+			auto signer = crypto::KeyPair::FromString(test::Test_Network_Nemesis_Private_Key);
+			auto generationHashSeed = test::GetNemesisGenerationHashSeed();
 
 			model::Transactions transactions;
-			for (const auto* pRecipientPrivateKeyString : test::Mijin_Test_Private_Keys) {
+			for (const auto* pRecipientPrivateKeyString : test::Test_Network_Private_Keys) {
 				auto recipient = crypto::KeyPair::FromString(pRecipientPrivateKeyString);
 				auto pTransfer = test::CreateTransferTransaction(signer, recipient.publicKey(), Nemesis_Amount);
 				pTransfer->MaxFee = Amount(0);
-				extensions::TransactionExtensions(generationHash).sign(signer, *pTransfer);
+				extensions::TransactionExtensions(generationHashSeed).sign(signer, *pTransfer);
 				transactions.push_back(std::move(pTransfer));
 			}
 
+			auto entityType = model::Entity_Type_Block_Normal;
 			model::PreviousBlockContext context;
-			context.GenerationHash = generationHash;
-			auto pBlock = model::CreateBlock(context, Network_Identifier, signer.publicKey(), transactions);
-			extensions::BlockExtensions(generationHash).signFullBlock(signer, *pBlock);
+			context.GenerationHash = generationHashSeed.copyTo<GenerationHash>();
+			auto pBlock = model::CreateBlock(entityType, context, Network_Identifier, signer.publicKey(), transactions);
+			extensions::BlockExtensions(generationHashSeed).signFullBlock(signer, *pBlock);
 			return pBlock;
 		}
 
 		void VerifyNemesisBlock(const model::Block& block) {
-			auto blockExtensions = extensions::BlockExtensions(test::GetNemesisGenerationHash());
+			auto blockExtensions = extensions::BlockExtensions(test::GetNemesisGenerationHashSeed());
 			auto verifyResult = blockExtensions.verifyFullBlock(block);
 			EXPECT_EQ(extensions::VerifyFullBlockResult::Success, verifyResult);
 		}

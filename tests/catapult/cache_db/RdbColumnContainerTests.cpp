@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -51,11 +52,9 @@ namespace catapult { namespace cache {
 		};
 
 		auto CreateSettings(size_t numKilobytes, FilterPruningMode pruningMode = FilterPruningMode::Disabled) {
-			return RocksDatabaseSettings(
-					test::TempDirectoryGuard::DefaultName(),
-					{ "default" },
-					utils::FileSize::FromKilobytes(numKilobytes),
-					pruningMode);
+			auto config = config::NodeConfiguration::CacheDatabaseSubConfiguration();
+			config.MaxWriteBatchSize = utils::FileSize::FromKilobytes(numKilobytes);
+			return RocksDatabaseSettings(test::TempDirectoryGuard::DefaultName(), config, { "default" }, pruningMode);
 		}
 
 		auto DefaultSettings() {
@@ -117,8 +116,8 @@ namespace catapult { namespace cache {
 	}
 
 	namespace {
-		template<typename TContainer, typename TKey>
-		void AssertElementValue(const TContainer& container, const TKey& key, const std::string& value) {
+		template<typename TContainer, typename TContainerKey>
+		void AssertElementValue(const TContainer& container, const TContainerKey& key, const std::string& value) {
 			RdbDataIterator iter;
 			container.find(key, iter);
 			test::AssertIteratorValue(value, iter);

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -39,7 +40,7 @@ namespace catapult { namespace observers {
 		auto& accountStateCache = context.Cache.sub<cache::AccountStateCache>();
 		auto& mosaicCache = context.Cache.sub<cache::MosaicCache>();
 
-		auto accountStateIter = accountStateCache.find(notification.Signer);
+		auto accountStateIter = accountStateCache.find(notification.Owner);
 		auto& accountState = accountStateIter.get();
 
 		auto mosaicIter = mosaicCache.find(mosaicId);
@@ -51,5 +52,5 @@ namespace catapult { namespace observers {
 			accountState.Balances.debit(mosaicId, notification.Delta);
 			mosaicEntry.decreaseSupply(notification.Delta);
 		}
-	});
+	})
 }}

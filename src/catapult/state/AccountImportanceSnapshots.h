@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,7 +21,7 @@
 
 #pragma once
 #include "CompactArrayStack.h"
-#include "catapult/model/ImportanceHeight.h"
+#include "catapult/model/HeightGrouping.h"
 
 namespace catapult { namespace state {
 
@@ -40,6 +41,12 @@ namespace catapult { namespace state {
 		using SnapshotStack = CompactArrayStack<ImportanceSnapshot, Importance_History_Size>;
 
 	public:
+		/// Returns \c true when no snapshots are present.
+		bool empty() const;
+
+		/// Returns \c true when top-level snapshot is nonzero.
+		bool active() const;
+
 		/// Gets the current importance of the account.
 		Importance current() const;
 
@@ -52,6 +59,9 @@ namespace catapult { namespace state {
 	public:
 		/// Sets the current account importance to \a importance at \a height.
 		void set(Importance importance, model::ImportanceHeight height);
+
+		/// Pushes an empty importance.
+		void push();
 
 		/// Pops the current importance.
 		void pop();

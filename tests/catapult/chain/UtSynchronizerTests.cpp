@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -51,7 +52,7 @@ namespace catapult { namespace chain {
 				}
 
 				const auto& singleRequest() const {
-					return m_pTransactionApi->utRequests()[0].second;
+					return m_pTransactionApi->utRequests()[0].ShortHashes;
 				}
 
 				void setError(bool setError = true) {
@@ -62,7 +63,8 @@ namespace catapult { namespace chain {
 				}
 
 				void checkAdditionalRequestParameters() {
-					EXPECT_EQ(BlockFeeMultiplier(17), m_pTransactionApi->utRequests()[0].first);
+					EXPECT_EQ(Timestamp(84), m_pTransactionApi->utRequests()[0].Deadline);
+					EXPECT_EQ(BlockFeeMultiplier(17), m_pTransactionApi->utRequests()[0].FeeMultiplier);
 				}
 
 			private:
@@ -85,11 +87,17 @@ namespace catapult { namespace chain {
 
 			static auto CreateSynchronizer(
 					const ShortHashesSupplier& shortHashesSupplier,
-					const handlers::TransactionRangeHandler& transactionRangeConsumer) {
-				return CreateUtSynchronizer(BlockFeeMultiplier(17), shortHashesSupplier, transactionRangeConsumer);
+					const handlers::TransactionRangeHandler& transactionRangeConsumer,
+					bool shouldExecute = true) {
+				return CreateUtSynchronizer(
+						BlockFeeMultiplier(17),
+						[]() { return Timestamp(84); },
+						shortHashesSupplier,
+						transactionRangeConsumer,
+						[shouldExecute]() { return shouldExecute; });
 			}
 		};
 	}
 
-	DEFINE_ENTITIES_SYNCHRONIZER_TESTS(UtSynchronizer)
+	DEFINE_CONDITIONAL_ENTITIES_SYNCHRONIZER_TESTS(UtSynchronizer)
 }}

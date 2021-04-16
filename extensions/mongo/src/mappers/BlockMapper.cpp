@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -24,8 +25,11 @@
 #include "catapult/model/BlockUtils.h"
 #include "catapult/model/Elements.h"
 #include "catapult/model/EntityHasher.h"
+#include "catapult/model/FinalizationRound.h"
 
 namespace catapult { namespace mongo { namespace mappers {
+
+	// region ToDbModel (block)
 
 	namespace {
 		void StreamHashArray(bson_stream::document& builder, const std::string& name, const std::vector<Hash256>& hashes) {
@@ -34,13 +38,6 @@ namespace catapult { namespace mongo { namespace mappers {
 				hashArray << ToBinary(hash);
 
 			hashArray << bson_stream::close_array;
-		}
-
-		void StreamBlockBasicMetadata(bson_stream::document& builder, const model::BlockElement& blockElement, Amount totalFee) {
-			builder
-					<< "hash" << ToBinary(blockElement.EntityHash)
-					<< "generationHash" << ToBinary(blockElement.GenerationHash)
-					<< "totalFee" << ToInt64(totalFee);
 		}
 
 		void StreamBlockMerkleTree(
@@ -54,7 +51,7 @@ namespace catapult { namespace mongo { namespace mappers {
 		}
 	}
 
-	bsoncxx::document::value ToDbModel(const model::BlockElement& blockElement) {
+	bsoncxx::document::value ToDbModel(const model::BlockElement& blockElement, uint32_t totalTransactionsCount) {
 		const auto& block = blockElement.Block;
 		auto blockTransactionsInfo = model::CalculateBlockTransactionsInfo(block);
 		auto transactionMerkleTree = model::CalculateMerkleTree(blockElement.Transactions);
@@ -62,33 +59,68 @@ namespace catapult { namespace mongo { namespace mappers {
 		// block metadata
 		bson_stream::document builder;
 
-		builder << "meta" << bson_stream::open_document;
-		StreamBlockBasicMetadata(builder, blockElement, blockTransactionsInfo.TotalFee);
+		builder
+				<< "meta" << bson_stream::open_document
+					<< "hash" << ToBinary(blockElement.EntityHash)
+					<< "generationHash" << ToBinary(blockElement.GenerationHash)
+					<< "totalFee" << ToInt64(blockTransactionsInfo.TotalFee)
+					<< "totalTransactionsCount" << static_cast<int32_t>(totalTransactionsCount);
 		StreamHashArray(builder, "stateHashSubCacheMerkleRoots", blockElement.SubCacheMerkleRoots);
-		StreamBlockMerkleTree(builder, "numTransactions", blockTransactionsInfo.Count, "transactionMerkleTree", transactionMerkleTree);
+		StreamBlockMerkleTree(builder, "transactionsCount", blockTransactionsInfo.Count, "transactionMerkleTree", transactionMerkleTree);
 
 		if (blockElement.OptionalStatement) {
 			const auto& blockStatement = *blockElement.OptionalStatement;
-			auto numStatements = static_cast<uint32_t>(model::CountTotalStatements(blockStatement));
+			auto statementsCount = static_cast<uint32_t>(model::CountTotalStatements(blockStatement));
 			auto statementMerkleTree = model::CalculateMerkleTree(blockStatement);
-			StreamBlockMerkleTree(builder, "numStatements", numStatements, "statementMerkleTree", statementMerkleTree);
+			StreamBlockMerkleTree(builder, "statementsCount", statementsCount, "statementMerkleTree", statementMerkleTree);
 		}
 
 		builder << bson_stream::close_document;
 
 		// block data
 		builder << "block" << bson_stream::open_document;
-		StreamVerifiableEntity(builder, block)
+		auto blockDocument = StreamVerifiableEntity(builder, block)
 				<< "height" << ToInt64(block.Height)
 				<< "timestamp" << ToInt64(block.Timestamp)
 				<< "difficulty" << ToInt64(block.Difficulty)
-				<< "feeMultiplier" << ToInt32(block.FeeMultiplier)
+				<< "proofGamma" << ToBinary(block.GenerationHashProof.Gamma)
+				<< "proofVerificationHash" << ToBinary(block.GenerationHashProof.VerificationHash)
+				<< "proofScalar" << ToBinary(block.GenerationHashProof.Scalar)
 				<< "previousBlockHash" << ToBinary(block.PreviousBlockHash)
 				<< "transactionsHash" << ToBinary(block.TransactionsHash)
 				<< "receiptsHash" << ToBinary(block.ReceiptsHash)
 				<< "stateHash" << ToBinary(block.StateHash)
-				<< "beneficiaryPublicKey" << ToBinary(block.BeneficiaryPublicKey);
+				<< "beneficiaryAddress" << ToBinary(block.BeneficiaryAddress)
+				<< "feeMultiplier" << ToInt32(block.FeeMultiplier);
+
+		if (model::IsImportanceBlock(block.Type)) {
+			const auto& blockFooter = model::GetBlockFooter<model::ImportanceBlockFooter>(block);
+			blockDocument
+					<< "votingEligibleAccountsCount" << static_cast<int32_t>(blockFooter.VotingEligibleAccountsCount)
+					<< "harvestingEligibleAccountsCount" << static_cast<int64_t>(blockFooter.HarvestingEligibleAccountsCount)
+					<< "totalVotingBalance" << ToInt64(blockFooter.TotalVotingBalance)
+					<< "previousImportanceBlockHash" << ToBinary(blockFooter.PreviousImportanceBlockHash);
+		}
+
 		builder << bson_stream::close_document;
 		return builder << bson_stream::finalize;
 	}
+
+	// endregion
+
+	// region ToDbModel (finalized block)
+
+	bsoncxx::document::value ToDbModel(const model::FinalizationRound& round, Height height, const Hash256& hash) {
+		bson_stream::document builder;
+		return builder
+				<< "block" << bson_stream::open_document
+					<< "finalizationEpoch" << ToInt32(round.Epoch)
+					<< "finalizationPoint" << ToInt32(round.Point)
+					<< "height" << ToInt64(height)
+					<< "hash" << ToBinary(hash)
+				<< bson_stream::close_document
+				<< bson_stream::finalize;
+	}
+
+	// endregion
 }}}

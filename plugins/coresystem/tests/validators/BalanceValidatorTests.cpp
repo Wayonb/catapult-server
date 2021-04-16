@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -21,7 +22,6 @@
 #include "src/validators/Validators.h"
 #include "catapult/cache/CatapultCache.h"
 #include "catapult/cache_core/AccountStateCache.h"
-#include "catapult/model/Address.h"
 #include "catapult/state/CatapultState.h"
 #include "tests/test/cache/BalanceTransferTestUtils.h"
 #include "tests/test/cache/CacheTestUtils.h"
@@ -165,7 +165,7 @@ namespace catapult { namespace validators {
 
 	TRANSFER_OR_DEBIT_TEST(FailureWhenTransactionSignerIsUnknown) {
 		// Arrange: do not register the signer with the cache
-		auto sender = test::GenerateRandomByteArray<Key>();
+		auto sender = test::GenerateRandomByteArray<Address>();
 		auto recipient = test::GenerateRandomUnresolvedAddress();
 		auto notification = model::BalanceTransferNotification(sender, recipient, test::UnresolveXor(Currency_Mosaic_Id), Amount(0));
 		auto cache = test::CreateEmptyCatapultCache();
@@ -174,16 +174,44 @@ namespace catapult { namespace validators {
 		AssertValidationResult<TValidatorTraits>(Failure_Core_Insufficient_Balance, cache, notification);
 	}
 
+	namespace {
+		auto CreateDynamicBalanceTransferNotification(const Address& sender, const UnresolvedAddress& recipient, Amount amount) {
+			return model::BalanceTransferNotification(
+					sender,
+					recipient,
+					test::UnresolveXor(Currency_Mosaic_Id),
+					amount,
+					model::BalanceTransferNotification::AmountType::Dynamic);
+		}
+	}
+
+	TEST(TRANSFER_TEST_CLASS, SuccessWhenFeeMultiplierIsZero_Dynamic) {
+		// Arrange:
+		auto sender = test::GenerateRandomByteArray<Address>();
+		auto recipient = test::GenerateRandomUnresolvedAddress();
+		auto notification = CreateDynamicBalanceTransferNotification(sender, recipient, Amount(100));
+
+		auto cache = test::CreateCache(sender, { { Currency_Mosaic_Id, Amount(0) } });
+		SetDynamicFeeMultiplier(cache, BlockFeeMultiplier(0));
+
+		auto cacheView = cache.createView();
+		auto readOnlyCache = cacheView.toReadOnly();
+		auto context = test::CreateValidatorContext(Height(1), readOnlyCache);
+
+		auto pValidator = CreateBalanceTransferValidator();
+
+		// Act:
+		auto result = test::ValidateNotification(*pValidator, notification, context);
+
+		// Assert:
+		EXPECT_EQ(ValidationResult::Success, result);
+	}
+
 	TEST(TRANSFER_TEST_CLASS, FailureWhenEffectiveBalanceOverflows_Dynamic) {
 		// Arrange:
-		auto sender = test::GenerateRandomByteArray<Key>();
+		auto sender = test::GenerateRandomByteArray<Address>();
 		auto recipient = test::GenerateRandomUnresolvedAddress();
-		auto notification = model::BalanceTransferNotification(
-				sender,
-				recipient,
-				test::UnresolveXor(Currency_Mosaic_Id),
-				Amount(0x8000'0000'0000'0000),
-				model::BalanceTransferNotification::AmountType::Dynamic);
+		auto notification = CreateDynamicBalanceTransferNotification(sender, recipient, Amount(0x8000'0000'0000'0000));
 
 		auto cache = test::CreateCache(sender, { { Currency_Mosaic_Id, Amount(234) } });
 		SetDynamicFeeMultiplier(cache, BlockFeeMultiplier(2));
@@ -210,7 +238,7 @@ namespace catapult { namespace validators {
 
 	VARIABLE_BALANCE_TEST(Currency) {
 		// Arrange:
-		auto sender = test::GenerateRandomByteArray<Key>();
+		auto sender = test::GenerateRandomByteArray<Address>();
 		auto recipient = test::GenerateRandomUnresolvedAddress();
 		auto notification = model::BalanceTransferNotification(sender, recipient, test::UnresolveXor(Currency_Mosaic_Id), Amount(234));
 		auto cache = test::CreateCache(sender, { { Currency_Mosaic_Id, TTraits::Adjust(Amount(234)) } });
@@ -219,28 +247,9 @@ namespace catapult { namespace validators {
 		AssertValidationResult<TValidatorTraits>(TTraits::Expected_Result, cache, notification);
 	}
 
-	VARIABLE_BALANCE_TEST(Currency_SeededByAddress) {
-		// Arrange:
-		auto sender = test::GenerateRandomByteArray<Key>();
-		auto recipient = test::GenerateRandomUnresolvedAddress();
-		auto notification = model::BalanceTransferNotification(sender, recipient, test::UnresolveXor(Currency_Mosaic_Id), Amount(234));
-
-		// - seed the sender by address
-		auto cache = test::CreateEmptyCatapultCache();
-		auto senderAddress = model::PublicKeyToAddress(sender, cache.sub<cache::AccountStateCache>().networkIdentifier());
-		{
-			auto delta = cache.createDelta();
-			test::SetCacheBalances(delta, senderAddress, { { Currency_Mosaic_Id, TTraits::Adjust(Amount(234)) } });
-			cache.commit(Height());
-		}
-
-		// Assert:
-		AssertValidationResult<TValidatorTraits>(TTraits::Expected_Result, cache, notification);
-	}
-
 	VARIABLE_BALANCE_TEST(OtherMosaic) {
 		// Arrange:
-		auto sender = test::GenerateRandomByteArray<Key>();
+		auto sender = test::GenerateRandomByteArray<Address>();
 		auto recipient = test::GenerateRandomUnresolvedAddress();
 		auto notification = model::BalanceTransferNotification(sender, recipient, test::UnresolveXor(MosaicId(12)), Amount(234));
 		auto cache = test::CreateCache(sender, { { MosaicId(12), TTraits::Adjust(Amount(234)) } });

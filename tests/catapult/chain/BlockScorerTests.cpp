@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -128,7 +129,7 @@ namespace catapult { namespace chain {
 				// Act:
 				auto hit = CalculateHit(generationHash);
 				auto oldHit = CalculateHitWithDoubles(generationHash);
-				auto ratio = static_cast<double>(hit) / static_cast<double>(oldHit);
+				auto ratio = utils::to_ratio(hit, oldHit);
 
 				// Assert:
 				auto message = "at index " + std::to_string(i) + ", value = " + std::to_string(value);

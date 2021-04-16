@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,7 +32,7 @@ namespace catapult { namespace observers {
 	DEFINE_COMMON_OBSERVER_TESTS(SecretLock,)
 
 	namespace {
-		struct SecretObserverTraits {
+		struct SecretObserverTraits : public test::BasicSecretLockInfoTestTraits {
 		public:
 			using CacheType = cache::SecretLockInfoCache;
 			using NotificationType = model::SecretLockNotification;
@@ -44,22 +45,12 @@ namespace catapult { namespace observers {
 				return CreateSecretLockObserver();
 			}
 
-			static auto GenerateRandomLockInfo(const NotificationType& notification) {
-				auto resolver = test::CreateResolverContextXor();
-				auto lockInfo = test::BasicSecretLockInfoTestTraits::CreateLockInfo();
-				lockInfo.Secret = notification.Secret;
-				lockInfo.RecipientAddress = resolver.resolve(notification.Recipient);
-				lockInfo.CompositeHash = model::CalculateSecretLockInfoHash(lockInfo.Secret, lockInfo.RecipientAddress);
-				return lockInfo;
-			}
-
 			static auto ToKey(const NotificationType& notification) {
 				auto resolver = test::CreateResolverContextXor();
 				return model::CalculateSecretLockInfoHash(notification.Secret, resolver.resolve(notification.Recipient));
 			}
 
 			static void AssertAddedLockInfo(const state::SecretLockInfo& lockInfo, const NotificationType& notification) {
-				// Assert:
 				EXPECT_EQ(notification.HashAlgorithm, lockInfo.HashAlgorithm);
 				EXPECT_EQ(notification.Secret, lockInfo.Secret);
 				EXPECT_EQ(notification.Recipient, test::UnresolveXor(lockInfo.RecipientAddress));

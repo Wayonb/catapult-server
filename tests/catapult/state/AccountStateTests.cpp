@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -44,7 +45,7 @@ namespace catapult { namespace state {
 		EXPECT_EQ(Height(0), state.PublicKeyHeight);
 
 		EXPECT_EQ(AccountType::Unlinked, state.AccountType);
-		EXPECT_EQ(Key(), state.LinkedAccountKey);
+		EXPECT_EQ(AccountPublicKeys::KeyType::Unset, state.SupplementalPublicKeys.mask());
 
 		for (const auto& snapshot : state.ImportanceSnapshots) {
 			EXPECT_EQ(Importance(0), snapshot.Importance);
@@ -78,6 +79,52 @@ namespace catapult { namespace state {
 
 	// endregion
 
+	// region HasHistoricalInformation
+
+	TEST(TEST_CLASS, HasHistoricalInformationReturnsTrueWhenImportanceSnapshotsIsNotEmpty) {
+		// Arrange:
+		AccountState accountState(test::GenerateRandomAddress(), Height(1));
+
+		// Sanity: initially false
+		EXPECT_FALSE(HasHistoricalInformation(accountState));
+
+		// - set an importance
+		accountState.ImportanceSnapshots.set(Importance(111), model::ImportanceHeight(222));
+
+		// Act + Assert: true as long any snapshot is set
+		for (auto i = 0u; i < Importance_History_Size; ++i) {
+			EXPECT_TRUE(HasHistoricalInformation(accountState));
+
+			accountState.ImportanceSnapshots.push();
+		}
+
+		// Assert: false now that it is empty again
+		EXPECT_FALSE(HasHistoricalInformation(accountState));
+	}
+
+	TEST(TEST_CLASS, HasHistoricalInformationReturnsTrueWhenActivityBucketsIsNotEmpty) {
+		// Arrange:
+		AccountState accountState(test::GenerateRandomAddress(), Height(1));
+
+		// Sanity: initially false
+		EXPECT_FALSE(HasHistoricalInformation(accountState));
+
+		// - set an activity bucket
+		accountState.ActivityBuckets.update(model::ImportanceHeight(222), [](const auto&) {});
+
+		// Act + Assert: true as long any bucket is set
+		for (auto i = 0u; i < Activity_Bucket_History_Size; ++i) {
+			EXPECT_TRUE(HasHistoricalInformation(accountState));
+
+			accountState.ActivityBuckets.push();
+		}
+
+		// Assert: false now that it is empty again
+		EXPECT_FALSE(HasHistoricalInformation(accountState));
+	}
+
+	// endregion
+
 	// region RequireLinkedRemoteAndMainAccounts
 
 	namespace {
@@ -92,8 +139,8 @@ namespace catapult { namespace state {
 			test::FillWithRandomData(mainAccountState.PublicKey);
 			mainAccountState.AccountType = AccountType::Main;
 
-			remoteAccountState.LinkedAccountKey = mainAccountState.PublicKey;
-			mainAccountState.LinkedAccountKey = remoteAccountState.PublicKey;
+			remoteAccountState.SupplementalPublicKeys.linked().set(mainAccountState.PublicKey);
+			mainAccountState.SupplementalPublicKeys.linked().set(remoteAccountState.PublicKey);
 
 			// Act + Assert:
 			action(remoteAccountState, mainAccountState);
@@ -136,20 +183,32 @@ namespace catapult { namespace state {
 		});
 	}
 
-	TEST(TEST_CLASS, RequireLinkedRemoteAndMainAccounts_ThrowsWhenRemoteAccountStateHasWrongLinkedAccountKey) {
+	namespace {
+		void MutateLinkedPublicKey(AccountState& accountState) {
+			auto& accountPublicKeys = accountState.SupplementalPublicKeys;
+
+			auto linkedPublicKey = accountPublicKeys.linked().get();
+			linkedPublicKey[0] ^= 0xFF;
+
+			accountPublicKeys.linked().unset();
+			accountPublicKeys.linked().set(linkedPublicKey);
+		}
+	}
+
+	TEST(TEST_CLASS, RequireLinkedRemoteAndMainAccounts_ThrowsWhenRemoteAccountStateHasWrongLinkedPublicKey) {
 		// Arrange:
 		PrepareRequireLinkedRemoteAndMainAccountsTest([](auto& remoteAccountState, const auto& mainAccountState) {
-			remoteAccountState.LinkedAccountKey[0] ^= 0xFF;
+			MutateLinkedPublicKey(remoteAccountState);
 
 			// Act + Assert:
 			EXPECT_THROW(RequireLinkedRemoteAndMainAccounts(remoteAccountState, mainAccountState), catapult_runtime_error);
 		});
 	}
 
-	TEST(TEST_CLASS, RequireLinkedRemoteAndMainAccounts_ThrowsWhenMainAccountStateHasWrongLinkedAccountKey) {
+	TEST(TEST_CLASS, RequireLinkedRemoteAndMainAccounts_ThrowsWhenMainAccountStateHasWrongLinkedPublicKey) {
 		// Arrange:
 		PrepareRequireLinkedRemoteAndMainAccountsTest([](const auto& remoteAccountState, auto& mainAccountState) {
-			mainAccountState.LinkedAccountKey[0] ^= 0xFF;
+			MutateLinkedPublicKey(mainAccountState);
 
 			// Act + Assert:
 			EXPECT_THROW(RequireLinkedRemoteAndMainAccounts(remoteAccountState, mainAccountState), catapult_runtime_error);
@@ -192,6 +251,37 @@ namespace catapult { namespace state {
 		auto activityBucket = accountState.ActivityBuckets.get(model::ImportanceHeight(100));
 		EXPECT_EQ(model::ImportanceHeight(100), activityBucket.StartHeight);
 		EXPECT_EQ(Amount(222), activityBucket.TotalFeesPaid);
+	}
+
+	// endregion
+
+	// region account key accessors
+
+	TEST(TEST_CLASS, CanRetrieveSupplementalPublicKeysViaAccessorsWhenUnset) {
+		// Arrange:
+		AccountState accountState(test::GenerateRandomAddress(), Height(123));
+
+		// Act + Assert:
+		EXPECT_EQ(Key(), GetLinkedPublicKey(accountState));
+		EXPECT_EQ(Key(), GetNodePublicKey(accountState));
+		EXPECT_EQ(Key(), GetVrfPublicKey(accountState));
+	}
+
+	TEST(TEST_CLASS, CanRetrieveSupplementalPublicKeysViaAccessorsWhenSet) {
+		// Arrange:
+		auto linkedPublicKey = test::GenerateRandomByteArray<Key>();
+		auto nodePublicKey = test::GenerateRandomByteArray<Key>();
+		auto vrfPublicKey = test::GenerateRandomByteArray<Key>();
+
+		AccountState accountState(test::GenerateRandomAddress(), Height(123));
+		accountState.SupplementalPublicKeys.linked().set(linkedPublicKey);
+		accountState.SupplementalPublicKeys.node().set(nodePublicKey);
+		accountState.SupplementalPublicKeys.vrf().set(vrfPublicKey);
+
+		// Act + Assert:
+		EXPECT_EQ(linkedPublicKey, GetLinkedPublicKey(accountState));
+		EXPECT_EQ(nodePublicKey, GetNodePublicKey(accountState));
+		EXPECT_EQ(vrfPublicKey, GetVrfPublicKey(accountState));
 	}
 
 	// endregion

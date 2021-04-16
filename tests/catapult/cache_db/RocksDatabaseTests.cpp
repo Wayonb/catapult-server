@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -25,7 +26,7 @@
 #include "tests/catapult/cache_db/test/SliceTestUtils.h"
 #include "tests/test/nodeps/Filesystem.h"
 #include "tests/TestHarness.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 namespace catapult { namespace cache {
 
@@ -36,11 +37,9 @@ namespace catapult { namespace cache {
 				const std::vector<std::string>& columnNames,
 				size_t numKilobytes = 0,
 				FilterPruningMode pruningMode = FilterPruningMode::Disabled) {
-			return RocksDatabaseSettings(
-					test::TempDirectoryGuard::DefaultName(),
-					columnNames,
-					utils::FileSize::FromKilobytes(numKilobytes),
-					pruningMode);
+			auto config = config::NodeConfiguration::CacheDatabaseSubConfiguration();
+			config.MaxWriteBatchSize = utils::FileSize::FromKilobytes(numKilobytes);
+			return RocksDatabaseSettings(test::TempDirectoryGuard::DefaultName(), config, columnNames, pruningMode);
 		}
 
 		auto DefaultSettings() {
@@ -69,7 +68,7 @@ namespace catapult { namespace cache {
 	TEST(TEST_CLASS, RdbThrowsWhenDbCannotBeOpened) {
 		// Arrange: use TempDirectoryGuard to create any intermediate directories (except for last one)
 		test::TempDirectoryGuard dbDirGuard;
-		boost::filesystem::remove(dbDirGuard.name());
+		std::filesystem::remove(dbDirGuard.name());
 
 		// - create a lock file with a name that will be used by Open
 		io::FileLock lock(dbDirGuard.name());
@@ -77,11 +76,6 @@ namespace catapult { namespace cache {
 
 		// Act + Assert:
 		EXPECT_THROW(RocksDatabase(CreateSettings({ "default" })), catapult_runtime_error);
-	}
-
-	TEST(TEST_CLASS, RdbThrowsWhenBatchSizeIsTooSmall) {
-		test::TempDirectoryGuard dbDirGuard;
-		EXPECT_THROW(RocksDatabase(CreateSettings({ "default" }, 99)), catapult_invalid_argument);
 	}
 
 	TEST(TEST_CLASS, CanOpenDatabaseWithValidBatchSize) {

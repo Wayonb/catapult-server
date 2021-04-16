@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -35,7 +36,7 @@ namespace catapult { namespace mongo { namespace plugins {
 			using ModelType = state::SecretLockInfo;
 
 			static constexpr auto Collection_Name = "secretLocks";
-			static constexpr auto Id_Property_Name = "lock.compositeHash";
+			static constexpr auto Id_Property_Name = "compositeHash";
 
 			static constexpr auto CreateCacheStorage = CreateMongoSecretLockInfoCacheStorage;
 			static constexpr auto AssertEqualLockInfoData = test::AssertEqualLockInfoData;

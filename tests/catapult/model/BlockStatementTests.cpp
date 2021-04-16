@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -331,11 +332,11 @@ namespace catapult { namespace model {
 				}
 			}
 
-			template<typename TKey, typename TStatement>
+			template<typename TStatementKey, typename TStatementValue>
 			static void AssertResolutionStatementSources(
 					size_t numExpectedStatements,
 					size_t numExpectedResolutions,
-					std::map<TKey, TStatement>& statements,
+					std::map<TStatementKey, TStatementValue>& statements,
 					const std::string& message) {
 				// empty statements are pruned
 				if (0 == numExpectedResolutions) {

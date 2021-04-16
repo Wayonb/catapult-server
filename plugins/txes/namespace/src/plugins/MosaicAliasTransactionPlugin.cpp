@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -31,14 +32,14 @@ namespace catapult { namespace plugins {
 
 	namespace {
 		template<typename TTransaction>
-		void Publish(const TTransaction& transaction, NotificationSubscriber& sub) {
-			sub.notify(NamespaceRequiredNotification(transaction.SignerPublicKey, transaction.NamespaceId));
+		void Publish(const TTransaction& transaction, const PublishContext& context, NotificationSubscriber& sub) {
+			sub.notify(NamespaceRequiredNotification(context.SignerAddress, transaction.NamespaceId));
 			sub.notify(AliasLinkNotification(transaction.NamespaceId, transaction.AliasAction));
 			sub.notify(AliasedMosaicIdNotification(transaction.NamespaceId, transaction.AliasAction, transaction.MosaicId));
 
 			// in case of unlink, the existence of the (possibly expired) mosaic is guaranteed
-			if (model::AliasAction::Link == transaction.AliasAction)
-				sub.notify(MosaicRequiredNotification(transaction.SignerPublicKey, transaction.MosaicId));
+			if (AliasAction::Link == transaction.AliasAction)
+				sub.notify(MosaicRequiredNotification(context.SignerAddress, transaction.MosaicId));
 		}
 	}
 

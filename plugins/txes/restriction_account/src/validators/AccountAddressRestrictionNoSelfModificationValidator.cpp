@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,20 +20,16 @@
 **/
 
 #include "Validators.h"
-#include "catapult/model/Address.h"
-#include "catapult/model/ResolverContext.h"
 
 namespace catapult { namespace validators {
 
 	using Notification = model::ModifyAccountAddressRestrictionValueNotification;
 
-	DECLARE_STATELESS_VALIDATOR(AccountAddressRestrictionNoSelfModification, Notification)(model::NetworkIdentifier networkIdentifier) {
-		return MAKE_STATELESS_VALIDATOR(AccountAddressRestrictionNoSelfModification, [networkIdentifier](
-				const Notification& notification) {
-			auto address = model::PublicKeyToAddress(notification.Key, networkIdentifier);
-			return address != model::ResolverContext().resolve(notification.RestrictionValue)
-					? ValidationResult::Success
-					: Failure_RestrictionAccount_Invalid_Modification_Address;
-		});
-	}
+	DEFINE_STATEFUL_VALIDATOR(AccountAddressRestrictionNoSelfModification, [](
+			const Notification& notification,
+			const ValidatorContext& context) {
+		return notification.Address != context.Resolvers.resolve(notification.RestrictionValue)
+				? ValidationResult::Success
+				: Failure_RestrictionAccount_Invalid_Modification_Address;
+	})
 }}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -283,22 +284,28 @@ namespace catapult { namespace state {
 		compact();
 	}
 
+	namespace {
+		void reinsert(CompactMosaicMap& map, MosaicId id) {
+			auto iter = map.find(id);
+			if (map.end() == iter)
+				return;
+
+			// copy and reinsert the matching mosaic
+			auto mosaicCopy = *iter;
+			map.erase(mosaicCopy.first);
+			map.insert(mosaicCopy);
+		}
+	}
+
 	void CompactMosaicMap::optimize(MosaicId id) {
 		if (id == m_optimizedMosaicId)
 			return;
 
-		if (MosaicId() != m_optimizedMosaicId)
-			CATAPULT_THROW_INVALID_ARGUMENT_2("cannot reoptimize map", utils::HexFormat(m_optimizedMosaicId), utils::HexFormat(id));
-
+		auto previousOptimizedMosaicId = m_optimizedMosaicId;
 		m_optimizedMosaicId = id;
-		auto iter = find(m_optimizedMosaicId);
-		if (end() == iter)
-			return;
 
-		// map already contains mosaic that should be optimized, so reinsert it
-		Mosaic mosaicCopy = *iter;
-		erase(mosaicCopy.first);
-		insert(mosaicCopy);
+		reinsert(*this, previousOptimizedMosaicId);
+		reinsert(*this, m_optimizedMosaicId);
 	}
 
 	bool CompactMosaicMap::find(MosaicId id, MosaicLocation& location) const {

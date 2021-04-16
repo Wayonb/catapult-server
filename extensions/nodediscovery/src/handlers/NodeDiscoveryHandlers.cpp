@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -30,19 +31,19 @@ namespace catapult { namespace handlers {
 
 	void RegisterNodeDiscoveryPushPingHandler(
 			ionet::ServerPacketHandlers& handlers,
-			model::NetworkIdentifier networkIdentifier,
+			const model::UniqueNetworkFingerprint& networkFingerprint,
 			const NodeConsumer& nodeConsumer) {
-		handlers.registerHandler(ionet::PacketType::Node_Discovery_Push_Ping, [networkIdentifier, nodeConsumer](
+		handlers.registerHandler(ionet::PacketType::Node_Discovery_Push_Ping, [networkFingerprint, nodeConsumer](
 				const auto& packet,
 				const auto& context) {
 			ionet::Node node;
 			if (!nodediscovery::TryParseNodePacket(packet, node))
 				return;
 
-			if (!nodediscovery::IsNodeCompatible(node, networkIdentifier, context.key())) {
+			if (!nodediscovery::IsNodeCompatible(node, networkFingerprint, context.key())) {
 				CATAPULT_LOG(warning)
 						<< "ignoring ping packet for incompatible node (identity = "
-						<< node.identity() << ", network = " << node.metadata().NetworkIdentifier << ")";
+						<< node.identity() << ", network = " << node.metadata().NetworkFingerprint << ")";
 				return;
 			}
 

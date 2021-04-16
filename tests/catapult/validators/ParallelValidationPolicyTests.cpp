@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -33,16 +34,15 @@ namespace catapult { namespace validators {
 		class PoolValidationPolicyPair {
 		public:
 			PoolValidationPolicyPair(
-					const std::shared_ptr<thread::IoThreadPool>& pPool,
+					std::unique_ptr<thread::IoThreadPool>&& pPool,
 					const std::shared_ptr<const StatelessEntityValidator>& pValidator)
-					: m_pPool(pPool)
-					, m_pValidationPolicy(CreateParallelValidationPolicy(m_pPool, pValidator))
+					: m_pPool(std::move(pPool))
+					, m_pValidationPolicy(CreateParallelValidationPolicy(*m_pPool, pValidator))
 					, m_isReleased(false)
 			{}
 
 			~PoolValidationPolicyPair() {
-				if (m_pPool)
-					stopAll();
+				stopAll();
 			}
 
 		public:
@@ -68,7 +68,7 @@ namespace catapult { namespace validators {
 			}
 
 		private:
-			std::shared_ptr<thread::IoThreadPool> m_pPool;
+			std::unique_ptr<thread::IoThreadPool> m_pPool;
 			std::shared_ptr<const ParallelValidationPolicy> m_pValidationPolicy;
 			bool m_isReleased;
 		};

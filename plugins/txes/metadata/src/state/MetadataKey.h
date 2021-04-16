@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -44,11 +45,11 @@ namespace catapult { namespace state {
 		const Hash256& uniqueKey() const;
 
 	public:
-		/// Gets the source public key.
-		const Key& sourcePublicKey() const;
+		/// Gets the source address.
+		const Address& sourceAddress() const;
 
-		/// Gets the target public key.
-		const Key& targetPublicKey() const;
+		/// Gets the target address.
+		const Address& targetAddress() const;
 
 		/// Gets the scoped metadata key.
 		uint64_t scopedMetadataKey() const;
@@ -77,9 +78,13 @@ namespace catapult { namespace state {
 		Hash256 m_uniqueKey;
 	};
 
+	/// Merges \a partialKey and \a target into a (resolved) metadata key.
+	/// \note \a target is expected to already be resolved.
+	MetadataKey CreateMetadataKey(const model::PartialMetadataKey& partialKey, const model::MetadataTarget& target);
+
 	/// Uses \a resolvers to merge \a partialKey and \a target into a (resolved) metadata key.
 	MetadataKey ResolveMetadataKey(
-			const model::PartialMetadataKey& partialKey,
+			const model::UnresolvedPartialMetadataKey& partialKey,
 			const model::MetadataTarget& target,
 			const model::ResolverContext& resolvers);
 }}

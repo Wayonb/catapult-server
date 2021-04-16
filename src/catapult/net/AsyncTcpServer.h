@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -27,8 +28,6 @@ namespace catapult { namespace net {
 
 	using AcceptHandler = consumer<const ionet::PacketSocketInfo&>;
 
-	using ConfigureSocketHandler = consumer<ionet::socket&>;
-
 	/// Settings used to configure AsyncTcpServer behavior.
 	struct AsyncTcpServerSettings {
 	public:
@@ -38,9 +37,6 @@ namespace catapult { namespace net {
 	public:
 		/// Accept handler (must be set via constructor).
 		const AcceptHandler Accept;
-
-		/// Configure socket handler.
-		ConfigureSocketHandler ConfigureSocket;
 
 		/// Packet socket options.
 		ionet::PacketSocketOptions PacketSocketOptions;
@@ -75,10 +71,9 @@ namespace catapult { namespace net {
 		virtual void shutdown() = 0;
 	};
 
-	/// Creates an async tcp server listening on \a endpoint with the specified \a settings using the specified
-	/// thread pool (\a pPool).
+	/// Creates an async tcp server listening on \a endpoint with the specified \a settings using the specified thread \a pool.
 	std::shared_ptr<AsyncTcpServer> CreateAsyncTcpServer(
-			const std::shared_ptr<thread::IoThreadPool>& pPool,
+			thread::IoThreadPool& pool,
 			const boost::asio::ip::tcp::endpoint& endpoint,
 			const AsyncTcpServerSettings& settings);
 }}

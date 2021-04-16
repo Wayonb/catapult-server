@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,10 +21,10 @@
 
 #pragma once
 #include "mongo/src/mappers/MapperInclude.h"
-#include "plugins/txes/lock_secret/src/state/SecretLockInfo.h"
+#include "plugins/txes/lock_secret/src/state/SecretLockInfoHistory.h"
 
 namespace catapult { namespace mongo { namespace plugins {
 
-	/// Maps \a secretLockInfo and \a senderAddress to the corresponding db model value.
-	bsoncxx::document::value ToDbModel(const state::SecretLockInfo& secretLockInfo, const Address& senderAddress);
+	/// Maps \a history to the corresponding db model value.
+	bsoncxx::document::value ToDbModel(const state::SecretLockInfoHistory& history);
 }}}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -25,6 +26,7 @@
 #include "TimeSynchronizationUtils.h"
 #include "TimeSynchronizer.h"
 #include "timesync/src/handlers/TimeSyncHandlers.h"
+#include "catapult/config/CatapultKeys.h"
 #include "catapult/extensions/NetworkUtils.h"
 #include "catapult/extensions/ServiceLocator.h"
 #include "catapult/extensions/ServiceState.h"
@@ -81,7 +83,7 @@ namespace catapult { namespace timesync {
 				auto pServiceGroup = state.pool().pushServiceGroup(Service_Group);
 				auto pNodeNetworkTimeRequestor = pServiceGroup->pushService(
 						CreateNodeNetworkTimeRequestor,
-						locator.keyPair(),
+						locator.keys().caPublicKey(),
 						connectionSettings);
 
 				locator.registerService(Requestor_Service_Name, pNodeNetworkTimeRequestor);

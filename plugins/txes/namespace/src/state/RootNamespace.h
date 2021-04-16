@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -58,13 +59,13 @@ namespace catapult { namespace state {
 		using OrderedChildPaths = std::set<Namespace::Path, PathsComparator>;
 
 	public:
-		/// Creates a root namespace around \a id, \a ownerPublicKey and \a liftime.
-		RootNamespace(NamespaceId id, const Key& ownerPublicKey, const NamespaceLifetime& lifetime);
+		/// Creates a root namespace around \a id, \a ownerAddress and \a liftime.
+		RootNamespace(NamespaceId id, const Address& ownerAddress, const NamespaceLifetime& lifetime);
 
-		/// Creates a root namespace around \a id, \a ownerPublicKey, \a liftime and \a pChildren.
+		/// Creates a root namespace around \a id, \a ownerAddress, \a liftime and \a pChildren.
 		RootNamespace(
 				NamespaceId id,
-				const Key& ownerPublicKey,
+				const Address& ownerAddress,
 				const NamespaceLifetime& lifetime,
 				const std::shared_ptr<Children>& pChildren);
 
@@ -76,7 +77,7 @@ namespace catapult { namespace state {
 		const Children& children() const;
 
 		/// Gets a const reference to the owner of this namespace.
-		const Key& ownerPublicKey() const;
+		const Address& ownerAddress() const;
 
 		/// Gets a const reference to the lifetime of this namespace.
 		const NamespaceLifetime& lifetime() const;
@@ -114,6 +115,9 @@ namespace catapult { namespace state {
 		bool operator!=(const RootNamespace& rhs) const;
 
 	public:
+		/// Returns \c true if this namespace can extend \a previous and inherit its children.
+		bool canExtend(const RootNamespace& previous) const;
+
 		/// Creates a new root namespace with \a lifetime.
 		/// \note The method shares the children of this root namespace with the new root namespace.
 		RootNamespace renew(const NamespaceLifetime& newLifetime) const;
@@ -125,7 +129,7 @@ namespace catapult { namespace state {
 	private:
 		NamespaceId m_id;
 		NamespaceAlias m_alias; // root namespace alias
-		Key m_ownerPublicKey;
+		Address m_ownerAddress;
 		NamespaceLifetime m_lifetime;
 		std::shared_ptr<Children> m_pChildren;
 	};

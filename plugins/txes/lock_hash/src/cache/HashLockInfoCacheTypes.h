@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,7 +20,7 @@
 **/
 
 #pragma once
-#include "src/state/HashLockInfo.h"
+#include "src/state/HashLockInfoHistory.h"
 #include "plugins/txes/lock_shared/src/cache/LockInfoCacheTypes.h"
 #include "catapult/cache/ReadOnlyArtifactCache.h"
 
@@ -48,7 +49,7 @@ namespace catapult { namespace cache {
 	public:
 		// key value types
 		using KeyType = Hash256;
-		using ValueType = state::HashLockInfo;
+		using ValueType = state::HashLockInfoHistory;
 
 		// cache types
 		using CacheType = HashLockInfoCache;
@@ -59,9 +60,9 @@ namespace catapult { namespace cache {
 		using PatriciaTree = HashLockInfoPatriciaTree;
 
 	public:
-		/// Gets the key corresponding to \a lockInfo.
-		static const auto& GetKeyFromValue(const ValueType& lockInfo) {
-			return lockInfo.Hash;
+		/// Gets the key corresponding to \a history.
+		static const auto& GetKeyFromValue(const ValueType& history) {
+			return history.id();
 		}
 	};
 
@@ -71,7 +72,7 @@ namespace catapult { namespace cache {
 			BasicHashLockInfoCacheView,
 			BasicHashLockInfoCacheDelta,
 			Hash256,
-			state::HashLockInfo>;
+			state::HashLockInfoHistory>;
 
 		using BaseSetDeltaPointers = HashLockInfoBaseSetDeltaPointers;
 		using BaseSets = HashLockInfoBaseSets;

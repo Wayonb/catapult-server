@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,6 +20,7 @@
 **/
 
 #include "EmbeddedTransaction.h"
+#include "Address.h"
 #include "NotificationSubscriber.h"
 #include "Transaction.h"
 #include "TransactionPlugin.h"
@@ -32,30 +34,32 @@ namespace catapult { namespace model {
 		return out;
 	}
 
+	Address GetSignerAddress(const EmbeddedTransaction& transaction) {
+		return PublicKeyToAddress(transaction.SignerPublicKey, transaction.Network);
+	}
+
 	namespace {
-		bool TryCalculateRealSize(const EmbeddedTransaction& transaction, const TransactionRegistry& registry, uint64_t& realSize) {
+		bool IsSizeValidInternal(const EmbeddedTransaction& transaction, const TransactionRegistry& registry) {
 			const auto* pPlugin = registry.findPlugin(transaction.Type);
 			if (!pPlugin || !pPlugin->supportsEmbedding()) {
 				CATAPULT_LOG(warning) << "rejected embedded transaction with type: " << transaction.Type;
 				return false;
 			}
 
-			realSize = pPlugin->embeddedPlugin().calculateRealSize(transaction);
-			return true;
+			return pPlugin->embeddedPlugin().isSizeValid(transaction);
 		}
 	}
 
 	bool IsSizeValid(const EmbeddedTransaction& transaction, const TransactionRegistry& registry) {
-		uint64_t realSize;
-		if (!TryCalculateRealSize(transaction, registry, realSize))
+		if (transaction.Size < sizeof(EmbeddedTransaction)) {
+			CATAPULT_LOG(warning) << "transaction failed size validation with size " << transaction.Size;
 			return false;
+		}
 
-		if (transaction.Size == realSize)
+		if (IsSizeValidInternal(transaction, registry))
 			return true;
 
-		CATAPULT_LOG(warning)
-				<< transaction.Type << " transaction failed size validation with size " << transaction.Size
-				<< " (expected " << realSize << ")";
+		CATAPULT_LOG(warning) << transaction.Type << " transaction failed size validation with size " << transaction.Size;
 		return false;
 	}
 

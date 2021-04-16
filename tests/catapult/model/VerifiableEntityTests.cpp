@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,6 +20,7 @@
 **/
 
 #include "catapult/model/VerifiableEntity.h"
+#include "catapult/model/Address.h"
 #include "tests/test/core/BlockTestUtils.h"
 #include "tests/test/core/TransactionTestUtils.h"
 #include "tests/test/core/mocks/MockTransaction.h"
@@ -37,7 +39,7 @@ namespace catapult { namespace model {
 		// Arrange:
 		auto expectedSize = sizeof(SizePrefixedEntity) + 2 * sizeof(uint32_t);
 
-#define FIELD(X) expectedSize += sizeof(VerifiableEntity::X);
+#define FIELD(X) expectedSize += SizeOf32<decltype(VerifiableEntity::X)>();
 		VERIFIABLE_ENTITY_FIELDS
 #undef FIELD
 
@@ -65,16 +67,36 @@ namespace catapult { namespace model {
 		VerifiableEntity entity;
 		entity.Size = 121;
 		entity.Version = 2;
-		entity.Type = Entity_Type_Nemesis_Block;
+		entity.Type = Entity_Type_Block_Nemesis;
 
 		// Act:
 		auto str = test::ToString(entity);
 
 		// Assert:
-		EXPECT_EQ("Nemesis_Block (v2) with size 121", str);
+		EXPECT_EQ("Block_Nemesis (v2) with size 121", str);
 	}
 
 	// endregion
+
+	// region GetSignerAddress
+
+	TEST(TEST_CLASS, GetSignerAddressCalculatesCorrectSignerAddress) {
+		// Arrange:
+		VerifiableEntity entity;
+		test::FillWithRandomData(entity.SignerPublicKey);
+		entity.Network = static_cast<NetworkIdentifier>(test::RandomByte());
+
+		// Act:
+		auto signerAddress = GetSignerAddress(entity);
+
+		// Assert:
+		auto expectedSignerAddress = PublicKeyToAddress(entity.SignerPublicKey, entity.Network);
+		EXPECT_EQ(expectedSignerAddress, signerAddress);
+	}
+
+	// endregion
+
+	// region IsSizeValid - utils
 
 	namespace {
 		bool IsSizeValid(const VerifiableEntity& entity) {
@@ -109,6 +131,8 @@ namespace catapult { namespace model {
 	TEST(TEST_CLASS, TEST_NAME##_BlockWithTransactions) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<BlockWithTransactionsTraits>(); } \
 	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)()
 
+	// endregion
+
 	// region IsSizeValid - basic tests
 
 	TRAITS_BASED_TEST(SizeIsValidWhenEntitySizeIsCorrect) {
@@ -137,6 +161,16 @@ namespace catapult { namespace model {
 		EXPECT_FALSE(IsSizeValid(*pEntity));
 	}
 
+	TEST(TEST_CLASS, SizeIsInvalidForEntityWithReportedSizeLessThanHeaderSize) {
+		// Arrange:
+		std::vector<uint8_t> buffer(sizeof(SizePrefixedEntity));
+		auto* pEntity = reinterpret_cast<VerifiableEntity*>(&buffer[0]);
+		pEntity->Size = sizeof(SizePrefixedEntity);
+
+		// Act:
+		EXPECT_FALSE(IsSizeValid(*pEntity));
+	}
+
 	// endregion
 
 	// region IsSizeValid - block
@@ -158,7 +192,7 @@ namespace catapult { namespace model {
 	}
 
 	TEST(TEST_CLASS, SizeIsInvalidWhenValidatingBlockContainingIncompatibleEntityType) {
-		AssertFailureForBlockWithEntityType(Entity_Type_Nemesis_Block);
+		AssertFailureForBlockWithEntityType(Entity_Type_Block_Nemesis);
 	}
 
 	TEST(TEST_CLASS, SizeIsInvalidWhenValidatingBlockContainingTransactionWithWrongSize) {

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,14 +20,15 @@
 **/
 
 #include "src/config/MosaicConfiguration.h"
-#include "catapult/crypto/KeyUtils.h"
+#include "catapult/model/Address.h"
+#include "catapult/utils/HexParser.h"
 #include "tests/test/nodeps/ConfigurationTestUtils.h"
 #include "tests/TestHarness.h"
 
 namespace catapult { namespace config {
 
 	namespace {
-		constexpr auto Mosaic_Rental_Fee_Sink_Public_Key = "F76B23F89550EF41E2FE4C6016D8829F1CB8E4ADAB1826EB4B735A25959886ED";
+		constexpr auto Mosaic_Rental_Fee_Sink_Address = "SBLIPGUADOMVLQI2TQ7SMGFHSVOZNE4H2I5NBIQ";
 
 		struct MosaicConfigurationTraits {
 			using ConfigurationType = MosaicConfiguration;
@@ -40,7 +42,7 @@ namespace catapult { namespace config {
 							{ "maxMosaicDuration", "2340h" },
 							{ "maxMosaicDivisibility", "7" },
 
-							{ "mosaicRentalFeeSinkPublicKey", Mosaic_Rental_Fee_Sink_Public_Key },
+							{ "mosaicRentalFeeSinkAddress", Mosaic_Rental_Fee_Sink_Address },
 							{ "mosaicRentalFee", "773388" }
 						}
 					}
@@ -57,7 +59,7 @@ namespace catapult { namespace config {
 				EXPECT_EQ(utils::BlockSpan(), config.MaxMosaicDuration);
 				EXPECT_EQ(0u, config.MaxMosaicDivisibility);
 
-				EXPECT_EQ(Key(), config.MosaicRentalFeeSinkPublicKey);
+				EXPECT_EQ(Address(), config.MosaicRentalFeeSinkAddress);
 				EXPECT_EQ(Amount(), config.MosaicRentalFee);
 			}
 
@@ -67,7 +69,7 @@ namespace catapult { namespace config {
 				EXPECT_EQ(utils::BlockSpan::FromHours(2340), config.MaxMosaicDuration);
 				EXPECT_EQ(7u, config.MaxMosaicDivisibility);
 
-				EXPECT_EQ(crypto::ParseKey(Mosaic_Rental_Fee_Sink_Public_Key), config.MosaicRentalFeeSinkPublicKey);
+				EXPECT_EQ(model::StringToAddress(Mosaic_Rental_Fee_Sink_Address), config.MosaicRentalFeeSinkAddress);
 				EXPECT_EQ(Amount(773388), config.MosaicRentalFee);
 			}
 		};

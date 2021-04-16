@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -32,7 +33,7 @@ namespace catapult { namespace validators {
 	namespace {
 		bool IsMosaicOwnerParticipant(
 				const cache::ReadOnlyCatapultCache& cache,
-				const Key& owner,
+				const Address& owner,
 				const Notification& notification,
 				const model::ResolverContext& resolvers) {
 			if (owner == notification.Sender)
@@ -61,12 +62,12 @@ namespace catapult { namespace validators {
 				return result;
 
 			// 2. if it's transferable there's nothing else to check
-			const auto& entry = mosaicIter.get();
-			if (entry.definition().properties().is(model::MosaicFlags::Transferable))
+			const auto& mosaicEntry = mosaicIter.get();
+			if (mosaicEntry.definition().properties().is(model::MosaicFlags::Transferable))
 				return ValidationResult::Success;
 
 			// 3. if it's NOT transferable then owner must be either sender or recipient
-			if (!IsMosaicOwnerParticipant(context.Cache, entry.definition().ownerPublicKey(), notification, context.Resolvers))
+			if (!IsMosaicOwnerParticipant(context.Cache, mosaicEntry.definition().ownerAddress(), notification, context.Resolvers))
 				return Failure_Mosaic_Non_Transferable;
 
 			return ValidationResult::Success;

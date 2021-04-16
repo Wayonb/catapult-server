@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -57,7 +58,7 @@ namespace catapult { namespace test {
 		};
 
 		template<typename TRegisterHandler, typename TAction>
-		static void RunPushTransactionsHandlerTest(TRegisterHandler registerHandler, const ionet::Packet& packet, TAction action) {
+		static void RunPushHandlerTest(TRegisterHandler registerHandler, const ionet::Packet& packet, TAction action) {
 			// Arrange:
 			ionet::ServerPacketHandlers handlers;
 			auto registry = TTraits::CreateRegistry();
@@ -90,18 +91,18 @@ namespace catapult { namespace test {
 			PushHandlerBuffer buffer(3, false);
 
 			// Act:
-			RunPushTransactionsHandlerTest(TTraits::RegisterHandler, buffer.packet(), [](const auto& counters) {
+			RunPushHandlerTest(TTraits::RegisterHandler, buffer.packet(), [](const auto& counters) {
 				// Assert:
 				EXPECT_TRUE(counters.empty());
 			});
 		}
 
-		static void AssertValidPacketWithValidTransactionsIsAccepted() {
+		static void AssertValidPacketWithValidRangeDataIsAccepted() {
 			// Arrange:
 			PushHandlerBuffer buffer(3, true);
 
 			// Act:
-			RunPushTransactionsHandlerTest(TTraits::RegisterHandler, buffer.packet(), [](const auto& counters) {
+			RunPushHandlerTest(TTraits::RegisterHandler, buffer.packet(), [](const auto& counters) {
 				// Assert:
 				ASSERT_EQ(1u, counters.size());
 				EXPECT_EQ(3u, counters[0]);
@@ -114,5 +115,5 @@ namespace catapult { namespace test {
 
 #define DEFINE_PUSH_HANDLER_TESTS(TEST_CLASS, HANDLER_NAME) \
 	MAKE_PUSH_HANDLER_TEST(TEST_CLASS, HANDLER_NAME, MalformedPacketIsRejected) \
-	MAKE_PUSH_HANDLER_TEST(TEST_CLASS, HANDLER_NAME, ValidPacketWithValidTransactionsIsAccepted)
+	MAKE_PUSH_HANDLER_TEST(TEST_CLASS, HANDLER_NAME, ValidPacketWithValidRangeDataIsAccepted)
 }}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -53,7 +54,7 @@ namespace catapult { namespace extensions {
 	// region HasSerializedState
 
 	bool HasSerializedState(const config::CatapultDirectory& directory) {
-		return boost::filesystem::exists(directory.file(Supplemental_Data_Filename));
+		return std::filesystem::exists(directory.file(Supplemental_Data_Filename));
 	}
 
 	// endregion
@@ -101,7 +102,7 @@ namespace catapult { namespace extensions {
 				return false;
 
 			// 1. load cache data
-			utils::StackLogger stopwatch("load state", utils::LogLevel::Warning);
+			utils::StackLogger stopwatch("load state", utils::LogLevel::important);
 			for (const auto& pStorage : cache.storages()) {
 				auto inputStream = OpenInputStream(directory, GetStorageFilename(*pStorage));
 				pStorage->loadAll(inputStream, Default_Loader_Batch_Size);
@@ -150,8 +151,7 @@ namespace catapult { namespace extensions {
 				Height height,
 				const consumer<const cache::CacheStorage&, io::OutputStream&>& save) {
 			// 1. create directory if required
-			if (!boost::filesystem::exists(directory.path()))
-				boost::filesystem::create_directory(directory.path());
+			config::CatapultDirectory(directory.path()).create();
 
 			// 2. save cache data
 			for (const auto& pStorage : cacheStorages) {
@@ -192,8 +192,8 @@ namespace catapult { namespace extensions {
 
 	void LocalNodeStateSerializer::moveTo(const config::CatapultDirectory& destinationDirectory) {
 		io::PurgeDirectory(destinationDirectory.str());
-		boost::filesystem::remove(destinationDirectory.path());
-		boost::filesystem::rename(m_directory.path(), destinationDirectory.path());
+		std::filesystem::remove(destinationDirectory.path());
+		std::filesystem::rename(m_directory.path(), destinationDirectory.path());
 	}
 
 	// endregion

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,7 +20,7 @@
 **/
 
 #pragma once
-#include "catapult/model/NetworkInfo.h"
+#include "catapult/model/NetworkIdentifier.h"
 #include <vector>
 
 namespace catapult {
@@ -29,8 +30,6 @@ namespace catapult {
 
 namespace catapult { namespace mongo { namespace plugins {
 
-	/// Converts the root namespace \a history into a vector of namespace descriptors using \a networkIdentifier for address conversions.
-	std::vector<NamespaceDescriptor> NamespaceDescriptorsFromHistory(
-			const state::RootNamespaceHistory& history,
-			model::NetworkIdentifier networkIdentifier);
+	/// Converts the root namespace \a history into a vector of namespace descriptors.
+	std::vector<NamespaceDescriptor> NamespaceDescriptorsFromHistory(const state::RootNamespaceHistory& history);
 }}}

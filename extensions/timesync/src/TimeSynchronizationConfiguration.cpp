@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -37,16 +38,17 @@ namespace catapult { namespace timesync {
 #define LOAD_TIMESYNC_PROPERTY(NAME) LOAD_PROPERTY("timesynchronization", NAME)
 
 		LOAD_TIMESYNC_PROPERTY(MaxNodes);
+		LOAD_TIMESYNC_PROPERTY(MinImportance);
 
 #undef LOAD_TIMESYNC_PROPERTY
 
-		utils::VerifyBagSizeLte(bag, 1);
+		utils::VerifyBagSizeExact(bag, 2);
 		return config;
 	}
 
 #undef LOAD_PROPERTY
 
-	TimeSynchronizationConfiguration TimeSynchronizationConfiguration::LoadFromPath(const boost::filesystem::path& resourcesPath) {
+	TimeSynchronizationConfiguration TimeSynchronizationConfiguration::LoadFromPath(const std::filesystem::path& resourcesPath) {
 		return config::LoadIniConfiguration<TimeSynchronizationConfiguration>(resourcesPath / "config-timesync.properties");
 	}
 }}

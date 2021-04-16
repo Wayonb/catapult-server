@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -102,22 +103,22 @@ namespace catapult { namespace tree {
 			auto time3 = test::GetCurrentTimeNanoseconds();
 
 			// Assert:
-			auto pSavedNode = dataSource.get(hash1);
-			EXPECT_TRUE(!!pSavedNode);
-			if (!pSavedNode)
+			auto savedNode = dataSource.get(hash1);
+			EXPECT_FALSE(savedNode.empty());
+			if (savedNode.empty())
 				return true;
 
-			EXPECT_EQ(hash1, pSavedNode->hash());
+			EXPECT_EQ(hash1, savedNode.hash());
 
-			// - only the first hash should recalculate the hash, so assert (conservatively) it is at least 3x slower
+			// - only the first hash should recalculate the hash, so assert (conservatively) it is at least 1.5x slower
 			auto elaspedHashTime = (time2 - time1).count();
 			auto elaspedSetTime = (time3 - time2).count();
 			CATAPULT_LOG(debug) << "elaspedHashTime = " << elaspedHashTime << ", elaspedSetTime = " << elaspedSetTime;
 
-			if (elaspedHashTime <= elaspedSetTime * 3)
+			if (elaspedHashTime <= elaspedSetTime * 3 / 2)
 				return false;
 
-			EXPECT_GT(elaspedHashTime, elaspedSetTime * 3);
+			EXPECT_GT(elaspedHashTime, elaspedSetTime * 3 / 2);
 			return true;
 		});
 	}

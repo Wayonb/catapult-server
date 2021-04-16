@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -68,7 +69,7 @@ namespace catapult { namespace model {
 		using Layout = TrailingVariableDataLayout<MosaicContainer, Mosaic>;
 		auto expectedSize = 0u;
 
-#define FIELD(X) expectedSize += sizeof(Layout::X);
+#define FIELD(X) expectedSize += SizeOf32<decltype(Layout::X)>();
 		LAYOUT_FIELDS
 #undef FIELD
 
@@ -94,7 +95,7 @@ namespace catapult { namespace model {
 	namespace {
 		struct MosaicContainerTraits {
 			static auto GenerateEntityWithAttachments(uint16_t count) {
-				uint32_t entitySize = sizeof(MosaicContainer) + count * sizeof(Mosaic);
+				uint32_t entitySize = SizeOf32<MosaicContainer>() + count * SizeOf32<Mosaic>();
 				auto pContainer = utils::MakeUniqueWithSize<MosaicContainer>(entitySize);
 				pContainer->Size = entitySize;
 				pContainer->MosaicsCount = count;

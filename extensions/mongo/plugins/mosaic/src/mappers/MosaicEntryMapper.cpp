@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -38,16 +39,16 @@ namespace catapult { namespace mongo { namespace plugins {
 		}
 	}
 
-	bsoncxx::document::value ToDbModel(const state::MosaicEntry& mosaicEntry, const Address& ownerAddress) {
+	bsoncxx::document::value ToDbModel(const state::MosaicEntry& mosaicEntry) {
 		const auto& definition = mosaicEntry.definition();
 		bson_stream::document builder;
 		auto doc = builder
 				<< "mosaic" << bson_stream::open_document
+					<< "version" << 1
 					<< "id" << ToInt64(mosaicEntry.mosaicId())
 					<< "supply" << ToInt64(mosaicEntry.supply())
 					<< "startHeight" << ToInt64(definition.startHeight())
-					<< "ownerPublicKey" << ToBinary(definition.ownerPublicKey())
-					<< "ownerAddress" << ToBinary(ownerAddress)
+					<< "ownerAddress" << ToBinary(definition.ownerAddress())
 					<< "revision" << static_cast<int32_t>(definition.revision());
 
 		StreamProperties(builder, definition.properties());

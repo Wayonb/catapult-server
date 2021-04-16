@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,7 +21,6 @@
 
 #include "TransactionExtensions.h"
 #include "plugins/txes/aggregate/src/model/AggregateTransaction.h"
-#include "catapult/crypto/KeyPair.h"
 #include "catapult/crypto/Signer.h"
 #include "catapult/model/EntityHasher.h"
 
@@ -40,21 +40,21 @@ namespace catapult { namespace extensions {
 		}
 	}
 
-	TransactionExtensions::TransactionExtensions(const GenerationHash& generationHash) : m_generationHash(generationHash)
+	TransactionExtensions::TransactionExtensions(const GenerationHashSeed& generationHashSeed) : m_generationHashSeed(generationHashSeed)
 	{}
 
 	Hash256 TransactionExtensions::hash(const model::Transaction& transaction) const {
-		return model::CalculateHash(transaction, m_generationHash, TransactionDataBuffer(transaction));
+		return model::CalculateHash(transaction, m_generationHashSeed, TransactionDataBuffer(transaction));
 	}
 
 	void TransactionExtensions::sign(const crypto::KeyPair& signer, model::Transaction& transaction) const {
-		crypto::Sign(signer, { m_generationHash, TransactionDataBuffer(transaction) }, transaction.Signature);
+		crypto::Sign(signer, { m_generationHashSeed, TransactionDataBuffer(transaction) }, transaction.Signature);
 	}
 
 	bool TransactionExtensions::verify(const model::Transaction& transaction) const {
 		return crypto::Verify(
 				transaction.SignerPublicKey,
-				{ m_generationHash, TransactionDataBuffer(transaction) },
+				{ m_generationHashSeed, TransactionDataBuffer(transaction) },
 				transaction.Signature);
 	}
 }}

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -47,10 +48,10 @@ namespace catapult { namespace partialtransaction {
 
 		constexpr auto Num_Pre_Existing_Services = 3u;
 		constexpr auto Num_Expected_Services = 2u + Num_Pre_Existing_Services;
-		constexpr auto Num_Expected_Counters = 2u;
+		constexpr auto Num_Expected_Counters = 3u;
 		constexpr auto Num_Expected_Tasks = 1u;
 
-		constexpr auto Service_Name = "api.partial";
+		constexpr auto Service_Name = "pt.writers";
 		constexpr auto Counter_Name = "PT ELEM TOT";
 		constexpr auto Active_Counter_Name = "PT ELEM ACT";
 		constexpr auto Sentinel_Counter_Value = extensions::ServiceLocator::Sentinel_Counter_Value;
@@ -58,14 +59,29 @@ namespace catapult { namespace partialtransaction {
 		constexpr auto Num_Cosignatures = 5u;
 		constexpr auto Transaction_Type = model::Entity_Type_Aggregate_Bonded;
 
-		struct PtDispatcherServiceTraits {
-			static constexpr auto CreateRegistrar = CreatePtDispatcherServiceRegistrar;
-		};
+		// region test utils
 
 		template<typename TAggregateNotification>
 		bool HasAllCosignatures(const TAggregateNotification& aggregateNotification) {
 			return Num_Cosignatures == aggregateNotification.CosignaturesCount;
 		}
+
+		Hash256 CalculateTransactionHash(const model::TransactionRegistry& registry, const model::Transaction& transaction) {
+			const auto& plugin = *registry.findPlugin(transaction.Type);
+			return model::CalculateHash(transaction, test::GetNemesisGenerationHashSeed(), plugin.dataBuffer(transaction));
+		}
+
+		std::vector<Hash256> CalculateHashes(const model::TransactionRegistry& registry, const model::TransactionRange& transactionRange) {
+			std::vector<Hash256> hashes;
+			for (const auto& transaction : transactionRange)
+				hashes.push_back(CalculateTransactionHash(registry, transaction));
+
+			return hashes;
+		}
+
+		// endregion
+
+		// region MockStatelessNotificationValidator
 
 		class MockStatelessNotificationValidator : public validators::stateless::NotificationValidatorT<model::Notification> {
 		public:
@@ -101,6 +117,14 @@ namespace catapult { namespace partialtransaction {
 			mutable std::atomic<size_t> m_numCosigs;
 		};
 
+		// endregion
+
+		// region TestContext
+
+		struct PtDispatcherServiceTraits {
+			static constexpr auto CreateRegistrar = CreatePtDispatcherServiceRegistrar;
+		};
+
 		class TestContext : public test::ServiceLocatorTestContext<PtDispatcherServiceTraits> {
 		public:
 			TestContext() : TestContext(ValidationResult::Failure)
@@ -110,7 +134,8 @@ namespace catapult { namespace partialtransaction {
 					: m_numCompletedTransactions(0)
 					, m_pWriters(std::make_shared<mocks::BroadcastAwareMockPacketWriters>()) {
 				auto pBootstrapperRegistrar = CreatePtBootstrapperServiceRegistrar([]() {
-					return std::make_unique<cache::MemoryPtCacheProxy>(cache::MemoryCacheOptions(1024, 1024));
+					auto cacheOptions = cache::MemoryCacheOptions(utils::FileSize(), utils::FileSize::FromKilobytes(2));
+					return std::make_unique<cache::MemoryPtCacheProxy>(cacheOptions);
 				});
 				pBootstrapperRegistrar->registerServices(locator(), testState().state());
 
@@ -163,21 +188,12 @@ namespace catapult { namespace partialtransaction {
 			std::shared_ptr<mocks::BroadcastAwareMockPacketWriters> m_pWriters;
 		};
 
-		Hash256 CalculateTransactionHash(const model::TransactionRegistry& registry, const model::Transaction& transaction) {
-			const auto& plugin = *registry.findPlugin(transaction.Type);
-			return model::CalculateHash(transaction, test::GetNemesisGenerationHash(), plugin.dataBuffer(transaction));
-		}
-
-		std::vector<Hash256> CalculateHashes(const model::TransactionRegistry& registry, const model::TransactionRange& transactionRange) {
-			std::vector<Hash256> hashes;
-			for (const auto& transaction : transactionRange)
-				hashes.push_back(CalculateTransactionHash(registry, transaction));
-
-			return hashes;
-		}
+		// endregion
 	}
 
 	ADD_SERVICE_REGISTRAR_INFO_TEST(PtDispatcher, Post_Range_Consumers)
+
+	// region boot + shutdown
 
 	TEST(TEST_CLASS, CanBootService) {
 		// Arrange:
@@ -239,6 +255,14 @@ namespace catapult { namespace partialtransaction {
 		// - no ranges have been completed
 		EXPECT_EQ(0u, context.numCompletedTransactions());
 	}
+
+	TEST(TEST_CLASS, TasksAreRegistered) {
+		test::AssertRegisteredTasks(TestContext(), { "batch partial transaction task" });
+	}
+
+	// endregion
+
+	// region transaction processing
 
 	namespace {
 		// tests are using CreateMockTransactionPlugin with Custom_Buffers option, which returns custom dataBuffer
@@ -325,8 +349,8 @@ namespace catapult { namespace partialtransaction {
 					EXPECT_EQ(0u, view.size());
 					EXPECT_FALSE(!!view.find(expectedHashes[0]));
 
-					// - note that broadcast is done before validation
-					EXPECT_EQ(1u, context.numBroadcastCalls());
+					// - nothing was broadcast
+					EXPECT_EQ(0u, context.numBroadcastCalls());
 					EXPECT_EQ(0u, context.numCompletedTransactions());
 				});
 	}
@@ -425,6 +449,8 @@ namespace catapult { namespace partialtransaction {
 				});
 	}
 
+	// endregion
+
 	// region hooks
 
 	namespace {
@@ -448,9 +474,9 @@ namespace catapult { namespace partialtransaction {
 			auto expectedHashes = CalculateHashes(transactionRegistry, transactionRange);
 			auto expectedPayload = ExtractTransactionPayload(transactionRange);
 
-			// Act:
+			// Act: forward all batched transactions to the dispatcher
 			invokeHook(GetPtServerHooks(context.locator()), std::move(transactionRange));
-			context.testState().state().tasks()[0].Callback(); // forward all batched transactions to the dispatcher
+			context.testState().state().tasks()[0].Callback();
 
 			// Assert: wait for element processing to finish
 			WAIT_FOR_VALUE_EXPR(3u, context.cache().view().size());
@@ -493,6 +519,30 @@ namespace catapult { namespace partialtransaction {
 			// Act:
 			hooks.ptRangeConsumer()(std::move(transactionRange));
 		});
+	}
+
+	TEST(TEST_CLASS, PtRangeConsumerDoesNotForwardTransactionRangeToDispatcherWhenTransactionsShouldNotBeProcessed) {
+		// Arrange:
+		TestContext context(ValidationResult::Success);
+		const_cast<config::NodeConfiguration&>(context.testState().config().Node).MaxTimeBehindPullTransactionsStart = utils::TimeSpan();
+		context.boot();
+
+		// - prepare a transaction range
+		const auto& transactionRegistry = context.registry();
+		auto transactionRange = CreateAggregateTransactionRange(transactionRegistry, 3, false);
+
+		// Act: forward all batched transactions to the dispatcher
+		GetPtServerHooks(context.locator()).ptRangeConsumer()(std::move(transactionRange));
+		context.testState().state().tasks()[0].Callback();
+
+		// - wait a bit to give the service time to consume more if there is a bug in the implementation
+		test::Pause();
+
+		// Assert: nothing was forwarded
+		auto view = context.cache().view();
+		EXPECT_EQ(0u, view.size());
+		EXPECT_EQ(0u, context.numBroadcastCalls());
+		EXPECT_EQ(0u, context.numCompletedTransactions());
 	}
 
 	namespace {

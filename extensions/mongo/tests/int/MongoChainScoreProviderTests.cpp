@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -37,12 +38,9 @@ namespace catapult { namespace mongo {
 		class TestContext final : public test::PrepareDatabaseMixin {
 		public:
 			explicit TestContext(MongoErrorPolicy::Mode errorPolicyMode = MongoErrorPolicy::Mode::Strict)
-					: m_mongoContext(
-							test::DefaultDbUri(),
-							test::DatabaseName(),
-							MongoBulkWriter::Create(test::DefaultDbUri(), test::DatabaseName(), test::CreateStartedIoThreadPool(8)),
-							errorPolicyMode)
-					, m_pScoreProvider(CreateMongoChainScoreProvider(m_mongoContext))
+					: m_pPool(test::CreateStartedIoThreadPool(test::Num_Default_Mongo_Test_Pool_Threads))
+					, m_pMongoContext(test::CreateDefaultMongoStorageContext(test::DatabaseName(), *m_pPool, errorPolicyMode))
+					, m_pScoreProvider(CreateMongoChainScoreProvider(*m_pMongoContext))
 			{}
 
 		public:
@@ -51,7 +49,8 @@ namespace catapult { namespace mongo {
 			}
 
 		private:
-			MongoStorageContext m_mongoContext;
+			std::unique_ptr<thread::IoThreadPool> m_pPool;
+			std::unique_ptr<MongoStorageContext> m_pMongoContext;
 			std::unique_ptr<ChainScoreProvider> m_pScoreProvider;
 		};
 	}

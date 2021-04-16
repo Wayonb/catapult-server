@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,6 +37,11 @@ namespace std {
 	template<size_t N>
 	void PrintTo(const array<uint8_t, N>& array, std::ostream* pOut) {
 		*pOut << catapult::utils::HexFormat(array);
+	}
+
+	// custom formatter for byte std::vector
+	inline void PrintTo(const vector<uint8_t>& vector, std::ostream* pOut) {
+		*pOut << catapult::utils::HexFormat(vector);
 	}
 }
 
@@ -99,9 +105,10 @@ namespace catapult { namespace test {
 				ecm_out << MESSAGE << ":" << std::endl; \
 			\
 			ecm_out << "{ "; \
-			for (const auto& ecm_value : VALUES) \
+			for (const auto& ecm_value : VALUES) { \
 				Printer::Print(ecm_value, &ecm_out); \
 				ecm_out << " "; \
+			} \
 			\
 			ecm_out << "} does not contain: "; \
 			Printer::Print(VALUE, &ecm_out); \

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,6 +20,7 @@
 **/
 
 #pragma once
+#include "SizeChecker.h"
 #include "catapult/utils/NonCopyable.h"
 #include <stdint.h>
 
@@ -42,7 +44,7 @@ namespace catapult { namespace model {
 		/// Gets the start of the variable data part of \a entity.
 		template<typename T>
 		static auto PayloadStart(T& entity) {
-			return entity.Size != T::CalculateRealSize(entity) ? nullptr : entity.ToBytePointer() + sizeof(T);
+			return !model::IsSizeValidT(entity) ? nullptr : entity.ToBytePointer() + sizeof(T);
 		}
 
 	public:
@@ -54,4 +56,16 @@ namespace catapult { namespace model {
 	};
 
 #pragma pack(pop)
+
+/// Defines \a NAME (\a TYPE typed) variable data accessors around a similarly named templated untyped data accessor.
+#define DEFINE_SIZE_PREFIXED_ENTITY_VARIABLE_DATA_ACCESSORS(NAME, TYPE) \
+	/* Returns a const pointer to the typed data contained in this entity. */ \
+	const TYPE* NAME##Ptr() const { \
+		return reinterpret_cast<const TYPE*>(NAME##PtrT(*this)); \
+	} \
+	\
+	/* Returns a pointer to the typed data contained in this entity. */ \
+	TYPE* NAME##Ptr() { \
+		return reinterpret_cast<TYPE*>(NAME##PtrT(*this)); \
+	}
 }}

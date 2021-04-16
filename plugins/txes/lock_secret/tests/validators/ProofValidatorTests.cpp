@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -124,7 +125,7 @@ namespace catapult { namespace validators {
 	TEST(TEST_CLASS, FailureWhenHashAlgorithmDoesNotMatch) {
 		// Arrange:
 		auto notificationBuilder = CreateNotificationBuilder();
-		notificationBuilder.setAlgorithm(model::LockHashAlgorithm::Op_Keccak_256);
+		notificationBuilder.setAlgorithm(model::LockHashAlgorithm::Op_Hash_256);
 
 		// Assert:
 		AssertValidationResult(Failure_LockSecret_Hash_Algorithm_Mismatch, notificationBuilder);

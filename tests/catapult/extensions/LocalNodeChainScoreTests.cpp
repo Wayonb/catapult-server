@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -77,6 +78,20 @@ namespace catapult { namespace extensions {
 		auto scoreArray = score.get().toArray();
 		EXPECT_EQ(&score, &result);
 		EXPECT_EQ(0x9FDE'426A'8C23'D688u, scoreArray[0]);
+		EXPECT_EQ(0x7C6B'3981'0265'43BBu, scoreArray[1]);
+	}
+
+	TEST(TEST_CLASS, CanAddToChainScore_Delta) {
+		// Arrange:
+		LocalNodeChainScore score(model::ChainScore(0x8FDE'4267'9C23'D678, 0x7A6B'3481'0235'43B6));
+
+		// Act:
+		const auto& result = score += model::ChainScore::Delta(0x0200'0500'0030'0005);
+
+		// Assert:
+		auto scoreArray = score.get().toArray();
+		EXPECT_EQ(&score, &result);
+		EXPECT_EQ(0x8FDE'4267'9C23'D678u, scoreArray[0]);
 		EXPECT_EQ(0x7C6B'3981'0265'43BBu, scoreArray[1]);
 	}
 

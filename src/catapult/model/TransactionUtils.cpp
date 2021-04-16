@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,7 +37,7 @@ namespace catapult { namespace model {
 		public:
 			void notify(const Notification& notification) override {
 				if (Core_Register_Account_Address_Notification == notification.Type)
-					m_addresses.insert(static_cast<const AccountAddressNotification&>(notification).Address);
+					m_addresses.insert(static_cast<const AccountAddressNotification&>(notification).Address.unresolved());
 				else if (Core_Register_Account_Public_Key_Notification == notification.Type)
 					m_addresses.insert(toAddress(static_cast<const AccountPublicKeyNotification&>(notification).PublicKey));
 			}
@@ -49,10 +50,7 @@ namespace catapult { namespace model {
 		private:
 			UnresolvedAddress toAddress(const Key& publicKey) const {
 				auto resolvedAddress = PublicKeyToAddress(publicKey, m_networkIdentifier);
-
-				UnresolvedAddress unresolvedAddress;
-				std::memcpy(unresolvedAddress.data(), resolvedAddress.data(), resolvedAddress.size());
-				return unresolvedAddress;
+				return resolvedAddress.copyTo<UnresolvedAddress>();
 			}
 
 		private:

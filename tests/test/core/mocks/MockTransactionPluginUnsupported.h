@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -35,12 +36,19 @@ namespace catapult { namespace mocks {
 			CATAPULT_THROW_RUNTIME_ERROR("attributes - not implemented in mock");
 		}
 
-		uint64_t calculateRealSize(const model::Transaction&) const override {
-			CATAPULT_THROW_RUNTIME_ERROR("calculateRealSize - not implemented in mock");
+		bool isSizeValid(const model::Transaction&) const override {
+			CATAPULT_THROW_RUNTIME_ERROR("isSizeValid - not implemented in mock");
 		}
 
-		void publish(const model::WeakEntityInfoT<model::Transaction>&, model::NotificationSubscriber&) const override {
+		void publish(
+				const model::WeakEntityInfoT<model::Transaction>&,
+				const model::PublishContext&,
+				model::NotificationSubscriber&) const override {
 			CATAPULT_THROW_RUNTIME_ERROR("publish - not implemented in mock");
+		}
+
+		uint32_t embeddedCount(const model::Transaction&) const override {
+			CATAPULT_THROW_RUNTIME_ERROR("embeddedCount - not implemented in mock");
 		}
 
 		RawBuffer dataBuffer(const model::Transaction&) const override {

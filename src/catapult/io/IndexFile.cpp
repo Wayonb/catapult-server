@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -20,7 +21,7 @@
 
 #include "IndexFile.h"
 #include "PodIoUtils.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 namespace catapult { namespace io {
 
@@ -30,7 +31,7 @@ namespace catapult { namespace io {
 	{}
 
 	bool IndexFile::exists() const {
-		return boost::filesystem::is_regular_file(m_filename);
+		return std::filesystem::is_regular_file(m_filename);
 	}
 
 	uint64_t IndexFile::get() const {

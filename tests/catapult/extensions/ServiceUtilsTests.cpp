@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -19,7 +20,7 @@
 **/
 
 #include "catapult/extensions/ServiceUtils.h"
-#include "catapult/crypto/KeyPair.h"
+#include "catapult/config/CatapultKeys.h"
 #include "catapult/extensions/ServerHooks.h"
 #include "catapult/extensions/ServiceLocator.h"
 #include "tests/test/core/PacketPayloadTestUtils.h"
@@ -39,13 +40,14 @@ namespace catapult { namespace extensions {
 		using TransactionSink = extensions::SharedNewTransactionsSink;
 	}
 
-	TEST(TEST_CLASS, CanCreatePushEntitySink) {
+	TEST(TEST_CLASS, CanCreatePushEntitySink_BroadcastsNonzeroEntities) {
 		// Arrange:
 		auto pWriters = std::make_shared<mocks::BroadcastAwareMockPacketWriters>();
-		auto keyPair = test::GenerateKeyPair();
 		auto transactionInfos = test::CreateTransactionInfos(1);
 		auto expectedPayload = ionet::CreateBroadcastPayload(transactionInfos);
-		ServiceLocator locator(keyPair);
+
+		config::CatapultKeys keys;
+		ServiceLocator locator(keys);
 		locator.registerService(Service_Name, pWriters);
 
 		// Act:
@@ -58,13 +60,31 @@ namespace catapult { namespace extensions {
 		test::AssertEqualPayload(expectedPayload, pWriters->broadcastedPayloads()[0]);
 	}
 
-	TEST(TEST_CLASS, CanCreatePushEntitySinkWithCustomPacketType) {
+	TEST(TEST_CLASS, CanCreatePushEntitySink_SkipsBroadcastOfZeroEntities) {
 		// Arrange:
 		auto pWriters = std::make_shared<mocks::BroadcastAwareMockPacketWriters>();
-		auto keyPair = test::GenerateKeyPair();
+		auto transactionInfos = test::CreateTransactionInfos(0);
+
+		config::CatapultKeys keys;
+		ServiceLocator locator(keys);
+		locator.registerService(Service_Name, pWriters);
+
+		// Act:
+		auto sink = CreatePushEntitySink<TransactionSink>(locator, Service_Name);
+		sink(transactionInfos);
+
+		// Assert:
+		ASSERT_EQ(0u, pWriters->broadcastedPayloads().size());
+	}
+
+	TEST(TEST_CLASS, CanCreatePushEntitySinkWithCustomPacketType_BroadcastsNonzeroEntities) {
+		// Arrange:
+		auto pWriters = std::make_shared<mocks::BroadcastAwareMockPacketWriters>();
 		auto transactionInfos = test::CreateTransactionInfos(1);
 		auto expectedPayload = ionet::CreateBroadcastPayload(transactionInfos, ionet::PacketType::Push_Partial_Transactions);
-		ServiceLocator locator(keyPair);
+
+		config::CatapultKeys keys;
+		ServiceLocator locator(keys);
 		locator.registerService(Service_Name, pWriters);
 
 		// Act:
@@ -75,5 +95,36 @@ namespace catapult { namespace extensions {
 		ASSERT_EQ(1u, pWriters->broadcastedPayloads().size());
 		EXPECT_EQ(ionet::PacketType::Push_Partial_Transactions, pWriters->broadcastedPayloads()[0].header().Type);
 		test::AssertEqualPayload(expectedPayload, pWriters->broadcastedPayloads()[0]);
+	}
+
+	TEST(TEST_CLASS, CanCreatePushEntitySinkWithCustomPacketType_SkipsBroadcastOfZeroEntities) {
+		// Arrange:
+		auto pWriters = std::make_shared<mocks::BroadcastAwareMockPacketWriters>();
+		auto transactionInfos = test::CreateTransactionInfos(0);
+
+		config::CatapultKeys keys;
+		ServiceLocator locator(keys);
+		locator.registerService(Service_Name, pWriters);
+
+		// Act:
+		auto sink = CreatePushEntitySink<TransactionSink>(locator, Service_Name, ionet::PacketType::Push_Partial_Transactions);
+		sink(transactionInfos);
+
+		// Assert:
+		ASSERT_EQ(0u, pWriters->broadcastedPayloads().size());
+	}
+
+	TEST(TEST_CLASS, CanCreateCloseConnectionSink) {
+		// Arrange:
+		auto pWriters = std::make_shared<mocks::BroadcastAwareMockPacketWriters>();
+		model::NodeIdentity identity{ test::GenerateRandomByteArray<Key>(), "Alice" };
+
+		// Act:
+		auto sink = CreateCloseConnectionSink(*pWriters);
+		sink(identity);
+
+		// Assert:
+		EXPECT_EQ(1u, pWriters->closedNodeIdentities().size());
+		EXPECT_CONTAINS(pWriters->closedNodeIdentities(), identity);
 	}
 }}

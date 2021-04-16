@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -58,8 +59,12 @@ namespace catapult { namespace ionet {
 			m_pSocket->waitForData(callback);
 		}
 
-		void close() override{
+		void close() override {
 			m_pSocket->close();
+		}
+
+		void abort() override {
+			m_pSocket->abort();
 		}
 
 		std::shared_ptr<PacketIo> buffered() override {

@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -26,10 +27,6 @@ namespace catapult { namespace state { class MosaicEntry; } }
 
 namespace catapult { namespace test {
 
-	/// Verifies that db mosaic entry (\a dbMosaicEntry) and model mosaic entry (\a mosaicEntry)
-	/// with address (\a ownerAddress) are equivalent.
-	void AssertEqualMosaicData(
-			const state::MosaicEntry& mosaicEntry,
-			const Address& ownerAddress,
-			const bsoncxx::document::view& dbMosaicEntry);
+	/// Verifies that db mosaic entry (\a dbMosaicEntry) and model mosaic entry (\a mosaicEntry) are equivalent.
+	void AssertEqualMosaicData(const state::MosaicEntry& mosaicEntry, const bsoncxx::document::view& dbMosaicEntry);
 }}

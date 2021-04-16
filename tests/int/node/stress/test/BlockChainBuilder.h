@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -95,9 +96,7 @@ namespace catapult { namespace test {
 		crypto::KeyPair findBlockSigner(const model::PreviousBlockContext& context, Timestamp timestamp, Difficulty difficulty);
 
 	private:
-		static std::shared_ptr<const model::BlockElement> ToSharedBlockElement(
-				const GenerationHash& parentGenerationHash,
-				const model::Block& block);
+		static std::shared_ptr<const model::BlockElement> ToSharedBlockElement(const model::Block& block);
 
 	private:
 		// pointers instead of references to allow copy
@@ -108,6 +107,7 @@ namespace catapult { namespace test {
 		std::shared_ptr<const model::BlockElement> m_pTailBlockElement;
 		std::shared_ptr<const model::Block> m_pNemesisBlock; // only used to extend block lifetime
 		std::set<state::BlockStatistic> m_statistics;
+		Hash256 m_previousImportanceBlockHash;
 
 		utils::TimeSpan m_blockTimeInterval;
 		BlockReceiptsHashCalculator m_blockReceiptsHashCalculator;

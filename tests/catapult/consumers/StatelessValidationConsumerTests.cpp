@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -39,7 +40,7 @@ namespace catapult { namespace consumers {
 
 		struct DispatchParams {
 		public:
-			explicit DispatchParams(const model::WeakEntityInfos& entityInfos) : EntityInfos(entityInfos){
+			explicit DispatchParams(const model::WeakEntityInfos& entityInfos) : EntityInfos(entityInfos) {
 				for (const auto& entityInfo : EntityInfos)
 					HashCopies.push_back(entityInfo.hash());
 			}
@@ -285,7 +286,7 @@ namespace catapult { namespace consumers {
 							const auto& hash,
 							auto result) {
 						// notice that transaction.Deadline is used as transaction marker
-						FailedTransactionStatuses.emplace_back(hash, utils::to_underlying_type(result), transaction.Deadline);
+						FailedTransactionStatuses.emplace_back(hash, transaction.Deadline, utils::to_underlying_type(result));
 					}))
 			{}
 

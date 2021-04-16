@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -59,7 +60,10 @@ namespace catapult { namespace cache {
 				const std::string& expectedMerkleRootStr) {
 			// Arrange: create a db-backed account state cache
 			test::TempDirectoryGuard dbDirGuard;
-			CacheConfiguration cacheConfig(dbDirGuard.name(), utils::FileSize::FromMegabytes(5), PatriciaTreeStorageMode::Enabled);
+
+			auto cacheDatabaseConfig = config::NodeConfiguration::CacheDatabaseSubConfiguration();
+			cacheDatabaseConfig.MaxWriteBatchSize = utils::FileSize::FromMegabytes(5);
+			CacheConfiguration cacheConfig(dbDirGuard.name(), cacheDatabaseConfig, PatriciaTreeStorageMode::Enabled);
 			AccountStateCache cache(cacheConfig, CreateAccountStateCacheOptions());
 
 			// - load all test accounts into the delta
@@ -101,37 +105,37 @@ namespace catapult { namespace cache {
 	TEST(TEST_CLASS, AccountStateCacheMerkleRootIsCalculatedCorrectly_Primary_1) {
 		AssertAccountStateMerkleRootIsCalculatedCorrectly<AccountStatePrimarySerializer>(
 				"../tests/int/stress/resources/1.patricia-tree-account.dat",
-				"FCC1555BF49CAF3DEB8E13FCA5F7BDCE139742FF9C9F4CD33FFD0429887F1338");
+				"90069B26F9A33D65FE3821E5B7FB98844AC8B3B006FFAFA43DD42A10D7AB2A94");
 	}
 
 	TEST(TEST_CLASS, AccountStateCacheMerkleRootIsCalculatedCorrectly_PatriciaTree_1) {
 		AssertAccountStateMerkleRootIsCalculatedCorrectly<AccountStatePatriciaTreeSerializer>(
 				"../tests/int/stress/resources/1.patricia-tree-account.dat",
-				"FCC1555BF49CAF3DEB8E13FCA5F7BDCE139742FF9C9F4CD33FFD0429887F1338");
+				"90069B26F9A33D65FE3821E5B7FB98844AC8B3B006FFAFA43DD42A10D7AB2A94");
 	}
 
 	TEST(TEST_CLASS, AccountStateCacheMerkleRootIsCalculatedCorrectly_Primary_2) {
 		AssertAccountStateMerkleRootIsCalculatedCorrectly<AccountStatePrimarySerializer>(
 				"../tests/int/stress/resources/2.patricia-tree-account.dat",
-				"58F90DC0C8FDB102594223C9C07EE27E2BF191CA90FB5ABF5CF2A09DD05F9FF3");
+				"865B77B387341D83E446E6A5662E8D84D171E46406C80D58AB8D8F770C85300B");
 	}
 
 	TEST(TEST_CLASS, AccountStateCacheMerkleRootIsCalculatedCorrectly_PatriciaTree_2) {
 		AssertAccountStateMerkleRootIsCalculatedCorrectly<AccountStatePatriciaTreeSerializer>(
 				"../tests/int/stress/resources/2.patricia-tree-account.dat",
-				"58F90DC0C8FDB102594223C9C07EE27E2BF191CA90FB5ABF5CF2A09DD05F9FF3");
+				"865B77B387341D83E446E6A5662E8D84D171E46406C80D58AB8D8F770C85300B");
 	}
 
 	TEST(TEST_CLASS, AccountStateCacheMerkleRootIsCalculatedCorrectly_Primary_3) {
 		AssertAccountStateMerkleRootIsCalculatedCorrectly<AccountStatePrimarySerializer>(
 				"../tests/int/stress/resources/3.patricia-tree-account.dat",
-				"E433C70F3A9CA59A924BC19CB0263898F49FA7507CBAA7F4A982755F99998111");
+				"EC548C8ECF3D46AFA4F34CF20C60577373FDEA5F44EBC6A67867F66CFE5B8533");
 	}
 
 	TEST(TEST_CLASS, AccountStateCacheMerkleRootIsCalculatedCorrectly_PatriciaTree_3) {
 		AssertAccountStateMerkleRootIsCalculatedCorrectly<AccountStatePatriciaTreeSerializer>(
 				"../tests/int/stress/resources/3.patricia-tree-account.dat",
-				"E433C70F3A9CA59A924BC19CB0263898F49FA7507CBAA7F4A982755F99998111");
+				"EC548C8ECF3D46AFA4F34CF20C60577373FDEA5F44EBC6A67867F66CFE5B8533");
 	}
 
 	// endregion
@@ -158,8 +162,12 @@ namespace catapult { namespace cache {
 		void AssertCanApplyManyAddsToTree(size_t numBatches) {
 			// Arrange: create a db-backed account state cache
 			CATAPULT_LOG(debug) << "creating patricia tree enabled cache";
+
+			auto cacheDatabaseConfig = config::NodeConfiguration::CacheDatabaseSubConfiguration();
+			cacheDatabaseConfig.MaxWriteBatchSize = utils::FileSize::FromMegabytes(5);
+
 			test::TempDirectoryGuard dbDirGuard;
-			CacheConfiguration cacheConfig(dbDirGuard.name(), utils::FileSize::FromMegabytes(5), PatriciaTreeStorageMode::Enabled);
+			CacheConfiguration cacheConfig(dbDirGuard.name(), cacheDatabaseConfig, PatriciaTreeStorageMode::Enabled);
 			AccountStateCache cache(cacheConfig, CreateAccountStateCacheOptions());
 
 			// - load all test accounts into the delta

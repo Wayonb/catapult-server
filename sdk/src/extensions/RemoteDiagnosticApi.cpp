@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -76,7 +77,7 @@ namespace catapult { namespace extensions {
 
 		public:
 			bool tryParseResult(const ionet::Packet& packet, ResultType& result) const {
-				result = ionet::ExtractEntitiesFromPacket<ionet::PackedNodeInfo>(packet, ionet::IsSizeValid<ionet::PackedNodeInfo>);
+				result = ionet::ExtractEntitiesFromPacket<ionet::PackedNodeInfo>(packet, model::IsSizeValidT<ionet::PackedNodeInfo>);
 				return !result.empty();
 			}
 		};
@@ -112,7 +113,7 @@ namespace catapult { namespace extensions {
 			bool tryParseResult(const ionet::Packet& packet, ResultType& result) const {
 				result = ionet::ExtractEntitiesFromPacket<model::CacheEntryInfo<TIdentifier>>(
 						packet,
-						ionet::IsSizeValid<model::CacheEntryInfo<TIdentifier>>);
+						model::IsSizeValidT<model::CacheEntryInfo<TIdentifier>>);
 				return !result.empty();
 			}
 		};

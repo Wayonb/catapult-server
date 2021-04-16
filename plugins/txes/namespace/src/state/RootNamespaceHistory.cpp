@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -39,25 +40,28 @@ namespace catapult { namespace state {
 	{}
 
 	RootNamespaceHistory::RootNamespaceHistory(const RootNamespaceHistory& history) : RootNamespaceHistory(history.m_id) {
+		if (history.empty())
+			return;
+
+		const RootNamespace* pPreviousRoot = nullptr;
 		std::shared_ptr<RootNamespace::Children> pChildren;
-		auto owner = Key();
 		for (const auto& root : history) {
-			if (owner != root.ownerPublicKey()) {
+			if (!pPreviousRoot || !root.canExtend(*pPreviousRoot))
 				pChildren = std::make_shared<RootNamespace::Children>(root.children());
-				owner = root.ownerPublicKey();
-			}
 
-			m_rootHistory.emplace_back(root.id(), root.ownerPublicKey(), root.lifetime(), pChildren);
+			m_rootHistory.emplace_back(root.id(), root.ownerAddress(), root.lifetime(), pChildren);
 			m_rootHistory.back().setAlias(root.id(), root.alias(root.id()));
-		}
-	}
 
-	bool RootNamespaceHistory::empty() const {
-		return m_rootHistory.empty();
+			pPreviousRoot = &root;
+		}
 	}
 
 	NamespaceId RootNamespaceHistory::id() const {
 		return m_id;
+	}
+
+	bool RootNamespaceHistory::empty() const {
+		return m_rootHistory.empty();
 	}
 
 	size_t RootNamespaceHistory::historyDepth() const {
@@ -69,11 +73,12 @@ namespace catapult { namespace state {
 			return 0;
 
 		auto historyDepth = 0u;
-		const auto& activeOwner = m_rootHistory.back().ownerPublicKey();
+		const auto* pNextRoot = &m_rootHistory.back();
 		for (auto iter = m_rootHistory.crbegin(); m_rootHistory.crend() != iter; ++iter) {
-			if (activeOwner != iter->ownerPublicKey())
+			if (!pNextRoot->canExtend(*iter))
 				break;
 
+			pNextRoot = &*iter;
 			++historyDepth;
 		}
 
@@ -88,17 +93,20 @@ namespace catapult { namespace state {
 		return utils::Sum(m_rootHistory, [](const auto& rootNamespace) { return rootNamespace.size(); });
 	}
 
-	void RootNamespaceHistory::push_back(const Key& owner, const NamespaceLifetime& lifetime) {
-		if (!m_rootHistory.empty()) {
-			const auto& previousNamespace = back();
-			if (previousNamespace.ownerPublicKey() == owner) {
-				// inherit all children since it is the same owner
-				m_rootHistory.push_back(previousNamespace.renew(lifetime));
+	void RootNamespaceHistory::push_back(const Address& owner, const NamespaceLifetime& lifetime) {
+		auto newRootNamespace = RootNamespace(m_id, owner, lifetime);
+
+		if (!empty()) {
+			const auto& previousRootNamespace = back();
+			if (newRootNamespace.canExtend(previousRootNamespace)) {
+				// since it is the same owner, inherit all children and aliases (child aliases are migrated automatically with children)
+				m_rootHistory.push_back(previousRootNamespace.renew(lifetime));
+				m_rootHistory.back().setAlias(previousRootNamespace.id(), previousRootNamespace.alias(previousRootNamespace.id()));
 				return;
 			}
 		}
 
-		m_rootHistory.emplace_back(m_id, owner, lifetime);
+		m_rootHistory.push_back(newRootNamespace);
 	}
 
 	void RootNamespaceHistory::pop_back() {

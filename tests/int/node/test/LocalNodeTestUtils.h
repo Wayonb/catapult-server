@@ -1,6 +1,7 @@
 /**
-*** Copyright (c) 2016-present,
-*** Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp. All rights reserved.
+*** Copyright (c) 2016-2019, Jaguar0625, gimre, BloodyRookie, Tech Bureau, Corp.
+*** Copyright (c) 2020-present, Jaguar0625, gimre, BloodyRookie.
+*** All rights reserved.
 ***
 *** This file is part of Catapult.
 ***
@@ -36,11 +37,6 @@ namespace catapult { namespace test {
 		return GetLocalHostPort();
 	}
 
-	/// Gets the local node api port.
-	inline unsigned short GetLocalNodeApiPort() {
-		return GetLocalNodePort() + 1;
-	}
-
 	/// Possible node flags.
 	enum class NodeFlag {
 		/// Node with a single (self) peer.
@@ -71,7 +67,10 @@ namespace catapult { namespace test {
 		Require_Explicit_Boot = 256,
 
 		/// Node supporting auto sync cleanup.
-		Auto_Sync_Cleanup = 512
+		Auto_Sync_Cleanup = 512,
+
+		/// Bypass seed directory and prepare data directory directly.
+		Bypass_Seed = 1024
 	};
 
 	MAKE_BITWISE_ENUM(NodeFlag)
@@ -101,9 +100,6 @@ namespace catapult { namespace test {
 
 	/// Statistics about a local p2p node.
 	struct PeerLocalNodeStats : public BasicLocalNodeStats {
-		/// Number of active broadcast packet writers.
-		uint64_t NumActiveBroadcastWriters;
-
 		/// Number of unlocked accounts.
 		uint64_t NumUnlockedAccounts;
 	};
@@ -124,16 +120,13 @@ namespace catapult { namespace test {
 
 	// region partner nodes
 
-	/// Gets the partner server key pair.
-	crypto::KeyPair LoadPartnerServerKeyPair();
+	/// Creates a local partner node with \a publicKey.
+	ionet::Node CreateLocalPartnerNode(const Key& publicKey);
 
-	/// Creates a local partner node.
-	ionet::Node CreateLocalPartnerNode();
-
-	/// Boots a local partner node around \a config with \a keyPair and specified \a nodeFlag.
+	/// Boots a local partner node around \a config with \a keys and specified \a nodeFlag.
 	std::unique_ptr<local::LocalNode> BootLocalPartnerNode(
 			config::CatapultConfiguration&& config,
-			const crypto::KeyPair& keyPair,
+			const config::CatapultKeys& keys,
 			NodeFlag nodeFlag);
 
 	/// Prepares catapult configuration (\a config) by  updating setings to be compatible with \a nodeFlag.
