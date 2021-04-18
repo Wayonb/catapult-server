@@ -16,13 +16,11 @@ jobs:
       - run: conan remote add nemtech https://api.bintray.com/conan/nemtech/symbol-server-dependencies
       - checkout
       - run: ls -la
-      - run: mkdir _build
-      - run: cd _build
-      - run: ls -la ..
-      - run: conan install --build=missing ..
       - run:
           name: build Script
           command: |
+            mkdir _build && cd _build
+            conan install --build=missing ..
             cmake .. -DUSE_CONAN=ON -DCATAPULT_BUILD_DEVELOPMENT=1 -GNinja
             ninja -j8
             ctest
