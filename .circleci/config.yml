@@ -15,6 +15,7 @@ jobs:
       - run: conan profile update settings.compiler.libcxx=libstdc++11 default
       - run: conan remote add nemtech https://api.bintray.com/conan/nemtech/symbol-server-dependencies
       - checkout
+      - run: ls -la && cd catapult-server
       - run: mkdir _build
       - run: cd _build
       - run: conan install --build=missing ..
