@@ -14,10 +14,10 @@ jobs:
       - run: conan profile new default --detect
       - run: conan profile update settings.compiler.libcxx=libstdc++11 default
       - run: conan remote add nemtech https://api.bintray.com/conan/nemtech/symbol-server-dependencies
+      - run: checkout
       - run: mkdir _build
       - run: cd _build
       - run: conan install --build=missing ..
-      - run: checkout
       - run:
           name: build Script
           command: |
