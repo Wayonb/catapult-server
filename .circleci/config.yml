@@ -6,7 +6,7 @@ jobs:
     resource_class: large
     steps:
       - checkout
-      - run: sudo snap install cmake
+      - run: sudo snap install cmake --classic
       - run: sudo apt-get install python3.6
       - run: sudo apt-get install build-essential
       - run: sudo pip install conan
