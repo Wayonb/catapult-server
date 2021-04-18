@@ -5,7 +5,7 @@ jobs:
       image: ubuntu-2004:202010-01
     resource_class: large
     steps:
-      - checkout
+      - run: sudo apt-get update
       - run: sudo snap install cmake --classic
       - run: sudo apt-get install python3.6
       - run: sudo apt-get install build-essential
@@ -17,6 +17,7 @@ jobs:
       - run: mkdir _build
       - run: cd _build
       - run: conan install --build=missing ..
+      - run: checkout
       - run:
           name: build Script
           command: |
