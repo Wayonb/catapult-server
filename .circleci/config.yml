@@ -1,13 +1,30 @@
-# Use the latest 2.1 version of CircleCI pipeline process engine. See: https://circleci.com/docs/2.0/configuration-reference
 version: 2.1
-# Use a package of configuration called an orb.
-orbs:
-  # Declare a dependency on the welcome-orb
-  welcome: circleci/welcome-orb@0.4.1
-# Orchestrate or schedule a set of jobs
+jobs:
+  build-and-test:
+    machine:
+      image: ubuntu-2004:202010-01
+    resource_class: large
+    steps:
+      - checkout
+      - run: sudo snap install cmake
+      - run: sudo apt-get install python3.6
+      - run: sudo apt-get install build-essential
+      - run: sudo pip install conan
+      - run: sudo apt install ninja-build
+      - run: conan profile new default --detect
+      - run: conan profile update settings.compiler.libcxx=libstdc++11 default
+      - run: conan remote add nemtech https://api.bintray.com/conan/nemtech/symbol-server-dependencies
+      - run: mkdir _build
+      - run: cd _build
+      - run: conan install --build=missing ..
+      - run:
+          name: build Script
+          command: |
+            cmake .. -DUSE_CONAN=ON -DCATAPULT_BUILD_DEVELOPMENT=1 -GNinja
+            ninja -j8
+            ctest
+
 workflows:
-  # Name the workflow "welcome"
-  welcome:
-    # Run the welcome/run job in its own container
+  main:
     jobs:
-      - welcome/run
+      - build-and-test
