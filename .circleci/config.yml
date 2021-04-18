@@ -9,7 +9,7 @@ jobs:
       - run: sudo snap install cmake --classic
       - run: sudo apt-get install python3.6
       - run: sudo apt-get install build-essential
-      - run: sudo pip install conan
+      - run: sudo pip3 install conan
       - run: sudo apt install ninja-build
       - run: conan profile new default --detect
       - run: conan profile update settings.compiler.libcxx=libstdc++11 default
